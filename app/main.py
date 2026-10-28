@@ -77,7 +77,7 @@ def get_stats(db: Session = Depends(get_db)):
 @app.get("/api/styles")
 def list_styles(
     q: Optional[str] = Query(None, description="Search style code e.g. A12"),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(2000, ge=1, le=10000),
     db: Session = Depends(get_db)
 ):
     query = db.query(
@@ -105,14 +105,21 @@ def get_styles_batch(
     styles: str = Query(..., description="Comma or space-separated style codes e.g. A12501,A12856"),
     db: Session = Depends(get_db)
 ):
-    # Split by comma or whitespace
-    import re
-    raw_list = [s.strip().upper() for s in re.split(r"[,\s]+", styles) if s.strip()]
+    # Split by comma first so style names containing spaces (e.g. "VDSW-2092 SND") stay intact
+    raw_list = [s.strip().upper() for s in styles.split(",") if s.strip()]
     if not raw_list:
         raise HTTPException(status_code=400, detail="No styles provided")
 
+    no_space_list = [s.replace(" ", "") for s in raw_list]
+    match_clauses = [
+        func.upper(InventoryItem.style).in_(raw_list),
+        func.replace(func.upper(InventoryItem.style), " ", "").in_(no_space_list),
+    ]
+    for tok in raw_list:
+        match_clauses.append(func.upper(InventoryItem.style).like(f"{tok}%"))
+
     items = db.query(InventoryItem).filter(
-        func.upper(InventoryItem.style).in_(raw_list)
+        or_(*match_clauses)
     ).order_by(
         InventoryItem.line.asc(),
         InventoryItem.section.asc(),

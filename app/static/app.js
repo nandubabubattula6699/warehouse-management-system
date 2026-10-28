@@ -67,7 +67,29 @@ function handleAddInputStyles() {
   const val = input.value.trim();
   if (!val) return;
 
-  const parts = val.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+  // Split by comma first so style names with spaces (e.g. "VDSW-2092 SND") stay intact
+  let parts = [];
+  val.split(",").forEach(chunk => {
+    const trimmed = chunk.trim().toUpperCase();
+    if (!trimmed) return;
+    const norm = trimmed.replace(/\s+/g, "");
+    const knownMatch = allStylesList.find(
+      s => s.style.toUpperCase() === trimmed || s.style.toUpperCase().replace(/\s+/g, "") === norm
+    );
+    if (knownMatch) {
+      parts.push(knownMatch.style.toUpperCase());
+    } else if (allStylesList.some(s => s.style.toUpperCase().includes(trimmed))) {
+      parts.push(trimmed);
+    } else {
+      // Check if user pasted multiple space-separated styles that each exist in allStylesList
+      const tokens = trimmed.split(/\s+/).filter(Boolean);
+      if (tokens.length > 1 && tokens.every(t => allStylesList.some(s => s.style.toUpperCase().startsWith(t)))) {
+        parts.push(...tokens);
+      } else {
+        parts.push(trimmed);
+      }
+    }
+  });
   let added = false;
   parts.forEach(st => {
     if (!selectedStyles.includes(st)) {
@@ -160,7 +182,7 @@ async function loadStats() {
 
 async function loadStylesList() {
   try {
-    const res = await fetch("/api/styles?limit=250");
+    const res = await fetch("/api/styles?limit=5000");
     if (!res.ok) return;
     allStylesList = await res.json();
 
@@ -187,7 +209,11 @@ function renderStyleDropdown(query) {
     return;
   }
 
-  const matches = allStylesList.filter(s => s.style.toUpperCase().includes(query)).slice(0, 15);
+  const qNorm = query.replace(/\s+/g, "");
+  const matches = allStylesList.filter(s => {
+    const stUpper = s.style.toUpperCase();
+    return stUpper.includes(query) || stUpper.replace(/\s+/g, "").includes(qNorm);
+  }).slice(0, 20);
   if (matches.length === 0) {
     dropdown.innerHTML = `<div class="p-3 text-xs text-slate-500">No styles matching "${escapeHtml(query)}"</div>`;
     dropdown.classList.remove("hidden");
