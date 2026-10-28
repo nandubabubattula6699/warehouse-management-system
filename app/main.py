@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from typing import Optional, List
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,14 +8,40 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, distinct
 
-from app.database import get_db, init_db
+from app.database import get_db, init_db, SessionLocal
 from app.models import InventoryItem, StockMovement
 from app.schemas import (
     ItemCreate, ItemResponse, StyleSummary,
     StockAdjustPayload, SetQuantityPayload, WarehouseStats
 )
 
+def seed_if_empty():
+    """Create tables and auto-seed from CSV if the database is empty (e.g. fresh Railway Postgres)."""
+    try:
+        init_db()
+        db = SessionLocal()
+        try:
+            count = db.query(InventoryItem).count()
+        finally:
+            db.close()
+        if count == 0:
+            print("[Database] Empty database detected. Auto-seeding records from CSV...", flush=True)
+            from scripts.migrate_inventory import migrate
+            migrate()
+        else:
+            print(f"[Database] {count:,} inventory records present.", flush=True)
+    except Exception as e:
+        print(f"[Database Startup Warning]: {e}", flush=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    seed_if_empty()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Warehouse Inventory OS - Manager Multi-Style View",
     description="Multi-style tracking, location mapping, and live stock adjustments in PostgreSQL.",
     version="2.1.0"
@@ -28,20 +55,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def on_startup():
-    try:
-        init_db()
-        # Auto-seed if database is empty (e.g. freshly deployed on Railway)
-        db = SessionLocal()
-        count = db.query(InventoryItem).count()
-        if count == 0:
-            print("[Database] Empty database detected. Auto-seeding 9,171 records from CSV...")
-            from scripts.migrate_inventory import migrate
-            migrate()
-        db.close()
-    except Exception as e:
-        print(f"[Database Startup Warning]: {e}")
 
 @app.get("/api/health")
 def health():
@@ -130,7 +143,7 @@ def get_styles_batch(
         "total_quantity": total_qty,
         "total_records": len(items),
         "per_style": per_style,
-        "items": [ItemResponse.from_orm(i) for i in items]
+        "items": [ItemResponse.model_validate(i) for i in items]
     }
 
 @app.get("/api/styles/{style_code}")
@@ -153,7 +166,7 @@ def get_style_detail(style_code: str, db: Session = Depends(get_db)):
         "total_locations": len(unique_locations),
         "sizes": unique_sizes,
         "colors": unique_colors,
-        "items": [ItemResponse.from_orm(i) for i in items]
+        "items": [ItemResponse.model_validate(i) for i in items]
     }
 
 @app.post("/api/items/{item_id}/adjust", response_model=ItemResponse)
@@ -218,7 +231,7 @@ def set_quantity(
 
 @app.post("/api/items", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
-    new_item = InventoryItem(**payload.dict())
+    new_item = InventoryItem(**payload.model_dump())
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
