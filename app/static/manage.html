@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warehouse OS - Manager Sheet Entry & Location Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/styles.css?v=5.0">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+    <div class="flex items-center space-x-3">
+      <div class="bg-emerald-500 text-slate-950 p-2.5 rounded-xl font-black flex items-center justify-center shadow-lg shadow-emerald-500/20 text-xl">
+        📋
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-black tracking-wider uppercase text-white">Warehouse Sheet Entry & Manager</h1>
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            Live PostgreSQL
+          </span>
+        </div>
+        <p class="text-xs text-slate-400">Enter Manager Sheets (10–25+ rows or 1,000-row CSV), Receive Stock IN, Ship Stock OUT, Edit & Delete Locations</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+      <a href="/" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg transition">
+        <span>🔍</span>
+        <span>Back to Style Lookup & Pick Sheet</span>
+      </a>
+      <a href="/api/export-csv" download class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+        <span>⬇</span>
+        <span class="hidden sm:inline">Export Full CSV</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="flex-1 p-4 lg:p-8 max-w-[1440px] mx-auto w-full space-y-8">
+
+    <!-- ================= SECTION 1: MULTI-ROW MANAGER SHEET ENTRY ================= -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 lg:p-6 shadow-2xl space-y-5">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-base lg:text-lg font-black text-white flex items-center gap-2">
+            <span>📝</span>
+            1. Enter Manager Sheet (Receive Stock IN / Ship Stock OUT / Update Locations)
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Type rows directly from your manager's sheet (or upload a CSV of 10 to 1,000+ rows). Existing styles + locations add automatically; new styles or new locations are created automatically.
+          </p>
+        </div>
+
+        <!-- Quick Controls: Default Mode, Sheet Note, Staff -->
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Sheet Mode (Applies to Rows)</label>
+            <select id="globalSheetMode" onchange="applyGlobalModeToRows(this.value)" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-emerald-400 focus:outline-none focus:border-amber-500">
+              <option value="IN">📥 STOCK IN (Add to Inventory / Receive)</option>
+              <option value="OUT">📤 STOCK OUT (Deduct / Today Output)</option>
+              <option value="SET">✏️ SET EXACT QTY (Overwrite Count)</option>
+              <option value="DELETE">🗑️ DELETE LOCATIONS</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Sheet Note / PO #</label>
+            <input type="text" id="sheetNoteInput" value="Manager Sheet" placeholder="e.g. Today Receiving / Output"
+              class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono w-44 focus:outline-none focus:border-amber-500" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Staff Name</label>
+            <input type="text" id="sheetStaffInput" value="Nandu"
+              class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white w-28 focus:outline-none focus:border-amber-500" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar: Add Rows, Load CSV File, Clear -->
+      <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-950/80 border border-slate-800/90 rounded-xl p-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="addSheetRows(1)" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs border border-slate-700 transition">
+            + Add 1 Row
+          </button>
+          <button type="button" onclick="addSheetRows(10)" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs border border-slate-700 transition">
+            + Add 10 Rows
+          </button>
+          <button type="button" onclick="addSheetRows(25)" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs border border-slate-700 transition">
+            + Add 25 Rows
+          </button>
+          <label class="bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/40 font-bold px-3 py-1.5 rounded-lg text-xs cursor-pointer transition inline-flex items-center gap-1.5">
+            <span>📂</span>
+            <span>Load CSV / Excel Sheet (Up to 1,000+ Rows)</span>
+            <input type="file" id="csvSheetFileInput" accept=".csv" onchange="loadCsvIntoSheetGrid(event)" class="hidden" />
+          </label>
+          <button type="button" onclick="resetSheetGrid(15)" class="text-xs text-slate-400 hover:text-red-400 px-3 py-1.5 rounded-lg border border-slate-800 hover:border-red-500/30 transition">
+            Reset / Clear Sheet
+          </button>
+        </div>
+
+        <!-- Live Running Totals Pill Bar -->
+        <div class="flex flex-wrap items-center gap-3 text-xs font-mono">
+          <span class="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
+            Rows Filled: <strong id="sumRowsFilled" class="text-white">0</strong>
+          </span>
+          <span class="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
+            Styles: <strong id="sumTotalStyles" class="text-amber-400">0</strong>
+            <span id="sumOldNewStyles" class="text-[11px] text-slate-400 ml-1">(0 existing, 0 new)</span>
+          </span>
+          <span class="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
+            Total Cartons: <strong id="sumTotalCartons" class="text-purple-400">0</strong>
+          </span>
+          <span class="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
+            Total Pieces: <strong id="sumTotalPieces" class="text-emerald-400">0</strong>
+          </span>
+        </div>
+      </div>
+
+      <!-- Autocomplete Datalist for Existing Styles -->
+      <datalist id="existingStylesDatalist"></datalist>
+
+      <!-- Spreadsheet Table -->
+      <div class="overflow-x-auto border border-slate-800 rounded-xl max-h-[520px] overflow-y-auto">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-slate-950 sticky top-0 z-10 border-b border-slate-800 text-[11px] font-bold uppercase text-slate-400">
+            <tr>
+              <th class="py-2.5 px-2 text-center w-10">#</th>
+              <th class="py-2.5 px-2 w-32">Action</th>
+              <th class="py-2.5 px-2 min-w-[160px]">Style (SKU) *</th>
+              <th class="py-2.5 px-2 w-28">Color</th>
+              <th class="py-2.5 px-2 w-20">Size</th>
+              <th class="py-2.5 px-2 w-20 text-center">Line</th>
+              <th class="py-2.5 px-2 w-24 text-center">Section</th>
+              <th class="py-2.5 px-2 w-20 text-center">Level</th>
+              <th class="py-2.5 px-2 w-20 text-center">Row</th>
+              <th class="py-2.5 px-2 w-24 text-center">Cartons / Box#</th>
+              <th class="py-2.5 px-2 w-24 text-center">Pcs/Carton</th>
+              <th class="py-2.5 px-2 w-28 text-center text-emerald-400">Total Pieces *</th>
+              <th class="py-2.5 px-2 w-10 text-center">✕</th>
+            </tr>
+          </thead>
+          <tbody id="sheetGridBody" class="divide-y divide-slate-800/60 text-xs"></tbody>
+        </table>
+      </div>
+
+      <!-- Result Banner (Hidden until submit) -->
+      <div id="sheetResultBanner" class="hidden rounded-xl p-4 border text-xs space-y-1.5"></div>
+
+      <!-- Submit Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-4 pt-2">
+        <p class="text-xs text-slate-400">
+          💡 <strong>Tip:</strong> If you enter <em>Cartons</em> and <em>Pcs/Carton</em>, <strong>Total Pieces</strong> calculates automatically — or you can type <strong>Total Pieces</strong> directly.
+        </p>
+        <button type="button" id="submitSheetBtn" onclick="submitManagerSheet()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-6 py-3 rounded-xl text-sm shadow-xl shadow-emerald-500/20 flex items-center gap-2 transition">
+          <span>🚀</span>
+          <span>Save Entire Sheet to PostgreSQL</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ================= SECTION 2: EDIT, UPDATE, RENAME & DELETE EXISTING LOCATIONS ================= -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 lg:p-6 shadow-2xl space-y-5">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-base lg:text-lg font-black text-white flex items-center gap-2">
+            <span>🗂️</span>
+            2. Find, Edit, Update or Delete Existing Locations in PostgreSQL
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Search any style or warehouse location (Line, Section, Level) to edit its Style name, Location, Cartons, or Pieces directly, or delete old boxes.
+          </p>
+        </div>
+
+        <!-- Quick Rename / Merge Style Form -->
+        <form onsubmit="handleQuickRenameStyle(event)" class="flex flex-wrap items-center gap-2 bg-slate-950 border border-slate-800 p-2.5 rounded-xl">
+          <span class="text-[11px] font-bold text-amber-400 uppercase px-1">Fix Wrong Style Name:</span>
+          <input type="text" id="quickOldStyle" placeholder="Wrong (e.g. 11159)" required
+            class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono uppercase w-36" />
+          <span class="text-slate-500">→</span>
+          <input type="text" id="quickNewStyle" placeholder="Correct (e.g. A11159)" required
+            class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono uppercase w-36" />
+          <button type="submit" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition">
+            Rename All
+          </button>
+        </form>
+      </div>
+
+      <!-- Search Filter Bar -->
+      <form onsubmit="searchExistingLocations(event)" class="grid grid-cols-2 sm:grid-cols-6 gap-2.5 items-end bg-slate-950/70 p-3.5 rounded-xl border border-slate-800">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Style (SKU)</label>
+          <input type="text" id="locSearchStyle" placeholder="e.g. A12501 or VDSW"
+            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono uppercase" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Line</label>
+          <input type="text" id="locSearchLine" placeholder="e.g. 1"
+            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Section</label>
+          <input type="text" id="locSearchSection" placeholder="e.g. 40 or FRONT"
+            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Level</label>
+          <input type="text" id="locSearchLevel" placeholder="e.g. 4"
+            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Color</label>
+          <input type="text" id="locSearchColor" placeholder="e.g. BLACK"
+            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono uppercase" />
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="submit" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2 rounded-lg text-xs transition">
+            🔍 Search Rows
+          </button>
+          <button type="button" onclick="deleteSelectedExistingRows()" class="bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 font-bold px-3 py-2 rounded-lg text-xs whitespace-nowrap transition" title="Delete Checked Rows">
+            🗑️ Delete Checked
+          </button>
+        </div>
+      </form>
+
+      <!-- Existing Locations Editable Table -->
+      <div class="overflow-x-auto border border-slate-800 rounded-xl max-h-[480px] overflow-y-auto">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-slate-950 sticky top-0 z-10 border-b border-slate-800 text-[11px] font-bold uppercase text-slate-400">
+            <tr>
+              <th class="py-2.5 px-2 text-center w-10">
+                <input type="checkbox" id="selectAllExistingCheckbox" onchange="toggleSelectAllExisting(this.checked)" />
+              </th>
+              <th class="py-2.5 px-2">Style (SKU)</th>
+              <th class="py-2.5 px-2 w-28">Color</th>
+              <th class="py-2.5 px-2 w-20">Size</th>
+              <th class="py-2.5 px-2 w-16 text-center">Line</th>
+              <th class="py-2.5 px-2 w-24 text-center">Section</th>
+              <th class="py-2.5 px-2 w-16 text-center">Level</th>
+              <th class="py-2.5 px-2 w-16 text-center">Row</th>
+              <th class="py-2.5 px-2 w-20 text-center">Cartons/Box</th>
+              <th class="py-2.5 px-2 w-20 text-center">Pcs/Box</th>
+              <th class="py-2.5 px-2 w-24 text-center text-emerald-400">Total Qty</th>
+              <th class="py-2.5 px-2 text-right w-36">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="existingLocationsBody" class="divide-y divide-slate-800/60 text-xs">
+            <tr>
+              <td colspan="12" class="text-center py-8 text-slate-500">Enter a Style or Location filter above and click "Search Rows" to edit or delete existing records.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <script src="/static/manage.js?v=1.0"></script>
+</body>
+</html>

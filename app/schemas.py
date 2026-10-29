@@ -18,6 +18,19 @@ class ItemBase(BaseModel):
 class ItemCreate(ItemBase):
     pass
 
+class ItemUpdatePayload(BaseModel):
+    style: str
+    color: str = "STANDARD"
+    size: str = "OS"
+    line: Optional[str] = None
+    section: Optional[str] = None
+    level: Optional[str] = None
+    row_pos: Optional[str] = None
+    box_num: Optional[str] = None
+    pcs_per_box: Optional[int] = None
+    quantity: int = 0
+    staff_name: Optional[str] = "Nandu"
+
 class ItemResponse(ItemBase):
     id: int
     created_at: datetime
@@ -48,3 +61,30 @@ class WarehouseStats(BaseModel):
     total_records: int
     total_units: int
     total_locations: int
+
+class SheetRowItem(BaseModel):
+    action: str = "IN"  # IN (Add/Receive), OUT (Deduct/Ship), SET (Exact Qty), DELETE (Remove Location)
+    style: str
+    color: Optional[str] = "STANDARD"
+    size: Optional[str] = "OS"
+    line: Optional[str] = None
+    section: Optional[str] = None
+    level: Optional[str] = None
+    row_pos: Optional[str] = None
+    box_num: Optional[str] = None      # Cartons / Box #
+    pcs_per_box: Optional[int] = None  # Pcs per Carton
+    quantity: int = 0                  # Total Pieces
+
+class SheetSubmitPayload(BaseModel):
+    rows: List[SheetRowItem]
+    sheet_note: Optional[str] = "Manager Sheet Entry"
+    staff_name: Optional[str] = "Nandu"
+
+class BulkDeletePayload(BaseModel):
+    item_ids: List[int]
+    staff_name: Optional[str] = "Nandu"
+
+class StyleRenamePayload(BaseModel):
+    old_style: str
+    new_style: str
+    staff_name: Optional[str] = "Nandu"
