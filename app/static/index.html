@@ -5,45 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Warehouse OS - Manager Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/static/styles.css?v=11.0">
+  <link rel="stylesheet" href="/static/styles.css?v=12.0">
 </head>
-<body class="bg-[#e6f1fb] text-slate-900 h-screen overflow-hidden flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+<body class="bg-[#ebf1f6] text-slate-900 selection:bg-[#0070ba] h-screen overflow-hidden flex flex-col font-sans selection:bg-blue-600 selection:text-white">
 
   <!-- ================= WEB VIEW (1280x720 Clean Single-Screen Layout) ================= -->
   <div class="web-only flex flex-col h-screen overflow-hidden">
 
-    <!-- Clean White Top Bar -->
-    <header class="bg-white border-b border-blue-200 px-4 py-2.5 flex items-center justify-between gap-3 shrink-0 shadow-sm z-30">
+    <!-- NetSuite Deep Navy Top Navigation Bar -->
+    <header class="bg-[#173456] border-b-2 border-[#0070ba] px-4 py-2 flex items-center justify-between gap-3 shrink-0 shadow-md z-30">
       <div class="flex items-center gap-3">
-        <div class="bg-blue-600 text-white w-9 h-9 rounded-lg font-black flex items-center justify-center text-base shrink-0">
+        <div class="bg-[#0070ba] text-white w-8 h-8 rounded-lg font-black flex items-center justify-center text-sm shrink-0 shadow-inner">
           📦
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-sm font-bold tracking-wide uppercase text-slate-900">Warehouse Inventory &amp; Location Lookup</h1>
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-300">
+            <h1 class="text-sm font-bold tracking-wide uppercase text-white">Warehouse Inventory &amp; Location Lookup</h1>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-[#244b7a] text-blue-100 border border-[#3b669b]">
               <span id="statTotalRecords">9,789</span> Records
             </span>
           </div>
-          <p class="text-[11px] text-slate-500 leading-tight">Sorted by Line / Row &rarr; Section &rarr; Level &rarr; Color &rarr; Size</p>
+          <p class="text-[11px] text-blue-200 leading-tight">NetSuite WMS View &bull; Sorted by Line / Row &rarr; Section &rarr; Level &rarr; Color &rarr; Size</p>
         </div>
       </div>
 
       <!-- Right Controls: Admin-only controls hidden for Manager -->
       <div class="flex items-center gap-2">
-        <button id="headerGiveAccessBtn" onclick="openUserAccessModal()" class="admin-only-control hidden bg-slate-800 hover:bg-slate-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
+        <button id="headerGiveAccessBtn" onclick="openUserAccessModal()" class="admin-only-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#3b669b] transition">
           <span>👥</span>
           <span>Give Access</span>
         </button>
-        <a id="headerManageDataBtn" href="/manage" class="admin-only-control hidden bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
+        <a id="headerManageDataBtn" href="/manage" class="admin-only-control hidden bg-[#0070ba] hover:bg-[#005a96] text-white font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition">
           <span>📋</span>
           <span>Sheet Entry / Manage Data</span>
         </a>
-        <button onclick="openModal('movementModal')" class="admin-only-control hidden bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
+        <button onclick="openModal('movementModal')" class="admin-only-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white border border-[#3b669b] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
           <span>📜</span>
           <span>Audit</span>
         </button>
-        <button onclick="openAddLocationModal()" class="admin-only-control hidden bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
+        <button onclick="openAddLocationModal()" class="admin-only-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white border border-[#3b669b] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
           <span>➕</span>
           <span>Add Stock</span>
         </button>
@@ -58,16 +58,17 @@
       <!-- LEFT PANEL (4 Cols): SEARCH + WAREHOUSE LINES/ROWS -->
       <section class="col-span-12 lg:col-span-4 flex flex-col gap-3 overflow-hidden min-h-0">
 
-        <!-- 1. Search Box Card -->
-        <div class="bg-white border border-blue-200/80 rounded-xl p-3.5 shadow-sm space-y-2.5 shrink-0">
-          <div class="flex items-center justify-between">
-            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">
+        <!-- 1. Search Box NetSuite Portlet -->
+        <div class="bg-white border border-[#c4d3e2] rounded-xl overflow-hidden shadow-sm shrink-0">
+          <div class="bg-[#eaeff5] border-b border-[#cbd8e5] px-3.5 py-2 flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-[#173456]">
               1. Search Style or Line / Row
             </h2>
-            <button onclick="clearAllStyles()" class="text-[11px] text-slate-500 hover:text-red-600 px-2 py-0.5 rounded border border-slate-200 hover:border-red-300 transition">
+            <button onclick="clearAllStyles()" class="text-[11px] text-[#2d4b68] hover:text-red-700 px-2 py-0.5 rounded bg-white border border-[#c4d3e2] hover:border-red-300 transition">
               Clear All
             </button>
           </div>
+          <div class="p-3.5 space-y-2.5">
 
           <div class="relative">
             <input 
@@ -75,9 +76,9 @@
               id="styleSearchInput" 
               placeholder="Enter Style (e.g. A12501, VDSW) or Line 14, Row 1..." 
               autocomplete="off"
-              class="w-full bg-slate-50 border border-slate-300 rounded-lg pl-3 pr-16 py-2 text-xs font-mono text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white"
+              class="w-full bg-slate-50 border border-slate-300 rounded-lg pl-3 pr-16 py-2 text-xs font-mono text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0070ba] focus:bg-white"
             />
-            <button id="addStyleBtn" class="absolute right-1.5 top-1.5 bg-blue-600 hover:bg-blue-700 text-[11px] text-white font-bold px-3 py-1 rounded-md transition">
+            <button id="addStyleBtn" class="absolute right-1.5 top-1.5 bg-[#0070ba] hover:bg-[#005a96] text-[11px] text-white font-bold px-3 py-1 rounded-md transition">
               + Add
             </button>
             <div id="styleDropdown" class="hidden absolute left-0 right-0 top-10 max-h-56 overflow-y-auto bg-white border border-slate-300 rounded-lg shadow-xl z-40 divide-y divide-slate-100"></div>
@@ -90,30 +91,32 @@
           </div>
 
           <!-- Quick Suggestions -->
-          <div class="flex items-center gap-1 flex-wrap pt-1.5 border-t border-slate-100">
-            <span class="text-[10px] font-semibold text-slate-400 uppercase">Quick:</span>
+          <div class="flex items-center gap-1 flex-wrap pt-1.5 border-t border-[#e2eaf2]">
+            <span class="text-[10px] font-semibold text-[#64748b] uppercase">Quick:</span>
             <div id="quickStyleChips" class="flex flex-wrap gap-1"></div>
+          </div>
           </div>
         </div>
 
-        <!-- 2. Simple Warehouse Zone Browser (Part 1 Lines 1-14 / Part 2 Rows 1-14) -->
-        <div class="bg-white border border-blue-200/80 rounded-xl p-3.5 shadow-sm flex-1 flex flex-col overflow-hidden min-h-0">
-          <div class="flex items-center justify-between pb-2 border-b border-slate-200 shrink-0">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-700">
+        <!-- 2. NetSuite Warehouse Zone Browser Portlet -->
+        <div class="bg-white border border-[#c4d3e2] rounded-xl overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
+          <div class="bg-[#eaeff5] border-b border-[#cbd8e5] px-3.5 py-2 flex items-center justify-between shrink-0">
+            <span class="text-xs font-bold uppercase tracking-wider text-[#173456]">
               2. Browse by Warehouse Zone
             </span>
             <span id="badgePart1Summary" class="hidden"></span>
             <span id="badgePart2Summary" class="hidden"></span>
           </div>
+          <div class="p-3 flex-1 flex flex-col overflow-hidden min-h-0">
 
           <!-- Clean 2-Button Zone Switcher -->
-          <div class="grid grid-cols-2 gap-1.5 my-2.5 shrink-0 bg-blue-100/70 p-1 rounded-lg border border-blue-200">
+          <div class="grid grid-cols-2 gap-1.5 my-2.5 shrink-0 bg-[#dfe8f2] p-1 rounded-lg border border-[#c4d4e4]">
             <button id="tabPart1Btn" onclick="switchWarehousePart('PART_1')"
-              class="px-2.5 py-1.5 rounded-md text-xs font-bold transition bg-blue-600 text-white shadow-sm">
+              class="px-2.5 py-1.5 rounded-md text-xs font-bold transition bg-[#173456] text-white shadow-sm">
               Part 1: Allbirds (Lines 1–14)
             </button>
             <button id="tabPart2Btn" onclick="switchWarehousePart('PART_2')"
-              class="px-2.5 py-1.5 rounded-md text-xs font-bold transition text-slate-600 hover:text-slate-900">
+              class="px-2.5 py-1.5 rounded-md text-xs font-bold transition text-[#2d4b68] hover:text-[#173456]">
               Part 2: VD &amp; Val (Rows 1–14)
             </button>
           </div>
@@ -142,7 +145,7 @@
                     Show Full Line/Row in Table &rarr;
                   </button>
                   <input type="text" id="aisleSectionFilterInput" oninput="filterAisleSections()" placeholder="Filter..."
-                    class="bg-white border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-900 font-mono w-24 focus:outline-none focus:border-blue-600" />
+                    class="bg-white border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-900 font-mono w-24 focus:outline-none focus:border-[#0070ba]" />
                 </div>
               </div>
               <div id="aisleSectionsGrid" class="grid grid-cols-1 gap-2"></div>
@@ -152,31 +155,37 @@
 
       </section>
 
+      </div>
+      </section>
+
+      </div>
+      </section>
+
       <!-- RIGHT PANEL (8 Cols): INSTANT SORTED LOCATION TABLE & PRINT BUTTON -->
       <section id="styleDetailContainer" class="col-span-12 lg:col-span-8 flex flex-col gap-3 overflow-hidden min-h-0">
 
-        <!-- Clean White Summary & Print Bar -->
-        <div class="bg-white border border-blue-200/80 rounded-xl p-3.5 shadow-sm shrink-0">
-          <div class="flex flex-wrap items-center justify-between gap-3">
+        <!-- NetSuite Summary & Print Action Portlet -->
+        <div class="bg-white border border-[#c4d3e2] rounded-xl overflow-hidden shadow-sm shrink-0">
+          <div class="bg-[#eaeff5] border-b border-[#cbd8e5] px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-3">
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                <span class="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded bg-[#e6f1fa] text-[#0b4975] border border-[#a8c7e4]">
                   <span id="styleCountBadge">Active Selection</span>
                 </span>
-                <h2 id="currentStyleTitle" class="text-lg font-bold font-mono text-slate-900 truncate">Loading...</h2>
+                <h2 id="currentStyleTitle" class="text-base font-bold font-mono text-[#173456] truncate">Loading...</h2>
               </div>
-              <p id="styleSummarySubtitle" class="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-3">
+              <p id="styleSummarySubtitle" class="text-xs text-[#475569] mt-0.5 flex flex-wrap items-center gap-3">
                 Loading locations...
               </p>
             </div>
 
             <div class="flex items-center gap-2.5 shrink-0">
-              <div class="bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-1.5 text-right">
-                <span class="text-[10px] font-semibold text-slate-500 uppercase block leading-none">Total Stock</span>
-                <div id="currentStyleTotalQty" class="text-lg font-bold text-slate-900 font-mono mt-0.5">-</div>
+              <div class="bg-white border border-[#c4d3e2] rounded-lg px-3 py-1 text-right shadow-xs">
+                <span class="text-[10px] font-semibold text-[#64748b] uppercase block leading-none">Total Stock</span>
+                <div id="currentStyleTotalQty" class="text-base font-bold text-[#173456] font-mono mt-0.5">-</div>
               </div>
 
-              <button onclick="triggerPrintPickSheet()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs flex items-center gap-2 shadow-sm transition">
+              <button onclick="triggerPrintPickSheet()" class="bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 shadow-sm transition">
                 <span class="text-base">🖨️</span>
                 <div class="text-left">
                   <div class="leading-tight text-xs font-bold uppercase">Print Pick Sheet</div>
@@ -186,27 +195,27 @@
             </div>
           </div>
 
-          <!-- Simple Filter Row -->
-          <div class="flex flex-wrap items-center gap-2 mt-2.5 pt-2.5 border-t border-slate-100 text-xs">
-            <span class="text-slate-500 font-semibold text-[11px]">Filter:</span>
-            <select id="filterStyleSelect" class="bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-600">
+          <!-- NetSuite Filter Bar Row -->
+          <div class="px-3.5 py-2 bg-[#f4f7fa] flex flex-wrap items-center gap-2 text-xs">
+            <span class="text-[#475569] font-semibold text-[11px]">Filter:</span>
+            <select id="filterStyleSelect" class="bg-white border border-[#b8c9d9] rounded-md px-2.5 py-1 text-xs text-[#173456] focus:outline-none focus:border-[#0070ba]">
               <option value="ALL">All Styles</option>
             </select>
-            <select id="filterColorSelect" class="bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-600">
+            <select id="filterColorSelect" class="bg-white border border-[#b8c9d9] rounded-md px-2.5 py-1 text-xs text-[#173456] focus:outline-none focus:border-[#0070ba]">
               <option value="ALL">All Colors</option>
             </select>
-            <select id="filterSizeSelect" class="bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-600">
+            <select id="filterSizeSelect" class="bg-white border border-[#b8c9d9] rounded-md px-2.5 py-1 text-xs text-[#173456] focus:outline-none focus:border-[#0070ba]">
               <option value="ALL">All Sizes</option>
             </select>
-            <span id="filteredRowCount" class="text-slate-500 ml-auto font-mono text-[11px]"></span>
+            <span id="filteredRowCount" class="text-[#64748b] ml-auto font-mono text-[11px]"></span>
           </div>
         </div>
 
         <!-- Clean White Sorted Locations Table -->
-        <div class="bg-white border border-blue-200/80 rounded-xl flex-1 overflow-hidden shadow-sm flex flex-col min-h-0">
+        <div class="bg-white border border-[#c4d3e2] rounded-xl flex-1 overflow-hidden shadow-sm flex flex-col min-h-0">
           <div class="flex-1 overflow-y-auto">
             <table class="w-full text-left border-collapse">
-              <thead class="sticky top-0 z-10 bg-blue-50/90 border-b border-blue-200 text-[11px] text-blue-950 uppercase tracking-wider font-bold">
+              <thead class="sticky top-0 z-10 bg-[#dfe7ef] border-b border-[#b8c9d9] text-[11px] text-[#173456] uppercase tracking-wider font-bold">
                 <tr>
                   <th class="py-2.5 px-3">Style (SKU)</th>
                   <th class="py-2.5 px-3">Location (Line/Row &bull; Sec &bull; Lvl)</th>
@@ -218,7 +227,7 @@
                   <th class="admin-only-control hidden py-2.5 px-3 text-right">Del</th>
                 </tr>
               </thead>
-              <tbody id="styleLocationTableBody" class="divide-y divide-slate-200 text-xs text-slate-800">
+              <tbody id="styleLocationTableBody" class="divide-y divide-[#e2eaf2] text-xs text-slate-800">
                 <!-- Populated dynamically in sorted order -->
               </tbody>
             </table>
@@ -437,7 +446,7 @@
               <th class="py-2.5 px-3">Reason</th>
             </tr>
           </thead>
-          <tbody id="movementTableBody" class="divide-y divide-slate-200"></tbody>
+          <tbody id="movementTableBody" class="divide-y divide-[#e2eaf2]"></tbody>
         </table>
       </div>
     </div>
@@ -445,7 +454,7 @@
 
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=11.0"></script>
-  <script src="/static/auth_client.js?v=5.0"></script>
+  <script src="/static/app.js?v=12.0"></script>
+  <script src="/static/auth_client.js?v=6.0"></script>
 </body>
 </html>

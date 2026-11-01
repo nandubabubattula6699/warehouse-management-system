@@ -51,12 +51,12 @@ function renderAuthHeaderControls(data) {
   const onlineCount = data.online_users_count || 1;
 
   bar.innerHTML = `
-    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-300 text-slate-800 font-mono text-xs">
+    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0e233b] border border-[#23456e] text-blue-100 font-mono text-xs">
       <span>👤</span>
-      <strong>${escapeAuthHtml(user.full_name)}</strong>
-      <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">${escapeAuthHtml(user.role)}</span>
+      <strong class="text-white">${escapeAuthHtml(user.full_name)}</strong>
+      <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#1d4370] text-blue-200 font-bold">${escapeAuthHtml(user.role)}</span>
     </span>
-    <button onclick="logoutWarehouseUser()" class="bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 border border-slate-300 hover:border-red-300 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition">
+    <button onclick="logoutWarehouseUser()" class="bg-[#1a385c] hover:bg-red-800 text-blue-100 hover:text-white border border-[#2b4d75] hover:border-red-600 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition">
       Logout
     </button>
   `;

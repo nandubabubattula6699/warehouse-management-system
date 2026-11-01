@@ -1,32 +1,32 @@
-/* Clean, minimal Light Blue theme styles for Warehouse OS */
+/* ================= Oracle NetSuite Theme for Warehouse OS ================= */
 body {
-  background-color: #e6f1fb !important;
-  color: #0f172a;
+  background-color: #ebf1f6 !important;
+  color: #173456;
 }
 
 .location-tag {
-  background-color: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1e3a8a;
+  background-color: #e8f1fa;
+  border: 1px solid #b8d4ee;
+  color: #0d4771;
 }
 
 .style-tag-badge {
-  background-color: #dbeafe;
-  border: 1px solid #93c5fd;
-  color: #1e40af;
+  background-color: #e6f1fa;
+  border: 1px solid #a8c7e4;
+  color: #0b4975;
 }
 
 .style-chip {
   background-color: #ffffff;
-  border: 1px solid #bfdbfe;
-  color: #1e293b;
+  border: 1px solid #c4d3e2;
+  color: #173456;
   transition: all 0.12s ease-in-out;
 }
 
 .style-chip:hover, .style-chip.active {
-  background-color: #2563eb;
+  background-color: #0070ba;
   color: #ffffff;
-  border-color: #2563eb;
+  border-color: #0070ba;
   font-weight: 700;
 }
 

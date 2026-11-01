@@ -250,7 +250,7 @@ function renderStyleDropdown(query) {
       <div 
         onclick="addStyleToSelection('${s.style}'); document.getElementById('styleDropdown').classList.add('hidden'); document.getElementById('styleSearchInput').value='';" 
         class="p-2.5 hover:bg-slate-100 cursor-pointer flex justify-between items-center transition ${isSelected ? 'bg-slate-50' : ''}">
-        <span class="font-mono font-bold text-slate-900 text-sm flex items-center gap-2">
+        <span class="font-mono font-bold text-[#173456] text-sm flex items-center gap-2">
           ${s.style} ${isSelected ? '<span class="text-[10px] text-emerald-400 font-sans">(added)</span>' : ''}
         </span>
         <span class="text-xs text-slate-400 font-mono">${s.total_quantity.toLocaleString()} units • ${s.location_count} locs</span>
@@ -437,42 +437,43 @@ function renderFilteredRows() {
 
   const isAdmin = window.currentWarehouseUser && window.currentWarehouseUser.role === "ADMIN";
 
-  tbody.innerHTML = items.map(item => {
+  tbody.innerHTML = items.map((item, idx) => {
     const isPart2 = item.warehouse_part === "PART_2" || (item.row_pos && !item.line);
     const coordSummary = isPart2
       ? `Row ${escapeHtml(item.row_pos || "-")} • Sec ${escapeHtml(item.section || "-")} • Lvl ${escapeHtml(item.level || "-")}`
       : `Line ${escapeHtml(item.line || "-")} • Sec ${escapeHtml(item.section || "-")} • Lvl ${escapeHtml(item.level || "-")}`;
 
+    const rowBg = idx % 2 === 1 ? 'bg-[#f7fafc]' : 'bg-white';
     return `
-      <tr class="hover:bg-blue-50/60 transition">
-        <td class="py-2.5 px-3 font-mono font-bold text-slate-900">
+      <tr class="${rowBg} hover:bg-[#e4effa] transition">
+        <td class="py-2.5 px-3 font-mono font-bold text-[#173456]">
           ${escapeHtml(item.style)}
         </td>
 
         <td class="py-2.5 px-3">
-          <div class="font-mono font-bold text-slate-900 text-xs">
+          <div class="font-mono font-bold text-[#0f172a] text-xs">
             ${escapeHtml(item.location || coordSummary)}
           </div>
-          <div class="text-[10px] text-slate-500 font-mono">
+          <div class="text-[10px] text-[#64748b] font-mono">
             ${isPart2 ? 'Part 2 (' + escapeHtml(item.brand || 'Wholesale') + ')' : 'Part 1 (Allbirds)'} • ${coordSummary}
           </div>
         </td>
 
-        <td class="py-2.5 px-3 font-mono text-xs text-slate-700 font-medium">
+        <td class="py-2.5 px-3 font-mono text-xs text-[#334155] font-medium">
           ${escapeHtml(item.color || "STANDARD")}
         </td>
 
-        <td class="py-2.5 px-3 text-center font-mono font-bold text-xs text-slate-900">
+        <td class="py-2.5 px-3 text-center font-mono font-bold text-xs text-[#0f172a]">
           ${escapeHtml(item.size || "OS")}
         </td>
 
-        <td class="py-2.5 px-3 text-center font-mono text-xs text-slate-600">
+        <td class="py-2.5 px-3 text-center font-mono text-xs text-[#475569]">
           <div>${item.box_num ? `Box #${escapeHtml(item.box_num)}` : "-"}</div>
-          <div class="text-[10px] text-slate-400">${item.pcs_per_box ? `${item.pcs_per_box} pcs/box` : ""}</div>
+          <div class="text-[10px] text-[#94a3b8]">${item.pcs_per_box ? `${item.pcs_per_box} pcs/box` : ""}</div>
         </td>
 
         <td class="py-2.5 px-3 text-center">
-          <span class="inline-block px-3 py-1 rounded-md text-xs font-bold font-mono bg-blue-50 text-blue-950 border border-blue-200">
+          <span class="inline-block px-3 py-1 rounded-md text-xs font-bold font-mono bg-[#e8f1fa] text-[#0d4771] border border-[#b8d4ee]">
             ${item.quantity.toLocaleString()} pcs
           </span>
         </td>
@@ -844,13 +845,13 @@ function switchWarehousePart(part) {
   if (part === "PART_1") {
     if (p1Panel) p1Panel.classList.remove("hidden");
     if (p2Panel) p2Panel.classList.add("hidden");
-    if (btn1) btn1.className = "px-2.5 py-1.5 rounded-md text-xs font-bold transition bg-blue-600 text-white shadow-sm";
-    if (btn2) btn2.className = "px-2.5 py-1.5 rounded-md text-xs font-bold transition text-slate-600 hover:text-slate-900";
+    if (btn1) btn1.className = "px-2.5 py-1.5 rounded-md text-xs font-bold transition bg-[#173456] text-white shadow-sm";
+    if (btn2) btn2.className = "px-2.5 py-1.5 rounded-md text-xs font-bold transition text-[#2d4b68] hover:text-[#173456]";
   } else {
     if (p1Panel) p1Panel.classList.add("hidden");
     if (p2Panel) p2Panel.classList.remove("hidden");
-    if (btn2) btn2.className = "px-2.5 py-1.5 rounded-md text-xs font-bold transition bg-blue-600 text-white shadow-sm";
-    if (btn1) btn1.className = "px-2.5 py-1.5 rounded-md text-xs font-bold transition text-slate-600 hover:text-slate-900";
+    if (btn2) btn2.className = "px-2.5 py-1.5 rounded-md text-xs font-bold transition bg-[#173456] text-white shadow-sm";
+    if (btn1) btn1.className = "px-2.5 py-1.5 rounded-md text-xs font-bold transition text-[#2d4b68] hover:text-[#173456]";
   }
 }
 
@@ -876,12 +877,12 @@ function renderWarehouseMapOverview() {
       const isSelected = activeAisleData && activeAisleData.part === "PART_1" && activeAisleData.aisle === String(ln.line);
       return `
         <button onclick="inspectWarehouseAisle('PART_1', '${ln.line}')"
-          class="text-left p-2.5 rounded-lg border transition ${isSelected ? 'bg-blue-50 border-blue-600 ring-1 ring-blue-600' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-white'}">
+          class="text-left p-2.5 rounded-lg border transition ${isSelected ? 'bg-[#e6f1fa] border-[#0070ba] ring-1 ring-[#0070ba]' : 'bg-[#f8fafc] border-[#cbd5e1] hover:border-[#0070ba] hover:bg-white'}">
           <div class="flex items-center justify-between">
-            <span class="font-mono font-bold text-xs text-slate-900">LINE ${escapeHtml(ln.line)}</span>
+            <span class="font-mono font-bold text-xs text-[#173456]">LINE ${escapeHtml(ln.line)}</span>
             <span class="text-[10px] font-mono text-slate-500">${ln.occupied_sections} sec</span>
           </div>
-          <div class="mt-1 text-xs font-bold text-blue-700 font-mono">${ln.total_units.toLocaleString()} pcs</div>
+          <div class="mt-1 text-xs font-bold text-[#0070ba] font-mono">${ln.total_units.toLocaleString()} pcs</div>
           <div class="text-[10px] text-slate-500 font-mono">${ln.total_styles} styles</div>
         </button>
       `;
@@ -896,12 +897,12 @@ function renderWarehouseMapOverview() {
       const label = isWall ? "WALL" : `ROW ${escapeHtml(rw.row)}`;
       return `
         <button onclick="inspectWarehouseAisle('PART_2', '${rw.row}')"
-          class="text-left p-2.5 rounded-lg border transition ${isSelected ? 'bg-blue-50 border-blue-600 ring-1 ring-blue-600' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-white'}">
+          class="text-left p-2.5 rounded-lg border transition ${isSelected ? 'bg-[#e6f1fa] border-[#0070ba] ring-1 ring-[#0070ba]' : 'bg-[#f8fafc] border-[#cbd5e1] hover:border-[#0070ba] hover:bg-white'}">
           <div class="flex items-center justify-between">
-            <span class="font-mono font-bold text-xs text-slate-900">${label}</span>
+            <span class="font-mono font-bold text-xs text-[#173456]">${label}</span>
             <span class="text-[10px] font-mono text-slate-500">${isWall ? 'Wall' : rw.occupied_sections + ' sec'}</span>
           </div>
-          <div class="mt-1 text-xs font-bold text-blue-700 font-mono">${rw.total_units.toLocaleString()} pcs</div>
+          <div class="mt-1 text-xs font-bold text-[#0070ba] font-mono">${rw.total_units.toLocaleString()} pcs</div>
           <div class="text-[10px] text-slate-500 font-mono">${rw.total_styles} styles</div>
         </button>
       `;
@@ -980,7 +981,7 @@ function renderAisleSectionsGrid() {
     return `
       <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1.5">
         <div class="flex items-center justify-between text-xs font-mono">
-          <strong class="text-slate-900">Section ${escapeHtml(sec.section)}</strong>
+          <strong class="text-[#173456]">Section ${escapeHtml(sec.section)}</strong>
           <span class="font-bold text-blue-700">${sec.total_units.toLocaleString()} pcs</span>
         </div>
         <div class="grid grid-cols-2 gap-1">${levelsHtml}</div>
