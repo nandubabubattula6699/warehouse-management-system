@@ -61,7 +61,7 @@ function autoSwitchToMobileLocations() {
 }
 
 // Multi-Style State: Array of active style codes
-let selectedStyles = ["A12501"];
+let selectedStyles = [];
 let allStylesList = [];
 let batchData = null;
 let activeItemForAdjust = null;
@@ -74,7 +74,25 @@ function initApp() {
   loadWarehouseOverview();
   loadStylesList();
   renderSelectedStylesChips();
-  loadBatchStylesDetails(); autoSwitchToMobileLocations();
+
+  if (selectedStyles.length > 0) {
+    loadBatchStylesDetails();
+  } else {
+    const title = document.getElementById("currentStyleTitle");
+    if (title) title.textContent = "Select a Style or Zone";
+    const badge = document.getElementById("styleCountBadge");
+    if (badge) badge.textContent = "0 Selected";
+    const qty = document.getElementById("currentStyleTotalQty");
+    if (qty) qty.textContent = "-";
+    const sub = document.getElementById("styleSummarySubtitle");
+    if (sub) sub.textContent = "Search a style or select a warehouse Line/Row to view inventory.";
+    const tbody = document.getElementById("styleLocationTableBody");
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center py-12 text-[#64748b]">Search a style or select a Line/Row on the left to view locations.</td></tr>';
+    const mobileCards = document.getElementById("styleLocationMobileCards");
+    if (mobileCards) {
+      mobileCards.innerHTML = '<div class="text-center py-10 bg-white rounded-xl border border-[#c4d3e2] p-4 text-xs text-[#64748b]">Search a style or select a warehouse Line/Row to view stock locations.</div>';
+    }
+  }
 
   const searchInput = document.getElementById("styleSearchInput");
   const dropdown = document.getElementById("styleDropdown");
