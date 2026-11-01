@@ -3,285 +3,245 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Warehouse OS - Multi-Style Inventory Manager</title>
-  <!-- Tailwind CSS CDN -->
+  <title>Warehouse OS - 1280x720 Single-View Manager Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/static/styles.css?v=3.0">
+  <link rel="stylesheet" href="/static/styles.css?v=8.0">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
+<body class="bg-slate-950 text-slate-100 h-screen overflow-hidden flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
 
-  <!-- ================= WEB VIEW (Hidden on Print) ================= -->
-  <div class="web-only flex flex-col min-h-screen">
-    <!-- Top Navigation Bar -->
-    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 px-4 lg:px-8 py-3.5 flex items-center justify-between shadow-xl">
-      <div class="flex items-center space-x-3">
-        <div class="bg-amber-500 text-slate-950 p-2.5 rounded-xl font-black flex items-center justify-center shadow-lg shadow-amber-500/20 text-xl">
+  <!-- ================= WEB VIEW (1280x720 Specialized Single-Screen Layout) ================= -->
+  <div class="web-only flex flex-col h-screen overflow-hidden">
+
+    <!-- Compact 54px Top Command Bar -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between gap-3 shrink-0 shadow-lg z-30">
+      <!-- Brand & Live Stats Pill -->
+      <div class="flex items-center gap-3">
+        <div class="bg-amber-500 text-slate-950 w-9 h-9 rounded-xl font-black flex items-center justify-center shadow text-lg shrink-0">
           📦
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-lg font-black tracking-wider uppercase text-white">Warehouse OS</h1>
-            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+            <h1 class="text-sm font-black tracking-wider uppercase text-white">Warehouse OS</h1>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              PostgreSQL Connected
+              <span id="statTotalRecords">9,789</span> Bins
+            </span>
+            <span id="badgePart1Summary" class="hidden xl:inline-flex px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[10px] font-mono">
+              Part 1 (Allbirds): 14 Lines
+            </span>
+            <span id="badgePart2Summary" class="hidden xl:inline-flex px-2 py-0.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[10px] font-mono">
+              Part 2 (VD &amp; Valentino): 14 Rows + Wall
             </span>
           </div>
-          <p class="text-xs text-slate-400">Multi-Style Inventory, Location Addresses, & Batch Pick Sheets</p>
+          <p class="text-[11px] text-slate-400 leading-tight">Single-View Location Lookup &amp; Worker Pick Sheet Printer</p>
         </div>
       </div>
 
-      <!-- Right Header Controls (Hidden by default; shown ONLY when logged in as Admin Nandu) -->
-      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-        <button id="headerGiveAccessBtn" onclick="openUserAccessModal()" class="admin-only-control hidden bg-purple-500 hover:bg-purple-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-purple-500/20 transition">
+      <!-- Right Controls: User Badge + Admin-Only Controls (Completely hidden for Manager) -->
+      <div class="flex items-center gap-2">
+        <!-- Admin-Only Buttons (Never shown to Manager) -->
+        <button id="headerGiveAccessBtn" onclick="openUserAccessModal()" class="admin-only-control hidden bg-purple-500 hover:bg-purple-400 text-slate-950 font-black px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow transition">
           <span>👥</span>
-          <span>Give Access / Manage Users</span>
+          <span>Give Access</span>
         </button>
-        <a id="headerManageDataBtn" href="/manage" class="admin-only-control hidden bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition">
+        <a id="headerManageDataBtn" href="/manage" class="admin-only-control hidden bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow transition">
           <span>📋</span>
           <span>Sheet Entry / Manage Data</span>
         </a>
-        <button onclick="openModal('movementModal')" class="admin-only-control hidden bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition">
+        <button onclick="openModal('movementModal')" class="admin-only-control hidden bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
           <span>📜</span>
-          <span class="hidden sm:inline">Audit Trail</span>
+          <span>Audit</span>
         </button>
-        <button onclick="openAddLocationModal()" class="admin-only-control hidden bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg transition">
+        <button onclick="openAddLocationModal()" class="admin-only-control hidden bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow transition">
           <span>➕</span>
-          <span>Add Location / Stock</span>
+          <span>Add Stock</span>
         </button>
+
+        <!-- Compact User & Logout Slot (Populated by auth_client.js) -->
+        <div id="warehouseAuthUserBar" class="flex items-center gap-2"></div>
       </div>
     </header>
 
-    <!-- Main Container -->
-    <main class="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    <!-- ================= MAIN 1280x720 SPLIT WORKSPACE (NO PAGE SCROLL) ================= -->
+    <main class="flex-1 grid grid-cols-12 gap-3 p-3 overflow-hidden min-h-0">
 
-      <!-- Global Warehouse Stats -->
-      <div class="grid grid-cols-1 gap-4">
-        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Inventory Records</p>
-            <h3 id="statTotalRecords" class="text-2xl font-black text-blue-400 mt-1">9,171</h3>
-          </div>
-          <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
-            <span class="px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300">
-              🏢 <strong>50,000+ sq ft</strong> Warehouse
-            </span>
-            <span id="badgePart1Summary" class="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
-              Part 1 (Allbirds): 14 Lines
-            </span>
-            <span id="badgePart2Summary" class="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300">
-              Part 2 (Von Dutch &amp; Valentino): 14 Rows + Ground Front/Back + Wall
-            </span>
-          </div>
-        </div>
-      </div>
+      <!-- LEFT COLUMN (4 cols / ~410px on 1280px): STYLE SEARCH + 2-PART WAREHOUSE MAP -->
+      <section class="col-span-12 lg:col-span-4 flex flex-col gap-2.5 overflow-hidden min-h-0">
 
-      <!-- ================= 50,000+ SQ FT 2-PART WAREHOUSE LOCATION MAP ================= -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-          <div>
-            <div class="flex items-center gap-2.5">
-              <span class="text-lg">🗺️</span>
-              <h2 class="text-base lg:text-lg font-black text-white">50,000+ sq ft Warehouse Location Map (Part 1 &amp; Part 2)</h2>
-            </div>
-            <p class="text-xs text-slate-400 mt-0.5">
-              Click any <strong>Line (1–14)</strong> in Part 1 or any <strong>Row (1–14 / WALL)</strong> in Part 2 to inspect every Section and its 4 Levels (<code class="text-amber-300">Lvl 1–4</code>, <code class="text-emerald-300">Ground FRONT</code>, <code class="text-cyan-300">Ground BACK</code>, <code class="text-rose-300">WALL</code>).
-            </p>
-          </div>
-
-          <!-- Zone Tabs -->
-          <div class="flex flex-wrap items-center gap-2">
-            <button id="tabPart1Btn" onclick="switchWarehousePart('PART_1')"
-              class="px-4 py-2 rounded-xl text-xs font-black transition border bg-blue-500 text-slate-950 border-blue-400 shadow-lg shadow-blue-500/20">
-              👟 Part 1: Allbirds (14 Lines × 35 Sec × 4 Lvl)
-            </button>
-            <button id="tabPart2Btn" onclick="switchWarehousePart('PART_2')"
-              class="px-4 py-2 rounded-xl text-xs font-black transition border bg-slate-950 text-slate-300 border-slate-700 hover:border-purple-400">
-              👜 Part 2: Von Dutch &amp; Valentino (14 Rows × 36 Sec + Front/Back/Wall)
-            </button>
-          </div>
-        </div>
-
-        <!-- Part 1 (Allbirds 14 Lines) View -->
-        <div id="warehousePart1Panel" class="space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-950/70 border border-slate-800 rounded-xl px-4 py-2.5 text-xs">
-            <div class="text-slate-300">
-              <strong class="text-blue-400">Part 1 Structure:</strong> 14 Rack Lines (<code class="text-amber-300">Line 1</code> – <code class="text-amber-300">Line 14</code>) • Each Line has <code class="text-amber-300">32–35 Sections</code> • Each Section has <code class="text-amber-300">4 Levels (Lvl 1–4)</code> • Dedicated to <strong>Allbirds</strong> (<code class="text-blue-300">A1...</code>, <code class="text-blue-300">TB...</code>, <code class="text-blue-300">TR...</code>, <code class="text-blue-300">WR...</code>)
-            </div>
-            <div id="part1StatsPill" class="font-mono text-slate-400"></div>
-          </div>
-          <div id="part1LinesGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5"></div>
-        </div>
-
-        <!-- Part 2 (Von Dutch & Valentino 14 Rows + Ground Front/Back + Wall) View -->
-        <div id="warehousePart2Panel" class="hidden space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-950/70 border border-slate-800 rounded-xl px-4 py-2.5 text-xs">
-            <div class="text-slate-300">
-              <strong class="text-purple-400">Part 2 Structure:</strong> 14 Rows (<code class="text-amber-300">Row 1</code> – <code class="text-amber-300">Row 14</code> + <code class="text-rose-300">WALL</code>) • Each Row has <code class="text-amber-300">36 Sections</code> + <code class="text-emerald-300">Ground FRONT</code> + <code class="text-cyan-300">Ground BACK</code> + <code class="text-rose-300">WALL</code> • <code class="text-amber-300">4 Levels</code> • Loaded with <strong>Von Dutch</strong> (<code class="text-purple-300">VD...</code>) &amp; <strong>Valentino</strong> (<code class="text-pink-300">VO...</code>, <code class="text-pink-300">V-...</code>)
-            </div>
-            <div id="part2StatsPill" class="font-mono text-slate-400"></div>
-          </div>
-          <div id="part2RowsGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5"></div>
-        </div>
-
-        <!-- Drilldown: Selected Line / Row Section x 4-Level Map Inspector -->
-        <div id="aisleInspectorContainer" class="hidden pt-4 border-t border-slate-800 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-950 border border-amber-500/30 rounded-xl px-4 py-3">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold uppercase">Section × 4-Level Breakdown</span>
-                <h3 id="aisleInspectorTitle" class="text-sm sm:text-base font-black text-white font-mono">Line 1</h3>
-              </div>
-              <p id="aisleInspectorSubtitle" class="text-xs text-slate-400 mt-0.5"></p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <button onclick="loadActiveAisleIntoLookup()" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition shadow">
-                🔍 Show Full Line/Row in Lookup Table
-              </button>
-              <input type="text" id="aisleSectionFilterInput" oninput="filterAisleSections()" placeholder="Filter section or style..."
-                class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono w-44 focus:outline-none focus:border-amber-500" />
-              <button onclick="closeAisleInspector()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">
-                Close Map ✕
-              </button>
-            </div>
-          </div>
-
-          <div id="aisleSectionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[520px] overflow-y-auto pr-1"></div>
-        </div>
-      </div>
-
-      <!-- Multi-Style Lookup Search Bar -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4">
-        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
+        <!-- 1. Fast Style & Line/Row Lookup Box -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-xl space-y-2.5 shrink-0">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
               <span>🔍</span>
-              Manager Multi-Style Lookup
+              <span>1. Find Product Locations</span>
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Enter one or multiple styles (comma-separated or click chips) to view and print all locations simultaneously.</p>
-          </div>
-
-          <!-- Multi-Style Search & Add Input -->
-          <div class="relative w-full md:w-[450px]">
-            <span class="absolute left-3.5 top-3 text-sm">🏷️</span>
-            <input 
-              type="text" 
-              id="styleSearchInput" 
-              placeholder="e.g. A12501, Line 14, Row 1, VDSW-2092 SND..." 
-              autocomplete="off"
-              class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-24 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
-            />
-            <button id="addStyleBtn" class="absolute right-2 top-2 bg-amber-500 hover:bg-amber-400 text-xs text-slate-950 font-black px-3 py-1.5 rounded-lg transition shadow">
-              + Add
-            </button>
-            
-            <!-- Dropdown autocomplete suggestions -->
-            <div id="styleDropdown" class="hidden absolute left-0 right-0 top-12 max-h-60 overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-40 divide-y divide-slate-800"></div>
-          </div>
-        </div>
-
-        <!-- Active Selected Styles Tag Badges Bar -->
-        <div class="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Selected Styles:
-            </span>
-            <div id="selectedStylesContainer" class="flex flex-wrap items-center gap-2"></div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <button onclick="clearAllStyles()" class="text-xs text-slate-400 hover:text-red-400 px-2.5 py-1 rounded-lg border border-slate-800 hover:border-red-500/30 transition">
+            <button onclick="clearAllStyles()" class="text-[11px] text-slate-400 hover:text-red-400 px-2 py-0.5 rounded border border-slate-800 hover:border-red-500/30 transition">
               Clear All
             </button>
           </div>
+
+          <!-- Search Input -->
+          <div class="relative">
+            <span class="absolute left-3 top-2.5 text-xs">🏷️</span>
+            <input 
+              type="text" 
+              id="styleSearchInput" 
+              placeholder="Type Style (A12501, VDSW) or Line 14, Row 1..." 
+              autocomplete="off"
+              class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-16 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+            />
+            <button id="addStyleBtn" class="absolute right-1.5 top-1.5 bg-amber-500 hover:bg-amber-400 text-[11px] text-slate-950 font-black px-2.5 py-1 rounded-lg transition shadow">
+              + Add
+            </button>
+            <div id="styleDropdown" class="hidden absolute left-0 right-0 top-10 max-h-56 overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-40 divide-y divide-slate-800"></div>
+          </div>
+
+          <!-- Selected Style Badges -->
+          <div class="flex flex-wrap items-center gap-1.5 max-h-16 overflow-y-auto pt-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase">Active:</span>
+            <div id="selectedStylesContainer" class="flex flex-wrap items-center gap-1"></div>
+          </div>
+
+          <!-- Quick Suggestions -->
+          <div class="flex items-center gap-1 flex-wrap pt-1 border-t border-slate-800/60">
+            <span class="text-[10px] font-semibold text-slate-500 uppercase">Quick:</span>
+            <div id="quickStyleChips" class="flex flex-wrap gap-1"></div>
+          </div>
         </div>
 
-        <!-- Quick Style Recommendations Bar -->
-        <div class="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-800/50">
-          <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Quick Suggestions:</span>
-          <div id="quickStyleChips" class="flex flex-wrap gap-1.5"></div>
-        </div>
-      </div>
+        <!-- 2. Compact 2-Part Warehouse Map (Fits in Left Column, Scrollable Internally) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-xl flex-1 flex flex-col overflow-hidden min-h-0">
+          <div class="flex items-center justify-between gap-1 pb-2 border-b border-slate-800 shrink-0">
+            <span class="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1">
+              <span>🗺️</span>
+              <span>2. Warehouse Map (Click Line/Row)</span>
+            </span>
+          </div>
 
-      <!-- Multi-Style Detailed Spotlight View -->
-      <div id="styleDetailContainer" class="space-y-4">
-        
-        <!-- Batch Overview Banner -->
-        <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-850 border border-amber-500/30 rounded-2xl p-6 shadow-2xl">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div class="flex items-center gap-3">
-                <span class="text-xs uppercase font-mono font-bold px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+          <!-- Zone Switcher Tabs -->
+          <div class="grid grid-cols-2 gap-1.5 my-2 shrink-0">
+            <button id="tabPart1Btn" onclick="switchWarehousePart('PART_1')"
+              class="px-2.5 py-1.5 rounded-lg text-[11px] font-black transition border bg-blue-500 text-slate-950 border-blue-400 shadow">
+              👟 Part 1: Allbirds (14 Lines)
+            </button>
+            <button id="tabPart2Btn" onclick="switchWarehousePart('PART_2')"
+              class="px-2.5 py-1.5 rounded-lg text-[11px] font-black transition border bg-slate-950 text-slate-300 border-slate-700 hover:border-purple-400">
+              👜 Part 2: VD/Val (14 Rows)
+            </button>
+          </div>
+
+          <!-- Scrollable Lines / Rows Grid + Section Inspector -->
+          <div class="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-0">
+            <!-- Part 1 (Allbirds 14 Lines) -->
+            <div id="warehousePart1Panel" class="space-y-2">
+              <div id="part1StatsPill" class="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800"></div>
+              <div id="part1LinesGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5"></div>
+            </div>
+
+            <!-- Part 2 (Von Dutch & Valentino 14 Rows + Wall) -->
+            <div id="warehousePart2Panel" class="hidden space-y-2">
+              <div id="part2StatsPill" class="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800"></div>
+              <div id="part2RowsGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5"></div>
+            </div>
+
+            <!-- Section x 4-Level Inspector (Appears when a Line or Row is clicked) -->
+            <div id="aisleInspectorContainer" class="hidden pt-2 border-t border-slate-800 space-y-2">
+              <div class="bg-slate-950 border border-amber-500/30 rounded-lg p-2 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <h3 id="aisleInspectorTitle" class="text-xs font-black text-amber-300 font-mono">Line 1</h3>
+                  <button onclick="closeAisleInspector()" class="text-[10px] text-slate-400 hover:text-white font-bold">✕ Close</button>
+                </div>
+                <p id="aisleInspectorSubtitle" class="text-[10px] text-slate-400 leading-snug"></p>
+                <div class="flex items-center gap-1.5 pt-1">
+                  <button onclick="loadActiveAisleIntoLookup()" class="flex-1 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-black transition">
+                    🔍 Load Full Line/Row in Table →
+                  </button>
+                  <input type="text" id="aisleSectionFilterInput" oninput="filterAisleSections()" placeholder="Sec/Style..."
+                    class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] text-white font-mono w-24 focus:outline-none focus:border-amber-500" />
+                </div>
+              </div>
+              <div id="aisleSectionsGrid" class="grid grid-cols-1 gap-2"></div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- RIGHT COLUMN (8 cols / ~830px on 1280px): INSTANT LOCATIONS TABLE & PRINT PICK SHEET -->
+      <section id="styleDetailContainer" class="col-span-12 lg:col-span-8 flex flex-col gap-2.5 overflow-hidden min-h-0">
+
+        <!-- Compact Spotlight & Print Action Header -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-850 border border-amber-500/30 rounded-xl p-3.5 shadow-xl shrink-0">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   <span id="styleCountBadge">Active Selection</span>
                 </span>
-                <h2 id="currentStyleTitle" class="text-2xl md:text-3xl font-black font-mono text-white tracking-wide">Loading...</h2>
+                <h2 id="currentStyleTitle" class="text-lg lg:text-xl font-black font-mono text-white truncate">Loading...</h2>
               </div>
-              <p id="styleSummarySubtitle" class="text-xs text-slate-400 mt-2 flex items-center gap-4">
-                Loading style details from PostgreSQL...
+              <p id="styleSummarySubtitle" class="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-3">
+                Loading style details...
               </p>
             </div>
 
-            <!-- Action Buttons: Print Pick Sheet & Total Quantity -->
-            <div class="flex items-center gap-3">
-              <!-- Print Pick Sheet Button -->
-              <button onclick="triggerPrintPickSheet()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-3 rounded-2xl text-xs flex items-center gap-2.5 shadow-lg shadow-emerald-900/30 transition border border-emerald-400/30">
-                <span class="text-base">🖨️</span>
-                <div class="text-left">
-                  <div class="leading-tight text-sm font-black">Print Pick Sheet</div>
-                  <div class="text-[10px] text-emerald-200 font-normal">For Warehouse Staff</div>
-                </div>
-              </button>
-
-              <div class="bg-slate-950/80 border border-slate-800 rounded-2xl px-5 py-3 text-right">
-                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Stock</span>
-                <div id="currentStyleTotalQty" class="text-2xl font-black text-amber-400 mt-0.5">-</div>
+            <!-- Total Stock & BIG PRINT PICK SHEET BUTTON -->
+            <div class="flex items-center gap-2.5 shrink-0">
+              <div class="bg-slate-950/90 border border-slate-800 rounded-xl px-3.5 py-2 text-right">
+                <span class="text-[10px] font-semibold text-slate-400 uppercase block leading-none">Total Stock</span>
+                <div id="currentStyleTotalQty" class="text-lg font-black text-amber-400 font-mono mt-0.5">-</div>
               </div>
 
-              <button onclick="openAddLocationModal()" class="admin-only-control hidden bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 p-3 rounded-2xl transition" title="Add Location / Stock">
-                <span>➕</span>
+              <button onclick="triggerPrintPickSheet()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition">
+                <span class="text-base">🖨️</span>
+                <div class="text-left">
+                  <div class="leading-tight text-xs font-black uppercase">Print Pick Sheet</div>
+                  <div class="text-[10px] text-slate-900 font-semibold">Give to Warehouse Workers</div>
+                </div>
               </button>
             </div>
           </div>
 
-          <!-- Filter within Selection: Style, Color, or Size -->
-          <div class="flex flex-wrap items-center gap-3 mt-5 pt-4 border-t border-slate-800/80 text-xs">
-            <span class="text-slate-400 font-semibold">Filter table:</span>
-            <select id="filterStyleSelect" class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500">
+          <!-- Inline Table Filters (Style, Color, Size) -->
+          <div class="flex flex-wrap items-center gap-2 mt-2.5 pt-2.5 border-t border-slate-800/80 text-xs">
+            <span class="text-slate-400 font-semibold text-[11px]">Filter Locations:</span>
+            <select id="filterStyleSelect" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
               <option value="ALL">All Styles</option>
             </select>
-            <select id="filterColorSelect" class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500">
+            <select id="filterColorSelect" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
               <option value="ALL">All Colors</option>
             </select>
-            <select id="filterSizeSelect" class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500">
+            <select id="filterSizeSelect" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
               <option value="ALL">All Sizes</option>
             </select>
-            <span id="filteredRowCount" class="text-slate-500 ml-auto font-mono"></span>
+            <span id="filteredRowCount" class="text-slate-400 ml-auto font-mono text-[11px]"></span>
           </div>
         </div>
 
-        <!-- Realtime Locations & Quantity Table -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-          <div class="overflow-x-auto">
+        <!-- Scrollable Locations & Quantities Table (Fills remaining height of 1280x720 screen) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl flex-1 overflow-hidden shadow-2xl flex flex-col min-h-0">
+          <div class="flex-1 overflow-y-auto">
             <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-slate-950/80 border-b border-slate-800 text-[11px] text-slate-400 uppercase tracking-wider font-bold">
-                  <th class="py-3.5 px-4">Style / SKU</th>
-                  <th class="py-3.5 px-4">Warehouse Location Address</th>
-                  <th class="py-3.5 px-4">Color</th>
-                  <th class="py-3.5 px-4 text-center">Size</th>
-                  <th class="py-3.5 px-4 text-center">Boxes / Pcs</th>
-                  <th class="py-3.5 px-4 text-center">In-Stock Quantity</th>
-                  <th class="admin-only-control hidden py-3.5 px-4 text-center">Realtime Quantity Actions</th>
-                  <th class="admin-only-control hidden py-3.5 px-4 text-right">Delete</th>
+              <thead class="sticky top-0 z-10 bg-slate-950 border-b border-slate-800 text-[11px] text-slate-400 uppercase tracking-wider font-bold">
+                <tr>
+                  <th class="py-2.5 px-3">Style / SKU</th>
+                  <th class="py-2.5 px-3">Warehouse Location Address</th>
+                  <th class="py-2.5 px-3">Color</th>
+                  <th class="py-2.5 px-3 text-center">Size</th>
+                  <th class="py-2.5 px-3 text-center">Boxes / Pcs</th>
+                  <th class="py-2.5 px-3 text-center">In-Stock Qty</th>
+                  <th class="admin-only-control hidden py-2.5 px-3 text-center">Actions</th>
+                  <th class="admin-only-control hidden py-2.5 px-3 text-right">Del</th>
                 </tr>
               </thead>
-              <tbody id="styleLocationTableBody" class="divide-y divide-slate-800/60 text-sm">
-                <!-- Dynamically populated rows -->
+              <tbody id="styleLocationTableBody" class="divide-y divide-slate-800/60 text-xs">
+                <!-- Populated dynamically -->
               </tbody>
             </table>
           </div>
         </div>
 
-      </div>
+      </section>
 
     </main>
   </div>
@@ -308,7 +268,7 @@
     </div>
 
     <div class="bg-gray-100 border border-gray-300 p-2 mb-4 text-xs font-semibold text-gray-800 flex justify-between">
-      <span>Instructions: Follow location order (Line &rarr; Sec &rarr; Lvl). Check box [✓] and record Picked Qty.</span>
+      <span>Instructions: Follow location order (Line/Row &rarr; Sec &rarr; Lvl). Check box [✓] and record Picked Qty.</span>
       <span>Aisle Optimized Path</span>
     </div>
 
@@ -344,7 +304,7 @@
     </div>
   </div>
 
-  <!-- Stock Adjustment Modal (+ / - / Custom) -->
+  <!-- Admin Modals (Hidden unless triggered by Admin Nandu) -->
   <div id="adjustModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -354,7 +314,6 @@
         </div>
         <button onclick="closeModal('adjustModal')" class="text-slate-400 hover:text-white text-lg">✕</button>
       </div>
-
       <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 flex justify-between items-center text-xs">
         <div>
           <span class="text-slate-400">Location:</span>
@@ -365,7 +324,6 @@
           <p id="adjustModalCurrentQty" class="text-base font-black text-amber-400"></p>
         </div>
       </div>
-
       <div class="space-y-2">
         <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Adjustment Amount (+ or -)</label>
         <div class="grid grid-cols-6 gap-1.5">
@@ -376,14 +334,8 @@
           <button onclick="setAdjustInput(5)" class="bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 border border-slate-700 rounded-lg py-1.5 text-xs font-mono font-bold">+5</button>
           <button onclick="setAdjustInput(10)" class="bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 border border-slate-700 rounded-lg py-1.5 text-xs font-mono font-bold">+10</button>
         </div>
-        <input 
-          type="number" 
-          id="adjustInputAmount" 
-          placeholder="e.g. +15 or -8"
-          class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-center text-lg font-black text-white focus:outline-none focus:border-amber-500"
-        />
+        <input type="number" id="adjustInputAmount" placeholder="e.g. +15 or -8" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-center text-lg font-black text-white focus:outline-none focus:border-amber-500" />
       </div>
-
       <div>
         <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Reason for Adjustment</label>
         <select id="adjustReasonSelect" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
@@ -395,7 +347,6 @@
           <option value="General Adjustment">General Adjustment</option>
         </select>
       </div>
-
       <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
         <button onclick="closeModal('adjustModal')" class="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white">Cancel</button>
         <button onclick="submitStockAdjustment()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-5 py-2 rounded-xl text-xs shadow-lg transition">Apply in SQL Now</button>
@@ -403,19 +354,16 @@
     </div>
   </div>
 
-  <!-- Direct Set Exact Quantity Modal -->
   <div id="setQtyModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-base font-black text-white">Set Exact Quantity</h3>
         <button onclick="closeModal('setQtyModal')" class="text-slate-400 hover:text-white text-lg">✕</button>
       </div>
-
       <div>
         <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">New Total Quantity (Units)</label>
         <input type="number" min="0" id="exactQtyInput" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-center text-xl font-black text-white focus:outline-none focus:border-amber-500" />
       </div>
-
       <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-800">
         <button onclick="closeModal('setQtyModal')" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Cancel</button>
         <button onclick="submitExactQuantity()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs">Save in SQL</button>
@@ -423,34 +371,29 @@
     </div>
   </div>
 
-  <!-- Add New Location / Variant Modal -->
   <div id="addLocationModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-lg font-black text-white flex items-center gap-2">
-          <span>➕</span> Add Location / Stock
-        </h3>
+        <h3 class="text-lg font-black text-white flex items-center gap-2"><span>➕</span> Add Location / Stock</h3>
         <button onclick="closeModal('addLocationModal')" class="text-slate-400 hover:text-white text-lg">✕</button>
       </div>
-
       <form id="addLocationForm" onsubmit="handleAddLocationSubmit(event)" class="space-y-4">
         <div class="grid grid-cols-3 gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Style Code *</label>
-            <input type="text" id="newLocStyle" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-amber-500 uppercase" />
+            <input type="text" id="newLocStyle" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono uppercase" />
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Color</label>
-            <input type="text" id="newLocColor" value="STANDARD" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 uppercase" />
+            <input type="text" id="newLocColor" value="STANDARD" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white uppercase" />
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Size *</label>
-            <input type="text" id="newLocSize" required placeholder="e.g. 10.5" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+            <input type="text" id="newLocSize" required placeholder="e.g. 10.5" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white" />
           </div>
         </div>
-
         <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
-          <span class="text-xs font-bold text-amber-400 uppercase tracking-wider block">📍 Warehouse Location (Part 1: Line 1–14 | Part 2: Row 1–14 / WALL, Sec 1–36 / FRONT / BACK)</span>
+          <span class="text-xs font-bold text-amber-400 uppercase tracking-wider block">📍 Warehouse Location</span>
           <div class="grid grid-cols-5 gap-2">
             <div>
               <label class="block text-[10px] text-blue-300 uppercase">Line (P1)</label>
@@ -462,7 +405,7 @@
             </div>
             <div>
               <label class="block text-[10px] text-slate-400 uppercase">Section</label>
-              <input type="text" id="newLocSection" placeholder="1-36/FRONT/BACK" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono" />
+              <input type="text" id="newLocSection" placeholder="1-36/FRONT" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono" />
             </div>
             <div>
               <label class="block text-[10px] text-slate-400 uppercase">Level</label>
@@ -474,18 +417,16 @@
             </div>
           </div>
         </div>
-
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Initial Quantity (Units) *</label>
-            <input type="number" min="0" id="newLocQuantity" value="15" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white text-center focus:outline-none focus:border-amber-500" />
+            <input type="number" min="0" id="newLocQuantity" value="15" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white text-center" />
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Pieces Per Box</label>
-            <input type="number" min="0" id="newLocPcsBox" placeholder="optional" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white text-center focus:outline-none focus:border-amber-500" />
+            <input type="number" min="0" id="newLocPcsBox" placeholder="optional" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white text-center" />
           </div>
         </div>
-
         <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
           <button type="button" onclick="closeModal('addLocationModal')" class="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white">Cancel</button>
           <button type="submit" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-5 py-2 rounded-xl text-xs shadow-lg transition">Save to PostgreSQL</button>
@@ -494,42 +435,33 @@
     </div>
   </div>
 
-  <!-- Realtime Movement Audit Log Modal -->
   <div id="movementModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-lg font-black text-white flex items-center gap-2">
-          <span>📜</span> Realtime Stock Movement Audit Trail
-        </h3>
+        <h3 class="text-lg font-black text-white flex items-center gap-2"><span>📜</span> Realtime Stock Movement Audit Trail</h3>
         <button onclick="closeModal('movementModal')" class="text-slate-400 hover:text-white text-lg">✕</button>
       </div>
-
       <div class="flex-1 overflow-y-auto">
         <table class="w-full text-left text-xs">
           <thead>
             <tr class="text-slate-400 uppercase border-b border-slate-800">
               <th class="py-2.5 px-3">Timestamp</th>
-              <th class="py-2.5 px-3">Style & Location</th>
+              <th class="py-2.5 px-3">Style &amp; Location</th>
               <th class="py-2.5 px-3 text-center">Size / Color</th>
               <th class="py-2.5 px-3 text-center">Change</th>
               <th class="py-2.5 px-3 text-center">New Balance</th>
               <th class="py-2.5 px-3">Reason</th>
             </tr>
           </thead>
-          <tbody id="movementTableBody" class="divide-y divide-slate-800/40">
-            <tr>
-              <td colspan="6" class="text-center py-6 text-slate-400">Loading audit trail...</td>
-            </tr>
-          </tbody>
+          <tbody id="movementTableBody" class="divide-y divide-slate-800/40"></tbody>
         </table>
       </div>
     </div>
   </div>
 
-  <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=8.0"></script>
-  <script src="/static/auth_client.js?v=3.0"></script>
+  <script src="/static/app.js?v=9.0"></script>
+  <script src="/static/auth_client.js?v=4.0"></script>
 </body>
 </html>

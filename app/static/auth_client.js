@@ -44,46 +44,25 @@ function renderAuthHeaderControls(data) {
     if (!header) return;
     bar = document.createElement("div");
     bar.id = "warehouseAuthUserBar";
-    bar.className = "w-full pt-2.5 mt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs";
-    header.classList.add("flex-wrap");
+    bar.className = "flex items-center gap-2 text-xs";
     header.appendChild(bar);
   }
 
-  const isAdmin = user.role === "ADMIN";
-  const pendingCount = data.pending_users_count || 0;
   const onlineCount = data.online_users_count || 1;
 
-  const pendingBadge = pendingCount > 0
-    ? `<span class="px-1.5 py-0.5 rounded-full bg-red-500 text-white font-black text-[10px] animate-pulse">${pendingCount} Pending</span>`
-    : "";
-
-  const adminBtn = isAdmin
-    ? `<button onclick="openUserAccessModal()" class="bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/40 font-black px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition">
-         <span>👥</span>
-         <span>Manage Users / Give Access</span>
-         ${pendingBadge}
-       </button>`
-    : "";
-
   bar.innerHTML = `
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 font-mono">
-        <span>👤</span>
-        <strong>${escapeAuthHtml(user.full_name)}</strong>
-        <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">${escapeAuthHtml(user.role)}</span>
-        <span class="text-[10px] text-slate-400">(${escapeAuthHtml(user.assigned_zone)})</span>
-      </span>
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono text-[11px]" title="Active logged-in users in the last 5 minutes">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <strong>${onlineCount} User${onlineCount === 1 ? '' : 's'} Online Now</strong>
-      </span>
-    </div>
-    <div class="flex items-center gap-2">
-      ${adminBtn}
-      <button onclick="logoutWarehouseUser()" class="bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/40 px-3 py-1.5 rounded-xl text-xs font-bold transition">
-        🚪 Logout
-      </button>
-    </div>
+    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs">
+      <span>👤</span>
+      <strong>${escapeAuthHtml(user.full_name)}</strong>
+      <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">${escapeAuthHtml(user.role)}</span>
+    </span>
+    <span class="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono text-[10px]" title="Users online now">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <strong>${onlineCount} Online</strong>
+    </span>
+    <button onclick="logoutWarehouseUser()" class="bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/40 px-2.5 py-1.5 rounded-lg text-xs font-bold transition">
+      🚪 Logout
+    </button>
   `;
 }
 

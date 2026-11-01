@@ -864,13 +864,13 @@ function switchWarehousePart(part) {
   if (part === "PART_1") {
     if (p1Panel) p1Panel.classList.remove("hidden");
     if (p2Panel) p2Panel.classList.add("hidden");
-    if (btn1) btn1.className = "px-4 py-2 rounded-xl text-xs font-black transition border bg-blue-500 text-slate-950 border-blue-400 shadow-lg shadow-blue-500/20";
-    if (btn2) btn2.className = "px-4 py-2 rounded-xl text-xs font-black transition border bg-slate-950 text-slate-300 border-slate-700 hover:border-purple-400";
+    if (btn1) btn1.className = "px-2.5 py-1.5 rounded-lg text-[11px] font-black transition border bg-blue-500 text-slate-950 border-blue-400 shadow";
+    if (btn2) btn2.className = "px-2.5 py-1.5 rounded-lg text-[11px] font-black transition border bg-slate-950 text-slate-300 border-slate-700 hover:border-purple-400";
   } else {
     if (p1Panel) p1Panel.classList.add("hidden");
     if (p2Panel) p2Panel.classList.remove("hidden");
-    if (btn2) btn2.className = "px-4 py-2 rounded-xl text-xs font-black transition border bg-purple-500 text-slate-950 border-purple-400 shadow-lg shadow-purple-500/20";
-    if (btn1) btn1.className = "px-4 py-2 rounded-xl text-xs font-black transition border bg-slate-950 text-slate-300 border-slate-700 hover:border-blue-400";
+    if (btn2) btn2.className = "px-2.5 py-1.5 rounded-lg text-[11px] font-black transition border bg-purple-500 text-slate-950 border-purple-400 shadow";
+    if (btn1) btn1.className = "px-2.5 py-1.5 rounded-lg text-[11px] font-black transition border bg-slate-950 text-slate-300 border-slate-700 hover:border-blue-400";
   }
 }
 
