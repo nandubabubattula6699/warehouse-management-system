@@ -253,7 +253,7 @@ function loadCsvIntoSheetGrid(e) {
     const iSec = idxOf("SECTION", "SEC", "SEC #");
     const iLvl = idxOf("LEVEL", "LVL", "TIER");
     const iRow = idxOf("ROW", "ROW #", "ROW NO");
-    const iBox = idxOf("BOX #", "BOX", "CARTONS", "TOTAL CARTONS", "CARTON", "CTN");
+    const iBox = idxOf("BOX #", "TOTAL BOXES", "BOXES", "BOX", "CARTONS", "TOTAL CARTONS", "CARTON", "CTN");
     const iPcs = idxOf("PCS/BOX", "PCS/CARTON", "PCS_PER_BOX", "PCS PER BOX", "PACK");
     const iQty = idxOf("QTY", "QUANTITY", "TOTAL PIECES", "PIECES", "TOTAL QTY", "UNITS", "PCS");
 

@@ -274,3 +274,19 @@ def ensure_schema_and_locations_seeded(db: Session):
             db.bulk_insert_mappings(WarehouseLocation, master_locs[i:i + BATCH])
             db.commit()
         print(f"[Warehouse Map] Seeded {len(master_locs):,} physical warehouse locations!", flush=True)
+
+
+    # 4. Ensure Line 14 records from data/alexander_inventory.csv are seeded if Line 14 is currently empty
+    line14_count = db.query(InventoryItem).filter(InventoryItem.line == "14").count()
+    if line14_count == 0:
+        import os as _os
+        from scripts.migrate_inventory import load_csv_records
+        csv_p = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "..", "data", "alexander_inventory.csv"))
+        if _os.path.exists(csv_p):
+            all_recs = load_csv_records(csv_p)
+            l14_recs = [r for r in all_recs if str(r.get("line") or "") == "14"]
+            if l14_recs:
+                print(f"[Warehouse Map] Seeding {len(l14_recs):,} Line 14 records into PostgreSQL...", flush=True)
+                db.bulk_insert_mappings(InventoryItem, l14_recs)
+                db.commit()
+                print(f"[Warehouse Map] Seeded {len(l14_recs):,} Line 14 records!", flush=True)
