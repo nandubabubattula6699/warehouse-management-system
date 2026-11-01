@@ -119,6 +119,60 @@ def list_styles(
         for r in results
     ]
 
+
+def _parse_num_or_inf(val, special_map=None) -> float:
+    if val is None:
+        return 999999.0
+    s = str(val).strip().upper()
+    if not s:
+        return 999999.0
+    if special_map and s in special_map:
+        return float(special_map[s])
+    try:
+        return float(s)
+    except Exception:
+        import re as _re
+        m = _re.search(r"[-+]?\d+(?:\.\d+)?", s)
+        return float(m.group(0)) if m else 999998.0
+
+
+_SIZE_ORDER_MAP = {
+    "XXS": 1, "XS": 2, "S": 3, "SM": 3, "M": 4, "MD": 4,
+    "L": 5, "LG": 5, "XL": 6, "XXL": 7, "2XL": 7, "3XL": 8, "OS": 900, "ONE SIZE": 900
+}
+_SECTION_SPECIAL_MAP = {"FRONT": -3, "BACK": -2, "WALL": -1}
+_ROW_SPECIAL_MAP = {"WALL": 999}
+
+
+def sort_inventory_items_physically(items):
+    """
+    Sort items in exact physical warehouse order:
+      - Part 1 (Allbirds): Line (1..14) -> Section (1..35) -> Level (1..4) -> Color -> Size (numeric 5..14)
+      - Part 2 (VD/Valentino): Row (1..14, WALL) -> Section (FRONT, BACK, 1..36) -> Level (1..4) -> Color -> Size
+    """
+    def _sort_key(it):
+        part = getattr(it, "warehouse_part", None) or ("PART_2" if (getattr(it, "row_pos", None) and not getattr(it, "line", None)) else "PART_1")
+        part_ord = 1 if part == "PART_1" else 2
+        if part == "PART_1":
+            aisle_num = _parse_num_or_inf(getattr(it, "line", None))
+            aisle_str = str(getattr(it, "line", "") or "")
+        else:
+            aisle_num = _parse_num_or_inf(getattr(it, "row_pos", None), _ROW_SPECIAL_MAP)
+            aisle_str = str(getattr(it, "row_pos", "") or "")
+
+        sec_num = _parse_num_or_inf(getattr(it, "section", None), _SECTION_SPECIAL_MAP)
+        sec_str = str(getattr(it, "section", "") or "")
+        lvl_num = _parse_num_or_inf(getattr(it, "level", None))
+        lvl_str = str(getattr(it, "level", "") or "")
+        color_str = str(getattr(it, "color", "") or "STANDARD").strip().upper()
+        size_num = _parse_num_or_inf(getattr(it, "size", None), _SIZE_ORDER_MAP)
+        size_str = str(getattr(it, "size", "") or "").strip().upper()
+        style_str = str(getattr(it, "style", "") or "").strip().upper()
+
+        return (part_ord, aisle_num, aisle_str, sec_num, sec_str, lvl_num, lvl_str, color_str, size_num, size_str, style_str)
+
+    return sorted(items, key=_sort_key)
+
 # Multi-Style Batch Lookup Endpoint
 @app.get("/api/styles-batch")
 def get_styles_batch(
@@ -156,12 +210,8 @@ def get_styles_batch(
 
     items = db.query(InventoryItem).filter(
         or_(*match_clauses)
-    ).order_by(
-        InventoryItem.line.asc(),
-        InventoryItem.section.asc(),
-        InventoryItem.level.asc(),
-        InventoryItem.style.asc()
     ).all()
+    items = sort_inventory_items_physically(items)
 
     if not items:
         raise HTTPException(status_code=404, detail="None of the requested styles were found in PostgreSQL.")

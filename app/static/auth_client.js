@@ -51,17 +51,13 @@ function renderAuthHeaderControls(data) {
   const onlineCount = data.online_users_count || 1;
 
   bar.innerHTML = `
-    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs">
+    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-300 text-slate-800 font-mono text-xs">
       <span>👤</span>
       <strong>${escapeAuthHtml(user.full_name)}</strong>
-      <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">${escapeAuthHtml(user.role)}</span>
+      <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">${escapeAuthHtml(user.role)}</span>
     </span>
-    <span class="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono text-[10px]" title="Users online now">
-      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-      <strong>${onlineCount} Online</strong>
-    </span>
-    <button onclick="logoutWarehouseUser()" class="bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/40 px-2.5 py-1.5 rounded-lg text-xs font-bold transition">
-      🚪 Logout
+    <button onclick="logoutWarehouseUser()" class="bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 border border-slate-300 hover:border-red-300 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition">
+      Logout
     </button>
   `;
 }

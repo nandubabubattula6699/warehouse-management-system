@@ -1,25 +1,28 @@
+/* Clean, minimal light theme styles for Warehouse OS */
 .location-tag {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
 }
 
 .style-tag-badge {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  color: #fbbf24;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
 }
 
 .style-chip {
-  background-color: rgba(30, 41, 59, 0.6);
-  border: 1px solid rgba(51, 65, 85, 0.8);
-  transition: all 0.15s ease-in-out;
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  transition: all 0.12s ease-in-out;
 }
 
 .style-chip:hover, .style-chip.active {
-  background-color: rgb(245, 158, 11);
-  color: rgb(2, 6, 23);
-  border-color: rgb(245, 158, 11);
-  font-weight: 800;
+  background-color: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+  font-weight: 700;
 }
 
 /* ================= PRINT STYLES ================= */
@@ -37,6 +40,8 @@
     background-color: #ffffff !important;
     color: #000000 !important;
     font-family: Arial, sans-serif !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
   .web-only,
