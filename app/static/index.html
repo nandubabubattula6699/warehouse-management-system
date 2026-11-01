@@ -2,18 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#173456">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Warehouse OS - Manager Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/static/styles.css?v=12.0">
+  <link rel="stylesheet" href="/static/styles.css?v=14.0">
 </head>
-<body class="bg-[#ebf1f6] text-slate-900 selection:bg-[#0070ba] h-screen overflow-hidden flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+<body class="bg-[#ebf1f6] text-slate-900 selection:bg-[#0070ba] min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:text-white">
 
   <!-- ================= WEB VIEW (1280x720 Clean Single-Screen Layout) ================= -->
-  <div class="web-only flex flex-col h-screen overflow-hidden">
+  <div class="web-only flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
 
-    <!-- NetSuite Deep Navy Top Navigation Bar -->
-    <header class="bg-[#173456] border-b-2 border-[#0070ba] px-4 py-2 flex items-center justify-between gap-3 shrink-0 shadow-md z-30">
+    <!-- NetSuite Deep Navy Top Navigation Bar (Mobile Responsive) -->
+    <header class="bg-[#173456] border-b-2 border-[#0070ba] px-3 sm:px-4 py-2 flex items-center justify-between gap-2 shrink-0 shadow-md z-30">
       <div class="flex items-center gap-3">
         <div class="bg-[#0070ba] text-white w-8 h-8 rounded-lg font-black flex items-center justify-center text-sm shrink-0 shadow-inner">
           📦
@@ -52,11 +55,43 @@
       </div>
     </header>
 
-    <!-- ================= MAIN 1280x720 SPLIT WORKSPACE ================= -->
-    <main class="flex-1 grid grid-cols-12 gap-3 p-3 overflow-hidden min-h-0">
+    <!-- Mobile Top Navigation Segment Control (Visible on Mobile Screens) -->
+    <div id="mobileTopNav" class="block lg:hidden px-3 pt-2 pb-1.5 bg-[#ebf1f6] shrink-0 border-b border-[#cbd8e5]">
+      <div class="grid grid-cols-2 gap-1.5 bg-[#dfe8f2] p-1 rounded-xl border border-[#c4d4e4] text-xs font-bold">
+        <button id="mobileTabSearchBtn" onclick="switchMobileView('SEARCH')"
+          class="py-2.5 px-3 rounded-lg transition bg-[#173456] text-white shadow-sm flex items-center justify-center gap-1.5 active:scale-95">
+          <span class="text-sm">🔍</span>
+          <span>Search &amp; Zones</span>
+        </button>
+        <button id="mobileTabLocationsBtn" onclick="switchMobileView('LOCATIONS')"
+          class="py-2.5 px-3 rounded-lg transition text-[#2d4b68] hover:text-[#173456] flex items-center justify-center gap-1.5 active:scale-95">
+          <span class="text-sm">📋</span>
+          <span>Locations (<span id="mobileLocationCount">0</span>)</span>
+        </button>
+      </div>
+    </div>
 
-      <!-- LEFT PANEL (4 Cols): SEARCH + WAREHOUSE LINES/ROWS -->
-      <section class="col-span-12 lg:col-span-4 flex flex-col gap-3 overflow-hidden min-h-0">
+    <!-- Mobile Top Navigation Segment Control (Visible on Mobile Screens) -->
+    <div id="mobileTopNav" class="block lg:hidden px-3 pt-2 pb-1.5 bg-[#ebf1f6] shrink-0 border-b border-[#cbd8e5]">
+      <div class="grid grid-cols-2 gap-1.5 bg-[#dfe8f2] p-1 rounded-xl border border-[#c4d4e4] text-xs font-bold">
+        <button id="mobileTabSearchBtn" onclick="switchMobileView('SEARCH')"
+          class="py-2.5 px-3 rounded-lg transition bg-[#173456] text-white shadow-sm flex items-center justify-center gap-1.5 active:scale-95">
+          <span class="text-sm">🔍</span>
+          <span>Search &amp; Zones</span>
+        </button>
+        <button id="mobileTabLocationsBtn" onclick="switchMobileView('LOCATIONS')"
+          class="py-2.5 px-3 rounded-lg transition text-[#2d4b68] hover:text-[#173456] flex items-center justify-center gap-1.5 active:scale-95">
+          <span class="text-sm">📋</span>
+          <span>Locations (<span id="mobileLocationCount">0</span>)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= MAIN WORKSPACE (Split 1280x720 on Desktop / Tabbed on Mobile) ================= -->
+    <main class="flex-1 grid grid-cols-12 gap-3 p-2.5 sm:p-3 overflow-y-auto lg:overflow-hidden min-h-0 pb-20 lg:pb-3">
+
+      <!-- LEFT PANEL (4 Cols on Desktop / Tab 1 on Mobile): SEARCH + WAREHOUSE LINES/ROWS -->
+      <section id="panelSearchAndZones" class="col-span-12 lg:col-span-4 flex flex-col gap-3 overflow-y-auto lg:overflow-hidden min-h-0">
 
         <!-- 1. Search Box NetSuite Portlet -->
         <div class="bg-white border border-[#c4d3e2] rounded-xl overflow-hidden shadow-sm shrink-0">
@@ -155,8 +190,15 @@
       </div>
     </section>
 
-    <!-- RIGHT PANEL (8 Cols): INSTANT SORTED LOCATION TABLE & PRINT BUTTON -->
-      <section id="styleDetailContainer" class="col-span-12 lg:col-span-8 flex flex-col gap-3 overflow-hidden min-h-0">
+    <!-- RIGHT PANEL (8 Cols on Desktop / Tab 2 on Mobile): INSTANT SORTED LOCATION TABLE & PRINT BUTTON -->
+      <section id="styleDetailContainer" class="col-span-12 lg:col-span-8 hidden lg:flex flex-col gap-3 overflow-y-auto lg:overflow-hidden min-h-0">
+
+        <!-- Mobile Back Button (Only visible on mobile) -->
+        <div class="block lg:hidden shrink-0">
+          <button onclick="switchMobileView('SEARCH')" class="w-full py-2 px-3 rounded-lg bg-white border border-[#c4d3e2] text-xs font-bold text-[#173456] flex items-center justify-center gap-1.5 shadow-xs active:bg-[#f0f4f8]">
+            <span>← Back to Search &amp; Warehouse Zones</span>
+          </button>
+        </div>
 
         <!-- NetSuite Summary & Print Action Portlet -->
         <div class="bg-white border border-[#c4d3e2] rounded-xl overflow-hidden shadow-sm shrink-0">
@@ -205,10 +247,11 @@
           </div>
         </div>
 
-        <!-- Clean White Sorted Locations Table -->
+        <!-- Clean White Sorted Locations Container (Desktop Table + Mobile Cards) -->
         <div class="bg-white border border-[#c4d3e2] rounded-xl flex-1 overflow-hidden shadow-sm flex flex-col min-h-0">
           <div class="flex-1 overflow-y-auto">
-            <table class="w-full text-left border-collapse">
+            <!-- 1. Desktop NetSuite Table (Hidden on small mobile phones) -->
+            <table class="hidden md:table w-full text-left border-collapse">
               <thead class="sticky top-0 z-10 bg-[#dfe7ef] border-b border-[#b8c9d9] text-[11px] text-[#173456] uppercase tracking-wider font-bold">
                 <tr>
                   <th class="py-2.5 px-3">Style (SKU)</th>
@@ -225,12 +268,53 @@
                 <!-- Populated dynamically in sorted order -->
               </tbody>
             </table>
+
+            <!-- 2. Mobile Touch Cards (Visible only on mobile devices) -->
+            <div id="styleLocationMobileCards" class="block md:hidden p-2.5 space-y-2.5">
+              <!-- Rendered dynamically as touch cards on mobile -->
+            </div>
           </div>
         </div>
 
       </section>
 
     </main>
+    <!-- Mobile Fixed Bottom Navigation Bar (Thumb Friendly) -->
+    <nav id="mobileBottomBar" class="block lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#173456] border-t-2 border-[#0070ba] px-3 py-2 shadow-2xl flex items-center justify-between gap-2 mobile-safe-bottom">
+      <button onclick="switchMobileView('SEARCH')" id="mobileBottomSearchBtn"
+        class="flex-1 py-2 px-2.5 rounded-lg bg-[#244b7a] text-white text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#1a385c] transition">
+        <span>🔍</span>
+        <span>Search</span>
+      </button>
+      <button onclick="switchMobileView('LOCATIONS')" id="mobileBottomLocBtn"
+        class="flex-1 py-2 px-2.5 rounded-lg bg-[#1a385c] text-blue-200 text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#10243c] transition">
+        <span>📋</span>
+        <span>Stock (<span id="mobileBottomCount">0</span>)</span>
+      </button>
+      <button onclick="triggerPrintPickSheet()"
+        class="py-2 px-3.5 rounded-lg bg-[#0070ba] hover:bg-[#005a96] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition">
+        <span>🖨️</span>
+        <span>Print</span>
+      </button>
+    </nav>
+    <!-- Mobile Fixed Bottom Navigation Bar (Thumb Friendly) -->
+    <nav id="mobileBottomBar" class="block lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#173456] border-t-2 border-[#0070ba] px-3 py-2 shadow-2xl flex items-center justify-between gap-2 mobile-safe-bottom">
+      <button onclick="switchMobileView('SEARCH')" id="mobileBottomSearchBtn"
+        class="flex-1 py-2 px-2.5 rounded-lg bg-[#244b7a] text-white text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#1a385c] transition">
+        <span>🔍</span>
+        <span>Search</span>
+      </button>
+      <button onclick="switchMobileView('LOCATIONS')" id="mobileBottomLocBtn"
+        class="flex-1 py-2 px-2.5 rounded-lg bg-[#1a385c] text-blue-200 text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#10243c] transition">
+        <span>📋</span>
+        <span>Stock (<span id="mobileBottomCount">0</span>)</span>
+      </button>
+      <button onclick="triggerPrintPickSheet()"
+        class="py-2 px-3.5 rounded-lg bg-[#0070ba] hover:bg-[#005a96] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition">
+        <span>🖨️</span>
+        <span>Print</span>
+      </button>
+    </nav>
   </div>
 
   <!-- ================= PRINTABLE BATCH PICK SHEET ================= -->
@@ -448,7 +532,7 @@
 
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=13.0"></script>
-  <script src="/static/auth_client.js?v=6.0"></script>
+  <script src="/static/app.js?v=14.0"></script>
+  <script src="/static/auth_client.js?v=7.0"></script>
 </body>
 </html>

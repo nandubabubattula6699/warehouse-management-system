@@ -1,3 +1,65 @@
+// ================= MOBILE NAVIGATION & RESPONSIVE VIEW STATE =================
+let activeMobileView = "SEARCH";
+
+function switchMobileView(view) {
+  activeMobileView = view;
+  const searchPanel = document.getElementById("panelSearchAndZones");
+  const detailPanel = document.getElementById("styleDetailContainer");
+  const tabSearch = document.getElementById("mobileTabSearchBtn");
+  const tabLoc = document.getElementById("mobileTabLocationsBtn");
+  const bottomSearch = document.getElementById("mobileBottomSearchBtn");
+  const bottomLoc = document.getElementById("mobileBottomLocBtn");
+
+  if (!searchPanel || !detailPanel) return;
+
+  if (view === "SEARCH") {
+    searchPanel.classList.remove("hidden");
+    searchPanel.classList.add("flex");
+    detailPanel.classList.add("hidden");
+    detailPanel.classList.remove("flex");
+
+    if (tabSearch) {
+      tabSearch.className = "py-2.5 px-3 rounded-lg transition bg-[#173456] text-white shadow-sm flex items-center justify-center gap-1.5 active:scale-95";
+    }
+    if (tabLoc) {
+      tabLoc.className = "py-2.5 px-3 rounded-lg transition text-[#2d4b68] hover:text-[#173456] flex items-center justify-center gap-1.5 active:scale-95";
+    }
+    if (bottomSearch) {
+      bottomSearch.className = "flex-1 py-2 px-2.5 rounded-lg bg-[#244b7a] text-white text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#1a385c] transition";
+    }
+    if (bottomLoc) {
+      bottomLoc.className = "flex-1 py-2 px-2.5 rounded-lg bg-[#1a385c] text-blue-200 text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#10243c] transition";
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else {
+    // LOCATIONS view
+    searchPanel.classList.add("hidden");
+    searchPanel.classList.remove("flex");
+    detailPanel.classList.remove("hidden");
+    detailPanel.classList.add("flex");
+
+    if (tabSearch) {
+      tabSearch.className = "py-2.5 px-3 rounded-lg transition text-[#2d4b68] hover:text-[#173456] flex items-center justify-center gap-1.5 active:scale-95";
+    }
+    if (tabLoc) {
+      tabLoc.className = "py-2.5 px-3 rounded-lg transition bg-[#173456] text-white shadow-sm flex items-center justify-center gap-1.5 active:scale-95";
+    }
+    if (bottomSearch) {
+      bottomSearch.className = "flex-1 py-2 px-2.5 rounded-lg bg-[#1a385c] text-blue-200 text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#10243c] transition";
+    }
+    if (bottomLoc) {
+      bottomLoc.className = "flex-1 py-2 px-2.5 rounded-lg bg-[#244b7a] text-white text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#1a385c] transition";
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
+function autoSwitchToMobileLocations() {
+  if (window.innerWidth < 1024) {
+    switchMobileView("LOCATIONS");
+  }
+}
+
 // Multi-Style State: Array of active style codes
 let selectedStyles = ["A12501"];
 let allStylesList = [];
@@ -12,7 +74,7 @@ function initApp() {
   loadWarehouseOverview();
   loadStylesList();
   renderSelectedStylesChips();
-  loadBatchStylesDetails();
+  loadBatchStylesDetails(); autoSwitchToMobileLocations();
 
   const searchInput = document.getElementById("styleSearchInput");
   const dropdown = document.getElementById("styleDropdown");
@@ -105,7 +167,7 @@ function handleAddInputStyles() {
 
   if (added) {
     renderSelectedStylesChips();
-    loadBatchStylesDetails();
+    loadBatchStylesDetails(); autoSwitchToMobileLocations();
   }
 }
 
@@ -131,7 +193,7 @@ function removeSelectedStyle(styleCode) {
   selectedStyles = selectedStyles.filter(s => s !== styleCode);
   renderSelectedStylesChips();
   if (selectedStyles.length > 0) {
-    loadBatchStylesDetails();
+    loadBatchStylesDetails(); autoSwitchToMobileLocations();
   } else {
     batchData = null;
     const title = document.getElementById("currentStyleTitle");
@@ -159,7 +221,7 @@ function addStyleToSelection(styleCode) {
   if (!selectedStyles.includes(upper)) {
     selectedStyles.push(upper);
     renderSelectedStylesChips();
-    loadBatchStylesDetails();
+    loadBatchStylesDetails(); autoSwitchToMobileLocations();
   }
 }
 
@@ -492,6 +554,79 @@ function renderFilteredRows() {
       </tr>
     `;
   }).join("");
+
+  // Update mobile location count badges
+  const mLocCount = document.getElementById("mobileLocationCount");
+  if (mLocCount) mLocCount.textContent = items.length;
+  const mBottomCount = document.getElementById("mobileBottomCount");
+  if (mBottomCount) mBottomCount.textContent = items.length;
+
+  // Render Mobile Touch Cards
+  const mobileContainer = document.getElementById("styleLocationMobileCards");
+  if (mobileContainer) {
+    if (items.length === 0) {
+      mobileContainer.innerHTML = '<div class="text-center py-8 text-[#64748b] bg-white rounded-xl border border-[#c4d3e2] p-4 text-xs">No locations matching active filter.</div>';
+    } else {
+      mobileContainer.innerHTML = items.map(item => {
+        const isPart2 = item.warehouse_part === "PART_2" || (item.row_pos && !item.line);
+        const coordSummary = isPart2
+          ? `Row ${escapeHtml(item.row_pos || "-")} • Sec ${escapeHtml(item.section || "-")} • Lvl ${escapeHtml(item.level || "-")}`
+          : `Line ${escapeHtml(item.line || "-")} • Sec ${escapeHtml(item.section || "-")} • Lvl ${escapeHtml(item.level || "-")}`;
+        const locDisplay = item.location || coordSummary;
+
+        return `
+          <div class="bg-white border border-[#c4d3e2] rounded-xl p-3 shadow-xs space-y-2">
+            <!-- Header: Style SKU & Quantity Pill -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#0070ba]"></span>
+                <span class="font-mono font-bold text-sm text-[#173456]">${escapeHtml(item.style)}</span>
+              </div>
+              <span class="inline-block px-2.5 py-0.5 rounded text-xs font-bold font-mono bg-[#e8f1fa] text-[#0d4771] border border-[#b8d4ee]">
+                ${item.quantity.toLocaleString()} pcs
+              </span>
+            </div>
+
+            <!-- Warehouse Location Card Highlight -->
+            <div class="bg-[#f0f4f8] border border-[#d3dfea] rounded-lg p-2.5 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] uppercase font-bold text-[#64748b] block">Shelf Location</span>
+                <div class="font-mono font-bold text-xs text-[#0f172a] mt-0.5">${escapeHtml(locDisplay)}</div>
+                <div class="text-[10px] text-[#64748b] font-mono mt-0.5">
+                  ${isPart2 ? ('Part 2 • ' + escapeHtml(item.brand || 'Wholesale')) : 'Part 1 • Allbirds'}
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] uppercase font-bold text-[#64748b] block">Size</span>
+                <span class="font-mono font-black text-sm text-[#173456] block mt-0.5">${escapeHtml(item.size || 'OS')}</span>
+              </div>
+            </div>
+
+            <!-- Details: Color & Box -->
+            <div class="flex items-center justify-between text-xs text-[#475569] px-1">
+              <div>Color: <strong class="text-[#173456]">${escapeHtml(item.color || 'STANDARD')}</strong></div>
+              <div class="font-mono text-[11px] text-[#64748b]">
+                ${item.box_num ? `Box #${escapeHtml(item.box_num)}` : ''} ${item.pcs_per_box ? `(${item.pcs_per_box} pcs/box)` : ''}
+              </div>
+            </div>
+
+            <!-- Admin Action Buttons (Large Touch Targets) -->
+            ${isAdmin ? `
+              <div class="flex items-center justify-between pt-2 border-t border-[#e2eaf2]">
+                <div class="inline-flex items-center space-x-2 bg-[#f0f4f8] border border-[#cbd5e1] rounded-lg p-1">
+                  <button onclick="realtimeQuickAdjust(${item.id}, -1)" ${item.quantity <= 0 ? 'disabled' : ''} class="w-9 h-9 rounded bg-white text-base font-bold text-[#173456] shadow-xs active:bg-slate-200 flex items-center justify-center">-</button>
+                  <button onclick='openAdjustModal(${JSON.stringify(item)})' class="px-3 py-1.5 text-xs font-mono font-bold text-[#173456]">Adj</button>
+                  <button onclick="realtimeQuickAdjust(${item.id}, 1)" class="w-9 h-9 rounded bg-white text-base font-bold text-[#173456] shadow-xs active:bg-slate-200 flex items-center justify-center">+</button>
+                </div>
+                <button onclick="deleteLocationRecord(${item.id})" class="p-2 text-slate-400 hover:text-red-600 text-sm" title="Delete">🗑️</button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join("");
+    }
+  }
+
 }
 
 function triggerPrintPickSheet() {
@@ -630,7 +765,7 @@ async function realtimeQuickAdjust(itemId, delta) {
     const updated = await res.json();
     showToast(`${updated.style} (${updated.location}): Stock is now ${updated.quantity}`, "success");
     
-    loadBatchStylesDetails();
+    loadBatchStylesDetails(); autoSwitchToMobileLocations();
     loadStats();
   } catch (err) {
     showToast("Network error updating stock", "error");
@@ -683,7 +818,7 @@ async function submitStockAdjustment() {
     closeModal("adjustModal");
     showToast(`Updated: ${updated.style} at ${updated.location} is now ${updated.quantity}`, "success");
 
-    loadBatchStylesDetails();
+    loadBatchStylesDetails(); autoSwitchToMobileLocations();
     loadStats();
   } catch (err) {
     showToast("Adjustment error", "error");
@@ -723,7 +858,7 @@ async function submitExactQuantity() {
 
     closeModal("setQtyModal");
     showToast(`Stock updated to ${newQty}`, "success");
-    loadBatchStylesDetails();
+    loadBatchStylesDetails(); autoSwitchToMobileLocations();
     loadStats();
   } catch (err) {
     showToast("Error updating stock", "error");
@@ -798,7 +933,7 @@ async function deleteLocationRecord(itemId) {
     const res = await fetch(`/api/items/${itemId}`, { method: "DELETE" });
     if (!res.ok) throw new Error("Delete failed");
     showToast("Location record deleted", "success");
-    loadBatchStylesDetails();
+    loadBatchStylesDetails(); autoSwitchToMobileLocations();
     loadStats();
   } catch (err) {
     showToast("Error deleting item", "error");
@@ -971,7 +1106,7 @@ async function inspectWarehouseAisle(part, aisle) {
   const token = part === "PART_1" ? `LINE ${aisle}` : (aisle === "WALL" ? "WALL" : `ROW ${aisle}`);
   selectedStyles = [token];
   renderSelectedStylesChips();
-  loadBatchStylesDetails();
+  loadBatchStylesDetails(); autoSwitchToMobileLocations();
 
   const container = document.getElementById("aisleInspectorContainer");
   const grid = document.getElementById("aisleSectionsGrid");
@@ -1054,5 +1189,5 @@ function loadActiveAisleIntoLookup() {
     : (activeAisleData.aisle === "WALL" ? "WALL" : `ROW ${activeAisleData.aisle}`);
   selectedStyles = [token];
   renderSelectedStylesChips();
-  loadBatchStylesDetails();
+  loadBatchStylesDetails(); autoSwitchToMobileLocations();
 }

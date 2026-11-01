@@ -1,7 +1,8 @@
-/* ================= Oracle NetSuite Theme for Warehouse OS ================= */
+/* ================= Oracle NetSuite Theme for Warehouse OS (Mobile & Desktop) ================= */
 body {
   background-color: #ebf1f6 !important;
   color: #173456;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .location-tag {
@@ -21,6 +22,7 @@ body {
   border: 1px solid #c4d3e2;
   color: #173456;
   transition: all 0.12s ease-in-out;
+  touch-action: manipulation;
 }
 
 .style-chip:hover, .style-chip.active {
@@ -28,6 +30,16 @@ body {
   color: #ffffff;
   border-color: #0070ba;
   font-weight: 700;
+}
+
+/* Touch optimization for mobile buttons */
+button, select, input {
+  touch-action: manipulation;
+}
+
+/* Safe area inset for modern mobile browsers (iPhone notch/home bar) */
+.mobile-safe-bottom {
+  padding-bottom: max(0.6rem, env(safe-area-inset-bottom));
 }
 
 /* ================= PRINT STYLES ================= */
@@ -54,7 +66,9 @@ body {
   nav,
   button,
   .modal-backdrop,
-  #toastContainer {
+  #toastContainer,
+  #mobileTopNav,
+  #mobileBottomBar {
     display: none !important;
   }
 
