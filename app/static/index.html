@@ -52,9 +52,93 @@
 
       <!-- Global Warehouse Stats -->
       <div class="grid grid-cols-1 gap-4">
-        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm">
-          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Inventory Records</p>
-          <h3 id="statTotalRecords" class="text-2xl font-black text-blue-400 mt-1">9,171</h3>
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Inventory Records</p>
+            <h3 id="statTotalRecords" class="text-2xl font-black text-blue-400 mt-1">9,171</h3>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+            <span class="px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300">
+              🏢 <strong>50,000+ sq ft</strong> Warehouse
+            </span>
+            <span id="badgePart1Summary" class="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+              Part 1 (Allbirds): 14 Lines
+            </span>
+            <span id="badgePart2Summary" class="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300">
+              Part 2 (Von Dutch &amp; Valentino): 14 Rows + Ground Front/Back + Wall
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= 50,000+ SQ FT 2-PART WAREHOUSE LOCATION MAP ================= -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <span class="text-lg">🗺️</span>
+              <h2 class="text-base lg:text-lg font-black text-white">50,000+ sq ft Warehouse Location Map (Part 1 &amp; Part 2)</h2>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Click any <strong>Line (1–14)</strong> in Part 1 or any <strong>Row (1–14 / WALL)</strong> in Part 2 to inspect every Section and its 4 Levels (<code class="text-amber-300">Lvl 1–4</code>, <code class="text-emerald-300">Ground FRONT</code>, <code class="text-cyan-300">Ground BACK</code>, <code class="text-rose-300">WALL</code>).
+            </p>
+          </div>
+
+          <!-- Zone Tabs -->
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="tabPart1Btn" onclick="switchWarehousePart('PART_1')"
+              class="px-4 py-2 rounded-xl text-xs font-black transition border bg-blue-500 text-slate-950 border-blue-400 shadow-lg shadow-blue-500/20">
+              👟 Part 1: Allbirds (14 Lines × 35 Sec × 4 Lvl)
+            </button>
+            <button id="tabPart2Btn" onclick="switchWarehousePart('PART_2')"
+              class="px-4 py-2 rounded-xl text-xs font-black transition border bg-slate-950 text-slate-300 border-slate-700 hover:border-purple-400">
+              👜 Part 2: Von Dutch &amp; Valentino (14 Rows × 36 Sec + Front/Back/Wall)
+            </button>
+          </div>
+        </div>
+
+        <!-- Part 1 (Allbirds 14 Lines) View -->
+        <div id="warehousePart1Panel" class="space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-950/70 border border-slate-800 rounded-xl px-4 py-2.5 text-xs">
+            <div class="text-slate-300">
+              <strong class="text-blue-400">Part 1 Structure:</strong> 14 Rack Lines (<code class="text-amber-300">Line 1</code> – <code class="text-amber-300">Line 14</code>) • Each Line has <code class="text-amber-300">32–35 Sections</code> • Each Section has <code class="text-amber-300">4 Levels (Lvl 1–4)</code> • Dedicated to <strong>Allbirds</strong> (<code class="text-blue-300">A1...</code>, <code class="text-blue-300">TB...</code>, <code class="text-blue-300">TR...</code>, <code class="text-blue-300">WR...</code>)
+            </div>
+            <div id="part1StatsPill" class="font-mono text-slate-400"></div>
+          </div>
+          <div id="part1LinesGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5"></div>
+        </div>
+
+        <!-- Part 2 (Von Dutch & Valentino 14 Rows + Ground Front/Back + Wall) View -->
+        <div id="warehousePart2Panel" class="hidden space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-950/70 border border-slate-800 rounded-xl px-4 py-2.5 text-xs">
+            <div class="text-slate-300">
+              <strong class="text-purple-400">Part 2 Structure:</strong> 14 Rows (<code class="text-amber-300">Row 1</code> – <code class="text-amber-300">Row 14</code> + <code class="text-rose-300">WALL</code>) • Each Row has <code class="text-amber-300">36 Sections</code> + <code class="text-emerald-300">Ground FRONT</code> + <code class="text-cyan-300">Ground BACK</code> + <code class="text-rose-300">WALL</code> • <code class="text-amber-300">4 Levels</code> • Loaded with <strong>Von Dutch</strong> (<code class="text-purple-300">VD...</code>) &amp; <strong>Valentino</strong> (<code class="text-pink-300">VO...</code>, <code class="text-pink-300">V-...</code>)
+            </div>
+            <div id="part2StatsPill" class="font-mono text-slate-400"></div>
+          </div>
+          <div id="part2RowsGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5"></div>
+        </div>
+
+        <!-- Drilldown: Selected Line / Row Section x 4-Level Map Inspector -->
+        <div id="aisleInspectorContainer" class="hidden pt-4 border-t border-slate-800 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-950 border border-amber-500/30 rounded-xl px-4 py-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold uppercase">Section × 4-Level Breakdown</span>
+                <h3 id="aisleInspectorTitle" class="text-sm sm:text-base font-black text-white font-mono">Line 1</h3>
+              </div>
+              <p id="aisleInspectorSubtitle" class="text-xs text-slate-400 mt-0.5"></p>
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="text" id="aisleSectionFilterInput" oninput="filterAisleSections()" placeholder="Filter section or style..."
+                class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono w-44 focus:outline-none focus:border-amber-500" />
+              <button onclick="closeAisleInspector()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">
+                Close Map ✕
+              </button>
+            </div>
+          </div>
+
+          <div id="aisleSectionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[520px] overflow-y-auto pr-1"></div>
         </div>
       </div>
 
@@ -359,23 +443,27 @@
         </div>
 
         <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
-          <span class="text-xs font-bold text-amber-400 uppercase tracking-wider block">📍 Warehouse Location Details</span>
-          <div class="grid grid-cols-4 gap-2">
+          <span class="text-xs font-bold text-amber-400 uppercase tracking-wider block">📍 Warehouse Location (Part 1: Line 1–14 | Part 2: Row 1–14 / WALL, Sec 1–36 / FRONT / BACK)</span>
+          <div class="grid grid-cols-5 gap-2">
             <div>
-              <label class="block text-[10px] text-slate-400 uppercase">Line</label>
-              <input type="text" id="newLocLine" placeholder="1" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white" />
+              <label class="block text-[10px] text-blue-300 uppercase">Line (P1)</label>
+              <input type="text" id="newLocLine" placeholder="1–14" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono" />
+            </div>
+            <div>
+              <label class="block text-[10px] text-purple-300 uppercase">Row (P2)</label>
+              <input type="text" id="newLocRow" placeholder="1–14/WALL" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono" />
             </div>
             <div>
               <label class="block text-[10px] text-slate-400 uppercase">Section</label>
-              <input type="text" id="newLocSection" placeholder="40" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white" />
+              <input type="text" id="newLocSection" placeholder="1-36/FRONT/BACK" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono" />
             </div>
             <div>
               <label class="block text-[10px] text-slate-400 uppercase">Level</label>
-              <input type="text" id="newLocLevel" placeholder="4" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white" />
+              <input type="text" id="newLocLevel" placeholder="1–4" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono" />
             </div>
             <div>
               <label class="block text-[10px] text-slate-400 uppercase">Box #</label>
-              <input type="text" id="newLocBox" placeholder="6" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white" />
+              <input type="text" id="newLocBox" placeholder="1" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono" />
             </div>
           </div>
         </div>
@@ -434,6 +522,6 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=4.0"></script>
+  <script src="/static/app.js?v=5.0"></script>
 </body>
 </html>

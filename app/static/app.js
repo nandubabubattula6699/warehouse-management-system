@@ -9,6 +9,7 @@ let searchDebounce = null;
 function initApp() {
   console.log("Initializing Warehouse OS Frontend...");
   loadStats();
+  loadWarehouseOverview();
   loadStylesList();
   renderSelectedStylesChips();
   loadBatchStylesDetails();
@@ -371,12 +372,18 @@ function renderFilteredRows() {
         </td>
 
         <td class="py-3.5 px-4">
-          <span class="location-tag inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-amber-300 shadow-sm">
-            <span>📍</span>
-            ${escapeHtml(item.location || "Unassigned")}
-          </span>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="location-tag inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-amber-300 shadow-sm">
+              <span>📍</span>
+              ${escapeHtml(item.location || "Unassigned")}
+            </span>
+            ${renderPartBrandBadge(item)}
+            ${renderPlacementBadge(item)}
+          </div>
           <div class="text-[10px] text-slate-500 font-mono mt-1">
-            Line: ${escapeHtml(item.line || "-")}, Sec: ${escapeHtml(item.section || "-")}, Lvl: ${escapeHtml(item.level || "-")}, Row: ${escapeHtml(item.row_pos || "-")}
+            ${item.warehouse_part === "PART_2" || (item.row_pos && !item.line)
+              ? `Part 2 • Row: ${escapeHtml(item.row_pos || "-")} • Sec: ${escapeHtml(item.section || "-")} • Lvl: ${escapeHtml(item.level || "-")}`
+              : `Part 1 • Line: ${escapeHtml(item.line || "-")} • Sec: ${escapeHtml(item.section || "-")} • Lvl: ${escapeHtml(item.level || "-")}`}
           </div>
         </td>
 
@@ -647,6 +654,8 @@ async function handleAddLocationSubmit(e) {
   const color = document.getElementById("newLocColor").value.trim().toUpperCase() || "STANDARD";
   const size = document.getElementById("newLocSize").value.trim();
   const line = document.getElementById("newLocLine").value.trim();
+  const rowEl = document.getElementById("newLocRow");
+  const row_pos = rowEl ? rowEl.value.trim() : "";
   const section = document.getElementById("newLocSection").value.trim();
   const level = document.getElementById("newLocLevel").value.trim();
   const box = document.getElementById("newLocBox").value.trim();
@@ -669,6 +678,7 @@ async function handleAddLocationSubmit(e) {
         color: color,
         size: size,
         line: line || null,
+        row_pos: row_pos || null,
         section: section || null,
         level: level || null,
         box_num: box || null,
@@ -776,4 +786,265 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+
+// ================= 50,000+ SQ FT 2-PART WAREHOUSE MAP FUNCTIONS =================
+let warehouseOverviewData = null;
+let activeWarehousePart = "PART_1";
+let activeAisleData = null;
+
+function renderPartBrandBadge(item) {
+  const part = item.warehouse_part || ((item.row_pos && !item.line) ? "PART_2" : "PART_1");
+  const brand = item.brand || (part === "PART_2" ? "VON DUTCH" : "ALLBIRDS");
+  if (part === "PART_1") {
+    return `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30">Part 1 • ${escapeHtml(brand)}</span>`;
+  }
+  const colorCls = brand === "VALENTINO"
+    ? "bg-pink-500/15 text-pink-300 border-pink-500/30"
+    : "bg-purple-500/15 text-purple-300 border-purple-500/30";
+  return `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${colorCls}">Part 2 • ${escapeHtml(brand)}</span>`;
+}
+
+function renderPlacementBadge(item) {
+  const pl = item.placement_type || "RACK";
+  if (pl === "GROUND_FRONT") {
+    return `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Ground FRONT</span>`;
+  }
+  if (pl === "GROUND_BACK") {
+    return `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">Ground BACK</span>`;
+  }
+  if (pl === "WALL") {
+    return `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">WALL</span>`;
+  }
+  return "";
+}
+
+async function loadWarehouseOverview() {
+  try {
+    const res = await fetch("/api/warehouse-overview");
+    if (!res.ok) return;
+    warehouseOverviewData = await res.json();
+    renderWarehouseMapOverview();
+  } catch (err) {
+    console.error("Warehouse overview error:", err);
+  }
+}
+
+function switchWarehousePart(part) {
+  activeWarehousePart = part;
+  const p1Panel = document.getElementById("warehousePart1Panel");
+  const p2Panel = document.getElementById("warehousePart2Panel");
+  const btn1 = document.getElementById("tabPart1Btn");
+  const btn2 = document.getElementById("tabPart2Btn");
+
+  if (part === "PART_1") {
+    if (p1Panel) p1Panel.classList.remove("hidden");
+    if (p2Panel) p2Panel.classList.add("hidden");
+    if (btn1) btn1.className = "px-4 py-2 rounded-xl text-xs font-black transition border bg-blue-500 text-slate-950 border-blue-400 shadow-lg shadow-blue-500/20";
+    if (btn2) btn2.className = "px-4 py-2 rounded-xl text-xs font-black transition border bg-slate-950 text-slate-300 border-slate-700 hover:border-purple-400";
+  } else {
+    if (p1Panel) p1Panel.classList.add("hidden");
+    if (p2Panel) p2Panel.classList.remove("hidden");
+    if (btn2) btn2.className = "px-4 py-2 rounded-xl text-xs font-black transition border bg-purple-500 text-slate-950 border-purple-400 shadow-lg shadow-purple-500/20";
+    if (btn1) btn1.className = "px-4 py-2 rounded-xl text-xs font-black transition border bg-slate-950 text-slate-300 border-slate-700 hover:border-blue-400";
+  }
+}
+
+function renderWarehouseMapOverview() {
+  if (!warehouseOverviewData) return;
+  const p1 = warehouseOverviewData.part_1_allbirds;
+  const p2 = warehouseOverviewData.part_2_vd_valentino;
+
+  const b1 = document.getElementById("badgePart1Summary");
+  if (b1 && p1) {
+    b1.innerHTML = `👟 Part 1 (Allbirds): <strong>${p1.total_lines} Lines</strong> • <strong>${p1.total_units.toLocaleString()} pcs</strong>`;
+  }
+  const b2 = document.getElementById("badgePart2Summary");
+  if (b2 && p2) {
+    b2.innerHTML = `👜 Part 2 (Von Dutch &amp; Valentino): <strong>${p2.total_rows} Rows + Wall</strong> • <strong>${p2.total_units.toLocaleString()} pcs</strong>`;
+  }
+
+  const p1Pill = document.getElementById("part1StatsPill");
+  if (p1Pill && p1) {
+    p1Pill.innerHTML = `${p1.total_styles} Styles • ${p1.total_records.toLocaleString()} Bins • <strong class="text-blue-300">${p1.total_units.toLocaleString()} Units</strong>`;
+  }
+
+  const p2Pill = document.getElementById("part2StatsPill");
+  if (p2Pill && p2) {
+    const pl = warehouseOverviewData.placement_totals || {};
+    p2Pill.innerHTML = `${p2.total_styles} Styles • Ground FRONT: <strong class="text-emerald-300">${(pl.GROUND_FRONT || 0).toLocaleString()}</strong> • Ground BACK: <strong class="text-cyan-300">${(pl.GROUND_BACK || 0).toLocaleString()}</strong> • WALL: <strong class="text-rose-300">${(pl.WALL || 0).toLocaleString()}</strong>`;
+  }
+
+  const p1Grid = document.getElementById("part1LinesGrid");
+  if (p1Grid && p1 && p1.lines) {
+    p1Grid.innerHTML = p1.lines.map(ln => {
+      const hasStock = ln.total_records > 0;
+      const isSelected = activeAisleData && activeAisleData.part === "PART_1" && activeAisleData.aisle === String(ln.line);
+      return `
+        <button onclick="inspectWarehouseAisle('PART_1', '${ln.line}')"
+          class="text-left p-3 rounded-xl border transition ${isSelected ? 'bg-blue-500/20 border-blue-400 ring-1 ring-blue-400' : (hasStock ? 'bg-slate-950/90 border-slate-800 hover:border-blue-500/50 hover:bg-slate-900' : 'bg-slate-950/40 border-slate-800/50 opacity-60 hover:opacity-100')}">
+          <div class="flex items-center justify-between">
+            <span class="font-mono font-black text-xs text-blue-400">LINE ${escapeHtml(ln.line)}</span>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-slate-400">${ln.occupied_sections}/35 sec</span>
+          </div>
+          <div class="mt-2 text-sm font-black text-white font-mono">${ln.total_units.toLocaleString()} <span class="text-[10px] font-normal text-slate-400">pcs</span></div>
+          <div class="text-[10px] text-slate-500 font-mono mt-0.5">${ln.total_styles} styles • 4 lvls</div>
+        </button>
+      `;
+    }).join("");
+  }
+
+  const p2Grid = document.getElementById("part2RowsGrid");
+  if (p2Grid && p2 && p2.rows) {
+    p2Grid.innerHTML = p2.rows.map(rw => {
+      const hasStock = rw.total_records > 0;
+      const isWall = rw.row === "WALL";
+      const isSelected = activeAisleData && activeAisleData.part === "PART_2" && activeAisleData.aisle === String(rw.row);
+      const label = isWall ? "🧱 WALL ZONE" : `ROW ${escapeHtml(rw.row)}`;
+      const subBadges = [];
+      if (rw.rack_units > 0) subBadges.push(`Rack:${rw.rack_units}`);
+      if (rw.ground_front_units > 0) subBadges.push(`Front:${rw.ground_front_units}`);
+      if (rw.ground_back_units > 0) subBadges.push(`Back:${rw.ground_back_units}`);
+      if (rw.wall_units > 0 && !isWall) subBadges.push(`Wall:${rw.wall_units}`);
+      return `
+        <button onclick="inspectWarehouseAisle('PART_2', '${rw.row}')"
+          class="text-left p-3 rounded-xl border transition ${isSelected ? 'bg-purple-500/20 border-purple-400 ring-1 ring-purple-400' : (hasStock ? 'bg-slate-950/90 border-slate-800 hover:border-purple-500/50 hover:bg-slate-900' : 'bg-slate-950/40 border-slate-800/50 opacity-60 hover:opacity-100')}">
+          <div class="flex items-center justify-between">
+            <span class="font-mono font-black text-xs ${isWall ? 'text-rose-400' : 'text-purple-400'}">${label}</span>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-slate-400">${isWall ? 'Wall' : `${rw.occupied_sections}/36 sec`}</span>
+          </div>
+          <div class="mt-2 text-sm font-black text-white font-mono">${rw.total_units.toLocaleString()} <span class="text-[10px] font-normal text-slate-400">pcs</span></div>
+          <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate">${subBadges.join(" • ") || `${rw.total_styles} styles`}</div>
+        </button>
+      `;
+    }).join("");
+  }
+}
+
+async function inspectWarehouseAisle(part, aisle) {
+  const container = document.getElementById("aisleInspectorContainer");
+  const grid = document.getElementById("aisleSectionsGrid");
+  const title = document.getElementById("aisleInspectorTitle");
+  const sub = document.getElementById("aisleInspectorSubtitle");
+  if (!container || !grid) return;
+
+  container.classList.remove("hidden");
+  grid.innerHTML = `<div class="col-span-full text-center py-8 text-xs text-slate-400 font-mono">Loading Section × 4-Level Map for ${part === 'PART_1' ? 'Line ' + aisle : 'Row ' + aisle}...</div>`;
+
+  try {
+    const res = await fetch(`/api/warehouse-map/aisle?part=${encodeURIComponent(part)}&aisle=${encodeURIComponent(aisle)}`);
+    if (!res.ok) return;
+    activeAisleData = await res.json();
+    renderWarehouseMapOverview();
+
+    if (title) title.textContent = activeAisleData.aisle_label;
+    if (sub) {
+      sub.innerHTML = `Occupied Sections: <strong>${activeAisleData.total_sections_occupied}</strong> • Total Stock: <strong class="text-amber-300">${activeAisleData.total_units.toLocaleString()} pieces</strong> across <strong>${activeAisleData.total_records}</strong> bins (Click any style chip below to load it in the lookup table)`;
+    }
+    const filterInput = document.getElementById("aisleSectionFilterInput");
+    if (filterInput) filterInput.value = "";
+    renderAisleSectionsGrid();
+  } catch (err) {
+    console.error("Aisle detail error:", err);
+  }
+}
+
+function closeAisleInspector() {
+  activeAisleData = null;
+  const container = document.getElementById("aisleInspectorContainer");
+  if (container) container.classList.add("hidden");
+  renderWarehouseMapOverview();
+}
+
+function filterAisleSections() {
+  renderAisleSectionsGrid();
+}
+
+function renderAisleSectionsGrid() {
+  const grid = document.getElementById("aisleSectionsGrid");
+  if (!grid || !activeAisleData) return;
+
+  const q = ((document.getElementById("aisleSectionFilterInput") && document.getElementById("aisleSectionFilterInput").value) || "").trim().toUpperCase();
+  let sections = activeAisleData.sections || [];
+  if (q) {
+    sections = sections.filter(sec => {
+      if (sec.section.toUpperCase().includes(q)) return true;
+      for (const lvl of ["1", "2", "3", "4", "OTHER"]) {
+        if ((sec.levels[lvl] || []).some(it => it.style.toUpperCase().includes(q) || (it.color || "").toUpperCase().includes(q))) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  if (sections.length === 0) {
+    grid.innerHTML = `<div class="col-span-full text-center py-8 text-xs text-slate-500 font-mono">No occupied sections in this Line/Row match the filter.</div>`;
+    return;
+  }
+
+  grid.innerHTML = sections.map(sec => {
+    let secHeaderBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-amber-300">SEC ${escapeHtml(sec.section)}</span>`;
+    if (sec.section === "FRONT") {
+      secHeaderBadge = `<span class="px-2.5 py-0.5 rounded text-[10px] font-mono font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">🟩 GROUND FRONT</span>`;
+    } else if (sec.section === "BACK") {
+      secHeaderBadge = `<span class="px-2.5 py-0.5 rounded text-[10px] font-mono font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">🟦 GROUND BACK</span>`;
+    } else if (sec.section === "WALL") {
+      secHeaderBadge = `<span class="px-2.5 py-0.5 rounded text-[10px] font-mono font-black bg-rose-500/20 text-rose-300 border border-rose-500/40">🧱 WALL</span>`;
+    }
+
+    const levelsHtml = ["1", "2", "3", "4"].map(lvl => {
+      const cellItems = sec.levels[lvl] || [];
+      if (cellItems.length === 0) {
+        return `
+          <div class="bg-slate-950/50 border border-slate-800/60 rounded-lg p-2">
+            <div class="text-[10px] font-mono font-bold text-slate-600 uppercase">Level ${lvl}</div>
+            <div class="text-[10px] text-slate-600 italic mt-1">Empty</div>
+          </div>
+        `;
+      }
+      const lvlUnits = cellItems.reduce((s, i) => s + (i.quantity || 0), 0);
+      // Group by style inside this level cell so it stays compact and readable
+      const byStyle = {};
+      cellItems.forEach(it => {
+        if (!byStyle[it.style]) byStyle[it.style] = { qty: 0, count: 0, brand: it.brand };
+        byStyle[it.style].qty += (it.quantity || 0);
+        byStyle[it.style].count += 1;
+      });
+      const chips = Object.entries(byStyle).map(([st, info]) => `
+        <button onclick="addStyleToSelection('${escapeHtml(st)}')"
+          title="Click to inspect ${escapeHtml(st)} in the table below"
+          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-[10px] font-mono font-bold text-amber-300 border border-slate-700 transition">
+          <span>${escapeHtml(st)}</span>
+          <span class=" opacity-75">(${info.qty})</span>
+        </button>
+      `).join("");
+
+      return `
+        <div class="bg-slate-950 border border-slate-800 rounded-lg p-2 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-mono font-bold text-slate-300 uppercase">Level ${lvl}</span>
+            <span class="text-[10px] font-mono font-bold text-emerald-400">${lvlUnits.toLocaleString()} pcs</span>
+          </div>
+          <div class="flex flex-wrap gap-1">${chips}</div>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 space-y-2.5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-2">
+            ${secHeaderBadge}
+            <span class="text-[11px] font-mono text-slate-400">${sec.total_records} bin${sec.total_records === 1 ? '' : 's'}</span>
+          </div>
+          <span class="text-xs font-mono font-black text-white">${sec.total_units.toLocaleString()} pcs</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          ${levelsHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
 }

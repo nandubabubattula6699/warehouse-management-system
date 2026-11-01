@@ -4,6 +4,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ItemBase(BaseModel):
     style: str
+    brand: Optional[str] = "ALLBIRDS"
+    warehouse_part: Optional[str] = "PART_1"
+    placement_type: Optional[str] = "RACK"
+    location_code: Optional[str] = None
     color: str = "STANDARD"
     size: str = "OS"
     line: Optional[str] = None

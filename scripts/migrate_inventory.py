@@ -64,7 +64,8 @@ def load_csv_records(csv_path):
                 except Exception:
                     qty = 0
 
-            loc_str = format_loc(line, section, level, row_pos, box)
+            from app.location_engine import build_location_info
+            loc_info = build_location_info(sku, line, section, level, row_pos, box)
 
             pcs_int = None
             if pcs_box:
@@ -75,14 +76,18 @@ def load_csv_records(csv_path):
 
             records.append({
                 "style": sku,
+                "brand": loc_info["brand"],
+                "warehouse_part": loc_info["warehouse_part"],
+                "placement_type": loc_info["placement_type"],
+                "location_code": loc_info["location_code"],
                 "color": color,
                 "size": size,
-                "line": line,
-                "section": section,
-                "level": level,
-                "row_pos": row_pos,
-                "box_num": box,
-                "location": loc_str,
+                "line": loc_info["line"],
+                "section": loc_info["section"],
+                "level": loc_info["level"],
+                "row_pos": loc_info["row_pos"],
+                "box_num": loc_info["box_num"],
+                "location": loc_info["location"],
                 "pcs_per_box": pcs_int,
                 "quantity": qty
             })

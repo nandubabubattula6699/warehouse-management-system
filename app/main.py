@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, distinct
 
 from app.database import get_db, init_db, SessionLocal
-from app.models import InventoryItem, StockMovement
+from app.models import WarehouseLocation, InventoryItem, StockMovement
+from app.location_engine import build_location_info, ensure_schema_and_locations_seeded
 from app.schemas import (
     ItemCreate, ItemUpdatePayload, ItemResponse, StyleSummary,
     StockAdjustPayload, SetQuantityPayload, WarehouseStats,
@@ -17,18 +18,29 @@ from app.schemas import (
 )
 
 def seed_if_empty():
-    """Create tables and auto-seed from CSV if the database is empty (e.g. fresh Railway Postgres)."""
+    """Create tables, upgrade 2-Part Warehouse schema/locations, and auto-seed from CSV if empty."""
     try:
         init_db()
+        db_map = SessionLocal()
+        try:
+            ensure_schema_and_locations_seeded(db_map)
+        finally:
+            db_map.close()
+
         db = SessionLocal()
         try:
-            count = db.query(InventoryItem).count()
+            count = db.query(func.count(InventoryItem.id)).scalar() or 0
         finally:
             db.close()
         if count == 0:
             print("[Database] Empty database detected. Auto-seeding records from CSV...", flush=True)
             from scripts.migrate_inventory import migrate
             migrate()
+            db_map2 = SessionLocal()
+            try:
+                ensure_schema_and_locations_seeded(db_map2)
+            finally:
+                db_map2.close()
         else:
             print(f"[Database] {count:,} inventory records present.", flush=True)
     except Exception as e:
@@ -239,7 +251,29 @@ def set_quantity(
 
 @app.post("/api/items", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
-    new_item = InventoryItem(**payload.model_dump())
+    data = payload.model_dump()
+    info = build_location_info(
+        style=data["style"],
+        line=data.get("line"),
+        section=data.get("section"),
+        level=data.get("level"),
+        row_pos=data.get("row_pos"),
+        box_num=data.get("box_num"),
+    )
+    data.update({
+        "style": data["style"].strip().upper(),
+        "brand": info["brand"],
+        "warehouse_part": info["warehouse_part"],
+        "placement_type": info["placement_type"],
+        "location_code": info["location_code"],
+        "location": info["location"],
+        "line": info["line"],
+        "row_pos": info["row_pos"],
+        "section": info["section"],
+        "level": info["level"],
+        "box_num": info["box_num"],
+    })
+    new_item = InventoryItem(**data)
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
@@ -306,14 +340,8 @@ def _clean_str(val: Optional[str]) -> Optional[str]:
     return s
 
 
-def _build_location(line, section, level, row_pos, box_num) -> str:
-    parts = []
-    if line: parts.append(f"Line {line}")
-    if section: parts.append(f"Sec {section}")
-    if level: parts.append(f"Lvl {level}")
-    if row_pos: parts.append(f"Row {row_pos}")
-    if box_num: parts.append(f"Box {box_num}")
-    return " • ".join(parts) if parts else "Unassigned"
+def _build_location(line, section, level, row_pos, box_num, style: str = "") -> str:
+    return build_location_info(style, line, section, level, row_pos, box_num)["location"]
 
 
 @app.post("/api/sheet-submit")
@@ -375,7 +403,7 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
             if style not in touched_styles:
                 touched_styles.append(style)
 
-            loc_str = _build_location(line, section, level, row_pos, box_num)
+            loc_str = _build_location(line, section, level, row_pos, box_num, style)
 
             # Find matching record at this location
             q = db.query(InventoryItem).filter(
@@ -461,7 +489,12 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                     exact_match.pcs_per_box = pcs_per_box
                 if box_num is not None:
                     exact_match.box_num = box_num
-                exact_match.location = loc_str
+                loc_meta_upd = build_location_info(style, line, section, level, row_pos, exact_match.box_num)
+                exact_match.brand = loc_meta_upd["brand"]
+                exact_match.warehouse_part = loc_meta_upd["warehouse_part"]
+                exact_match.placement_type = loc_meta_upd["placement_type"]
+                exact_match.location_code = loc_meta_upd["location_code"]
+                exact_match.location = loc_meta_upd["location"]
                 updated_count += 1
                 db.add(StockMovement(
                     item_id=exact_match.id,
@@ -473,16 +506,21 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                     staff_name=staff,
                 ))
             else:
+                loc_meta = build_location_info(style, line, section, level, row_pos, box_num)
                 new_item = InventoryItem(
                     style=style,
+                    brand=loc_meta["brand"],
+                    warehouse_part=loc_meta["warehouse_part"],
+                    placement_type=loc_meta["placement_type"],
+                    location_code=loc_meta["location_code"],
                     color=color,
                     size=size,
-                    line=line,
-                    section=section,
-                    level=level,
-                    row_pos=row_pos,
-                    box_num=box_num,
-                    location=loc_str,
+                    line=loc_meta["line"],
+                    section=loc_meta["section"],
+                    level=loc_meta["level"],
+                    row_pos=loc_meta["row_pos"],
+                    box_num=loc_meta["box_num"],
+                    location=loc_meta["location"],
                     pcs_per_box=pcs_per_box,
                     quantity=qty,
                 )
@@ -529,6 +567,8 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
 def search_locations(
     style: Optional[str] = Query(None),
     line: Optional[str] = Query(None),
+    row_pos: Optional[str] = Query(None),
+    warehouse_part: Optional[str] = Query(None),
     section: Optional[str] = Query(None),
     level: Optional[str] = Query(None),
     color: Optional[str] = Query(None),
@@ -545,8 +585,12 @@ def search_locations(
                 func.replace(func.upper(InventoryItem.style), " ", "").contains(s_clean.replace(" ", ""))
             )
         )
+    if warehouse_part and warehouse_part.strip():
+        q = q.filter(func.upper(func.coalesce(InventoryItem.warehouse_part, "")) == warehouse_part.strip().upper())
     if line and line.strip():
         q = q.filter(func.upper(func.coalesce(InventoryItem.line, "")) == line.strip().upper())
+    if row_pos and row_pos.strip():
+        q = q.filter(func.upper(func.coalesce(InventoryItem.row_pos, "")) == row_pos.strip().upper())
     if section and section.strip():
         q = q.filter(func.upper(func.coalesce(InventoryItem.section, "")).contains(section.strip().upper()))
     if level and level.strip():
@@ -588,7 +632,12 @@ def update_item_full(item_id: int, payload: ItemUpdatePayload, db: Session = Dep
     item.box_num = _clean_str(payload.box_num)
     item.pcs_per_box = payload.pcs_per_box
     item.quantity = payload.quantity
-    item.location = _build_location(item.line, item.section, item.level, item.row_pos, item.box_num)
+    loc_meta = build_location_info(item.style, item.line, item.section, item.level, item.row_pos, item.box_num)
+    item.brand = loc_meta["brand"]
+    item.warehouse_part = loc_meta["warehouse_part"]
+    item.placement_type = loc_meta["placement_type"]
+    item.location_code = loc_meta["location_code"]
+    item.location = loc_meta["location"]
 
     db.add(StockMovement(
         item_id=item.id,
@@ -655,6 +704,242 @@ def export_inventory_csv(db: Session = Depends(get_db)):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=warehouse_inventory_export.csv"}
     )
+
+
+@app.get("/api/warehouse-overview")
+def get_warehouse_overview(db: Session = Depends(get_db)):
+    """
+    Complete 50,000+ sq ft 2-Part Warehouse Map Overview:
+      - PART_1: Allbirds Zone (14 Lines, each 32-35 Sections, 4 Levels)
+      - PART_2: Von Dutch & Valentino Zone (14 Rows + WALL, 36 Sections + Ground FRONT/BACK + WALL, 4 Levels)
+    """
+    items = db.query(InventoryItem).all()
+
+    part1_lines = {
+        str(i): {
+            "line": str(i),
+            "occupied_sections": set(),
+            "styles": set(),
+            "records": 0,
+            "units": 0,
+        }
+        for i in range(1, 15)
+    }
+    part1_total_units = 0
+    part1_total_records = 0
+    part1_styles = set()
+
+    part2_rows = {
+        str(i): {
+            "row": str(i),
+            "occupied_sections": set(),
+            "styles": set(),
+            "brands": set(),
+            "rack_units": 0,
+            "ground_front_units": 0,
+            "ground_back_units": 0,
+            "wall_units": 0,
+            "records": 0,
+            "units": 0,
+        }
+        for i in list(range(1, 15)) + ["15", "WALL"]
+    }
+    part2_total_units = 0
+    part2_total_records = 0
+    part2_styles = set()
+    brand_totals = {}
+    placement_totals = {"RACK": 0, "GROUND_FRONT": 0, "GROUND_BACK": 0, "WALL": 0}
+
+    for it in items:
+        part = it.warehouse_part or ("PART_2" if (it.row_pos and not it.line) else "PART_1")
+        br = it.brand or "ALLBIRDS"
+        pl = it.placement_type or "RACK"
+        qty = it.quantity or 0
+
+        brand_totals[br] = brand_totals.get(br, 0) + qty
+        placement_totals[pl] = placement_totals.get(pl, 0) + qty
+
+        if part == "PART_1":
+            part1_total_units += qty
+            part1_total_records += 1
+            part1_styles.add(it.style)
+            ln_key = str(it.line or "1").strip()
+            if ln_key not in part1_lines:
+                part1_lines[ln_key] = {
+                    "line": ln_key,
+                    "occupied_sections": set(),
+                    "styles": set(),
+                    "records": 0,
+                    "units": 0,
+                }
+            part1_lines[ln_key]["records"] += 1
+            part1_lines[ln_key]["units"] += qty
+            part1_lines[ln_key]["styles"].add(it.style)
+            if it.section:
+                part1_lines[ln_key]["occupied_sections"].add(str(it.section))
+        else:
+            part2_total_units += qty
+            part2_total_records += 1
+            part2_styles.add(it.style)
+            rw_key = str(it.row_pos or "1").strip().upper()
+            if rw_key not in part2_rows:
+                part2_rows[rw_key] = {
+                    "row": rw_key,
+                    "occupied_sections": set(),
+                    "styles": set(),
+                    "brands": set(),
+                    "rack_units": 0,
+                    "ground_front_units": 0,
+                    "ground_back_units": 0,
+                    "wall_units": 0,
+                    "records": 0,
+                    "units": 0,
+                }
+            r_obj = part2_rows[rw_key]
+            r_obj["records"] += 1
+            r_obj["units"] += qty
+            r_obj["styles"].add(it.style)
+            r_obj["brands"].add(br)
+            if it.section:
+                r_obj["occupied_sections"].add(str(it.section))
+            if pl == "GROUND_FRONT":
+                r_obj["ground_front_units"] += qty
+            elif pl == "GROUND_BACK":
+                r_obj["ground_back_units"] += qty
+            elif pl == "WALL":
+                r_obj["wall_units"] += qty
+            else:
+                r_obj["rack_units"] += qty
+
+    part1_list = [
+        {
+            "line": k,
+            "occupied_sections": len(v["occupied_sections"]),
+            "max_sections": 35,
+            "levels": 4,
+            "total_styles": len(v["styles"]),
+            "total_records": v["records"],
+            "total_units": v["units"],
+        }
+        for k, v in part1_lines.items()
+    ]
+
+    part2_list = [
+        {
+            "row": k,
+            "occupied_sections": len(v["occupied_sections"]),
+            "max_sections": 36,
+            "levels": 4,
+            "brands": sorted(list(v["brands"])),
+            "rack_units": v["rack_units"],
+            "ground_front_units": v["ground_front_units"],
+            "ground_back_units": v["ground_back_units"],
+            "wall_units": v["wall_units"],
+            "total_styles": len(v["styles"]),
+            "total_records": v["records"],
+            "total_units": v["units"],
+        }
+        for k, v in part2_rows.items()
+        if k in [str(i) for i in range(1, 15)] + ["WALL"] or v["records"] > 0
+    ]
+
+    return {
+        "warehouse_sqft": "50,000+ sq ft",
+        "part_1_allbirds": {
+            "name": "Part 1: Allbirds Zone (14 Lines × 32–35 Sections × 4 Levels)",
+            "total_lines": 14,
+            "sections_per_line": "32–35",
+            "levels_per_section": 4,
+            "total_styles": len(part1_styles),
+            "total_records": part1_total_records,
+            "total_units": part1_total_units,
+            "lines": part1_list,
+        },
+        "part_2_vd_valentino": {
+            "name": "Part 2: Von Dutch & Valentino Zone (14 Rows × 36 Sections + Ground FRONT/BACK + WALL × 4 Levels)",
+            "total_rows": 14,
+            "sections_per_row": "36 + Ground FRONT / BACK / WALL",
+            "levels_per_section": 4,
+            "total_styles": len(part2_styles),
+            "total_records": part2_total_records,
+            "total_units": part2_total_units,
+            "rows": part2_list,
+        },
+        "brand_totals": brand_totals,
+        "placement_totals": placement_totals,
+    }
+
+
+@app.get("/api/warehouse-map/aisle")
+def get_warehouse_aisle_detail(
+    part: str = Query(..., description="PART_1 or PART_2"),
+    aisle: str = Query(..., description="Line number (1..14) for PART_1, or Row number (1..14 / WALL) for PART_2"),
+    db: Session = Depends(get_db)
+):
+    """
+    Return the Section x Level (1..4) breakdown for a specific Line in Part 1 or a specific Row/Wall in Part 2.
+    """
+    p = part.strip().upper()
+    a = aisle.strip().upper()
+
+    if p == "PART_1":
+        items = db.query(InventoryItem).filter(
+            func.coalesce(InventoryItem.line, "") == a
+        ).order_by(InventoryItem.section.asc(), InventoryItem.level.asc(), InventoryItem.style.asc()).all()
+    else:
+        items = db.query(InventoryItem).filter(
+            func.upper(func.coalesce(InventoryItem.row_pos, "")) == a
+        ).order_by(InventoryItem.section.asc(), InventoryItem.level.asc(), InventoryItem.style.asc()).all()
+
+    sections_map = {}
+    for it in items:
+        sec_key = (it.section or "UNASSIGNED").upper()
+        lvl_key = str(it.level or "1")
+        if sec_key not in sections_map:
+            sections_map[sec_key] = {
+                "section": sec_key,
+                "placement_type": it.placement_type or ("GROUND_FRONT" if sec_key == "FRONT" else ("GROUND_BACK" if sec_key == "BACK" else ("WALL" if a == "WALL" or sec_key == "WALL" else "RACK"))),
+                "total_units": 0,
+                "total_records": 0,
+                "levels": {"1": [], "2": [], "3": [], "4": [], "OTHER": []},
+            }
+        s_obj = sections_map[sec_key]
+        s_obj["total_units"] += (it.quantity or 0)
+        s_obj["total_records"] += 1
+        target_lvl = lvl_key if lvl_key in ("1", "2", "3", "4") else "OTHER"
+        s_obj["levels"][target_lvl].append({
+            "id": it.id,
+            "style": it.style,
+            "brand": it.brand or ("ALLBIRDS" if p == "PART_1" else "VON DUTCH"),
+            "color": it.color,
+            "size": it.size,
+            "box_num": it.box_num,
+            "pcs_per_box": it.pcs_per_box,
+            "quantity": it.quantity,
+            "location": it.location,
+        })
+
+    def sec_sort_key(sec_name: str):
+        if sec_name == "FRONT":
+            return (0, 0, sec_name)
+        if sec_name == "BACK":
+            return (0, 1, sec_name)
+        if sec_name == "WALL":
+            return (0, 2, sec_name)
+        if sec_name.isdigit():
+            return (1, int(sec_name), sec_name)
+        return (2, 0, sec_name)
+
+    sorted_sections = [sections_map[k] for k in sorted(sections_map.keys(), key=sec_sort_key)]
+    return {
+        "part": p,
+        "aisle": a,
+        "aisle_label": f"Line {a} (Allbirds)" if p == "PART_1" else (f"WALL Zone" if a == "WALL" else f"Row {a} (Von Dutch / Valentino)"),
+        "total_sections_occupied": len(sorted_sections),
+        "total_units": sum(s["total_units"] for s in sorted_sections),
+        "total_records": sum(s["total_records"] for s in sorted_sections),
+        "sections": sorted_sections,
+    }
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):

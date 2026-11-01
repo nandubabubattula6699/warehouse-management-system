@@ -188,21 +188,26 @@
       </div>
 
       <!-- Search Filter Bar -->
-      <form onsubmit="searchExistingLocations(event)" class="grid grid-cols-2 sm:grid-cols-6 gap-2.5 items-end bg-slate-950/70 p-3.5 rounded-xl border border-slate-800">
+      <form onsubmit="searchExistingLocations(event)" class="grid grid-cols-2 sm:grid-cols-7 gap-2.5 items-end bg-slate-950/70 p-3.5 rounded-xl border border-slate-800">
         <div>
           <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Style (SKU)</label>
           <input type="text" id="locSearchStyle" placeholder="e.g. A12501 or VDSW"
             class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono uppercase" />
         </div>
         <div>
-          <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Line</label>
+          <label class="block text-[10px] font-bold text-blue-300 uppercase mb-1">Part 1 Line (1–14)</label>
           <input type="text" id="locSearchLine" placeholder="e.g. 1"
             class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono" />
         </div>
         <div>
-          <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Section</label>
+          <label class="block text-[10px] font-bold text-purple-300 uppercase mb-1">Part 2 Row (1–14/WALL)</label>
+          <input type="text" id="locSearchRow" placeholder="e.g. 1 or WALL"
+            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono uppercase" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Section (1–36/FRONT/BACK)</label>
           <input type="text" id="locSearchSection" placeholder="e.g. 40 or FRONT"
-            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono" />
+            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono uppercase" />
         </div>
         <div>
           <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Level</label>
@@ -259,6 +264,6 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/manage.js?v=1.0"></script>
+  <script src="/static/manage.js?v=2.0"></script>
 </body>
 </html>

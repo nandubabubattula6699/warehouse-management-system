@@ -3,18 +3,45 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from .database import Base
 
+
+class WarehouseLocation(Base):
+    """
+    Master physical location map for the 50,000+ sq ft warehouse:
+      - PART_1: Allbirds Zone -> 14 Lines (Line 1..14), each 32-35+ Sections, 4 Levels
+      - PART_2: Von Dutch & Valentino Zone -> 14 Rows (Row 1..14 + WALL), each 36 Sections
+                plus Ground FRONT, Ground BACK, and WALL placements, 4 Levels
+    """
+    __tablename__ = "warehouse_locations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    location_code = Column(String(120), unique=True, index=True, nullable=False)
+    warehouse_part = Column(String(30), index=True, nullable=False)   # PART_1 | PART_2
+    zone_label = Column(String(100), nullable=False)                  # Allbirds Zone | Von Dutch & Valentino Zone
+    aisle_type = Column(String(20), index=True, nullable=False)       # LINE | ROW | WALL
+    aisle_number = Column(String(30), index=True, nullable=False)     # 1..14 or WALL
+    section = Column(String(50), index=True, nullable=False)          # 1..36, FRONT, BACK, WALL
+    level = Column(String(30), index=True, nullable=False)            # 1..4
+    placement_type = Column(String(30), index=True, nullable=False)   # RACK | GROUND_FRONT | GROUND_BACK | WALL
+    display_location = Column(String(200), index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class InventoryItem(Base):
     __tablename__ = "inventory_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    style = Column(String(100), index=True, nullable=False)   # Style / SKU code e.g. "A12501"
+    style = Column(String(100), index=True, nullable=False)           # e.g. "A12501", "VDSW-2092 SND", "VOSB-028"
+    brand = Column(String(60), index=True, default="ALLBIRDS")        # ALLBIRDS | VON DUTCH | VALENTINO | ED HARDY
+    warehouse_part = Column(String(30), index=True, default="PART_1") # PART_1 (Lines) | PART_2 (Rows/Ground/Wall)
+    placement_type = Column(String(30), index=True, default="RACK")   # RACK | GROUND_FRONT | GROUND_BACK | WALL
     color = Column(String(100), index=True, default="STANDARD")
     size = Column(String(50), index=True, default="OS")
-    line = Column(String(50), index=True, nullable=True)
-    section = Column(String(50), index=True, nullable=True)
-    level = Column(String(50), index=True, nullable=True)
-    row_pos = Column(String(50), index=True, nullable=True)
-    box_num = Column(String(50), nullable=True)
+    line = Column(String(50), index=True, nullable=True)              # Part 1: Line 1..14
+    section = Column(String(50), index=True, nullable=True)           # Sec 1..36 or FRONT / BACK / WALL
+    level = Column(String(50), index=True, nullable=True)             # Lvl 1..4
+    row_pos = Column(String(50), index=True, nullable=True)           # Part 2: Row 1..14 or WALL
+    box_num = Column(String(50), nullable=True)                       # Box # / Cartons
+    location_code = Column(String(120), index=True, nullable=True)    # Links to WarehouseLocation.location_code
     location = Column(String(200), index=True, nullable=False, default="Unassigned")
     pcs_per_box = Column(Integer, nullable=True)
     quantity = Column(Integer, default=0, nullable=False, index=True)
@@ -24,6 +51,7 @@ class InventoryItem(Base):
     __table_args__ = (
         Index("idx_item_style_loc", "style", "location"),
         Index("idx_item_style_size_color", "style", "size", "color"),
+        Index("idx_item_part_line_sec", "warehouse_part", "line", "row_pos", "section", "level"),
     )
 
     movements = relationship(
@@ -33,15 +61,16 @@ class InventoryItem(Base):
         order_by="desc(StockMovement.created_at)"
     )
 
+
 class StockMovement(Base):
     __tablename__ = "stock_movements"
 
     id = Column(Integer, primary_key=True, index=True)
     item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False, index=True)
     style = Column(String(100), index=True, nullable=False)
-    change_amount = Column(Integer, nullable=False)  # e.g., +5, -1
+    change_amount = Column(Integer, nullable=False)
     quantity_after = Column(Integer, nullable=False)
-    movement_type = Column(String(50), default="QUICK_ADJUST")  # QUICK_ADD, QUICK_SUB, STOCK_IN, STOCK_OUT, SET_EXACT
+    movement_type = Column(String(50), default="QUICK_ADJUST")
     reason = Column(String(255), nullable=True)
     staff_name = Column(String(100), default="Manager")
     created_at = Column(DateTime, default=datetime.utcnow, index=True)

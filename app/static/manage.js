@@ -386,6 +386,8 @@ async function searchExistingLocations(e) {
   if (e) e.preventDefault();
   const style = (document.getElementById("locSearchStyle").value || "").trim();
   const line = (document.getElementById("locSearchLine").value || "").trim();
+  const rowEl = document.getElementById("locSearchRow");
+  const row_pos = rowEl ? (rowEl.value || "").trim() : "";
   const section = (document.getElementById("locSearchSection").value || "").trim();
   const level = (document.getElementById("locSearchLevel").value || "").trim();
   const color = (document.getElementById("locSearchColor").value || "").trim();
@@ -393,6 +395,7 @@ async function searchExistingLocations(e) {
   const params = new URLSearchParams();
   if (style) params.set("style", style);
   if (line) params.set("line", line);
+  if (row_pos) params.set("row_pos", row_pos);
   if (section) params.set("section", section);
   if (level) params.set("level", level);
   if (color) params.set("color", color);
