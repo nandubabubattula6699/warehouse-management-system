@@ -90,11 +90,15 @@
           <button type="button" onclick="addSheetRows(25)" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs border border-slate-700 transition">
             + Add 25 Rows
           </button>
-          <label class="bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/40 font-bold px-3 py-1.5 rounded-lg text-xs cursor-pointer transition inline-flex items-center gap-1.5">
+          <label class="bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-400/50 font-black px-3.5 py-1.5 rounded-lg text-xs cursor-pointer transition inline-flex items-center gap-1.5 shadow">
             <span>📂</span>
-            <span>Load CSV / Excel Sheet (Up to 1,000+ Rows)</span>
+            <span>Upload &amp; Auto-Save CSV Sheet (10–1,000+ Rows)</span>
             <input type="file" id="csvSheetFileInput" accept=".csv" onchange="loadCsvIntoSheetGrid(event)" class="hidden" />
           </label>
+          <button type="button" id="submitSheetBtnTop" onclick="submitManagerSheet()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-1.5 rounded-lg text-xs shadow-lg shadow-emerald-500/20 inline-flex items-center gap-1.5 transition">
+            <span>🚀</span>
+            <span>Save Sheet to PostgreSQL</span>
+          </button>
           <button type="button" onclick="resetSheetGrid(15)" class="text-xs text-slate-400 hover:text-red-400 px-3 py-1.5 rounded-lg border border-slate-800 hover:border-red-500/30 transition">
             Reset / Clear Sheet
           </button>
@@ -264,6 +268,6 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/manage.js?v=2.0"></script>
+  <script src="/static/manage.js?v=3.0"></script>
 </body>
 </html>

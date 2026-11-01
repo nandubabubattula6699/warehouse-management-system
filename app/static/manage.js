@@ -232,25 +232,30 @@ function loadCsvIntoSheetGrid(e) {
       showToast("CSV file has no data rows", "error");
       return;
     }
-    const headers = parseCsvLine(lines[0]).map(h => h.toUpperCase().trim());
+    const headers = parseCsvLine(lines[0]).map(h => h.replace(/^\uFEFF/, "").toUpperCase().trim());
     const idxOf = (...names) => {
       for (const n of names) {
         const i = headers.indexOf(n);
         if (i !== -1) return i;
       }
+      // Fallback partial match
+      for (const n of names) {
+        const i = headers.findIndex(h => h.includes(n));
+        if (i !== -1) return i;
+      }
       return -1;
     };
 
-    const iSku = idxOf("SKU", "STYLE", "STYLE CODE");
+    const iSku = idxOf("SKU", "STYLE CODE", "STYLE #", "STYLE", "ITEM", "PRODUCT");
     const iColor = idxOf("COLOR", "COLOUR");
-    const iSize = idxOf("SIZE");
-    const iLine = idxOf("LINE");
-    const iSec = idxOf("SECTION", "SEC");
-    const iLvl = idxOf("LEVEL", "LVL");
-    const iRow = idxOf("ROW");
-    const iBox = idxOf("BOX #", "BOX", "CARTONS", "TOTAL CARTONS");
-    const iPcs = idxOf("PCS/BOX", "PCS/CARTON", "PCS_PER_BOX");
-    const iQty = idxOf("QTY", "QUANTITY", "TOTAL PIECES", "PIECES");
+    const iSize = idxOf("SIZE", "SZ");
+    const iLine = idxOf("LINE", "LINE #", "LINE NO", "AISLE");
+    const iSec = idxOf("SECTION", "SEC", "SEC #");
+    const iLvl = idxOf("LEVEL", "LVL", "TIER");
+    const iRow = idxOf("ROW", "ROW #", "ROW NO");
+    const iBox = idxOf("BOX #", "BOX", "CARTONS", "TOTAL CARTONS", "CARTON", "CTN");
+    const iPcs = idxOf("PCS/BOX", "PCS/CARTON", "PCS_PER_BOX", "PCS PER BOX", "PACK");
+    const iQty = idxOf("QTY", "QUANTITY", "TOTAL PIECES", "PIECES", "TOTAL QTY", "UNITS", "PCS");
 
     if (iSku === -1) {
       showToast("CSV must have a SKU or STYLE column header", "error");
@@ -288,18 +293,25 @@ function loadCsvIntoSheetGrid(e) {
     const tbody = document.getElementById("sheetGridBody");
     if (tbody) tbody.innerHTML = "";
     rowCounter = 0;
-    addSheetRows(parsed.length, parsed);
-    showToast(`Loaded ${parsed.length.toLocaleString()} rows from "${file.name}" into sheet!`, "success");
+    // Render up to 250 rows in the DOM preview grid so browser stays fast, while submitting ALL parsed rows to PostgreSQL!
+    window._pendingFullCsvRows = parsed;
+    addSheetRows(Math.min(parsed.length, 250), parsed);
+    showToast(`Loaded ${parsed.length.toLocaleString()} rows from "${file.name}" — Auto-saving to PostgreSQL now...`, "info");
     e.target.value = "";
+    submitManagerSheet(parsed);
   };
   reader.readAsText(file);
 }
 
-async function submitManagerSheet() {
-  const trs = document.querySelectorAll("#sheetGridBody .sheet-row");
-  const rowsPayload = [];
-
-  trs.forEach(tr => {
+async function submitManagerSheet(directRows = null) {
+  let rowsPayload = [];
+  if (Array.isArray(directRows) && directRows.length > 0) {
+    rowsPayload = directRows;
+  } else if (window._pendingFullCsvRows && window._pendingFullCsvRows.length > 250) {
+    rowsPayload = window._pendingFullCsvRows;
+  } else {
+    const trs = document.querySelectorAll("#sheetGridBody .sheet-row");
+    trs.forEach(tr => {
     const style = (tr.querySelector(".row-style").value || "").trim().toUpperCase();
     if (!style) return;
     const action = tr.querySelector(".row-action").value;
@@ -318,6 +330,7 @@ async function submitManagerSheet() {
       action, style, color, size, line, section, level, row_pos, box_num, pcs_per_box, quantity
     });
   });
+  }
 
   if (rowsPayload.length === 0) {
     showToast("Please enter at least 1 row with a Style code", "error");
@@ -366,7 +379,8 @@ async function submitManagerSheet() {
       banner.classList.remove("hidden");
     }
 
-    showToast(`Saved ${data.processed_rows} sheet rows to PostgreSQL!`, "success");
+    window._pendingFullCsvRows = null;
+    showToast(`Saved ${data.processed_rows.toLocaleString()} sheet rows to PostgreSQL!`, "success");
     await loadKnownStyles();
     if (data.touched_styles && data.touched_styles.length > 0) {
       document.getElementById("locSearchStyle").value = data.touched_styles[0];

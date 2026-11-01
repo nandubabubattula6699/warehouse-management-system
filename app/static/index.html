@@ -129,7 +129,10 @@
               </div>
               <p id="aisleInspectorSubtitle" class="text-xs text-slate-400 mt-0.5"></p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="loadActiveAisleIntoLookup()" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition shadow">
+                🔍 Show Full Line/Row in Lookup Table
+              </button>
               <input type="text" id="aisleSectionFilterInput" oninput="filterAisleSections()" placeholder="Filter section or style..."
                 class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono w-44 focus:outline-none focus:border-amber-500" />
               <button onclick="closeAisleInspector()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">
@@ -159,7 +162,7 @@
             <input 
               type="text" 
               id="styleSearchInput" 
-              placeholder="e.g. A12501, A12856, TB1WJBK..." 
+              placeholder="e.g. A12501, Line 14, Row 1, VDSW-2092 SND..." 
               autocomplete="off"
               class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-24 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
             />
@@ -522,6 +525,6 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=5.0"></script>
+  <script src="/static/app.js?v=6.0"></script>
 </body>
 </html>

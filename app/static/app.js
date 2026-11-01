@@ -211,17 +211,40 @@ function renderStyleDropdown(query) {
   }
 
   const qNorm = query.replace(/\s+/g, "");
+  const locationSuggestions = [];
+  for (let i = 1; i <= 14; i++) {
+    const lnCode = `LINE ${i}`;
+    if (lnCode.includes(query) || `LINE${i}`.includes(qNorm) || query === String(i)) {
+      locationSuggestions.push({ code: lnCode, label: `📍 ${lnCode} (Part 1 Allbirds — View all styles in Line ${i})` });
+    }
+    const rwCode = `ROW ${i}`;
+    if (rwCode.includes(query) || `ROW${i}`.includes(qNorm)) {
+      locationSuggestions.push({ code: rwCode, label: `📍 ${rwCode} (Part 2 Von Dutch / Valentino — View all styles in Row ${i})` });
+    }
+  }
+  if ("WALL".includes(query)) {
+    locationSuggestions.push({ code: "WALL", label: "📍 WALL ZONE (Part 2 — View all Wall stock)" });
+  }
+
   const matches = allStylesList.filter(s => {
     const stUpper = s.style.toUpperCase();
     return stUpper.includes(query) || stUpper.replace(/\s+/g, "").includes(qNorm);
   }).slice(0, 20);
-  if (matches.length === 0) {
-    dropdown.innerHTML = `<div class="p-3 text-xs text-slate-500">No styles matching "${escapeHtml(query)}"</div>`;
+  if (matches.length === 0 && locationSuggestions.length === 0) {
+    dropdown.innerHTML = `<div class="p-3 text-xs text-slate-500">No styles or lines matching "${escapeHtml(query)}"</div>`;
     dropdown.classList.remove("hidden");
     return;
   }
 
-  dropdown.innerHTML = matches.map(s => {
+  const locHtml = locationSuggestions.map(loc => `
+      <div 
+        onclick="addStyleToSelection('${loc.code}'); document.getElementById('styleDropdown').classList.add('hidden'); document.getElementById('styleSearchInput').value='';" 
+        class="p-2.5 bg-blue-500/10 hover:bg-blue-500/20 cursor-pointer flex justify-between items-center transition border-b border-slate-800">
+        <span class="font-mono font-black text-blue-300 text-xs">${escapeHtml(loc.label)}</span>
+        <span class="text-[10px] text-amber-300 font-mono font-bold">+ Load Line/Row</span>
+      </div>
+    `).join("");
+  dropdown.innerHTML = locHtml + matches.map(s => {
     const isSelected = selectedStyles.includes(s.style);
     return `
       <div 
@@ -1047,4 +1070,14 @@ function renderAisleSectionsGrid() {
       </div>
     `;
   }).join("");
+}
+
+function loadActiveAisleIntoLookup() {
+  if (!activeAisleData) return;
+  const token = activeAisleData.part === "PART_1"
+    ? `LINE ${activeAisleData.aisle}`
+    : (activeAisleData.aisle === "WALL" ? "WALL" : `ROW ${activeAisleData.aisle}`);
+  selectedStyles = [token];
+  renderSelectedStylesChips();
+  loadBatchStylesDetails();
 }

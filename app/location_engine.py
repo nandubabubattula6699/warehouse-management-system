@@ -5,6 +5,20 @@ from app.database import engine
 from app.models import WarehouseLocation, InventoryItem
 
 
+def _norm_coord(val: Optional[str], prefixes: tuple) -> Optional[str]:
+    if val is None:
+        return None
+    s = str(val).strip().upper()
+    if s == "" or s == "NAN" or s == "NONE":
+        return None
+    if s.endswith(".0"):
+        s = s[:-2].strip()
+    for p in prefixes:
+        if s.startswith(p):
+            s = s[len(p):].strip()
+    return s if s else None
+
+
 def classify_brand_and_part(
     style: str,
     line: Optional[str] = None,
@@ -68,11 +82,11 @@ def build_location_info(
     """
     Build standardized location strings, location_code, warehouse_part, brand, and placement_type.
     """
-    ln = str(line).strip() if line is not None and str(line).strip() != "" else None
-    sec = str(section).strip().upper() if section is not None and str(section).strip() != "" else None
-    lvl = str(level).strip() if level is not None and str(level).strip() != "" else None
-    rw = str(row_pos).strip().upper() if row_pos is not None and str(row_pos).strip() != "" else None
-    bx = str(box_num).strip() if box_num is not None and str(box_num).strip() != "" else None
+    ln = _norm_coord(line, ("LINE ", "LINE#", "LINE-", "LN ", "L-", "L"))
+    sec = _norm_coord(section, ("SECTION ", "SECTION#", "SEC ", "SEC#", "SEC-", "S-"))
+    lvl = _norm_coord(level, ("LEVEL ", "LEVEL#", "LVL ", "LVL#", "LVL-", "LV-", "LV"))
+    rw = _norm_coord(row_pos, ("ROW ", "ROW#", "ROW-", "RW "))
+    bx = _norm_coord(box_num, ("BOX #", "BOX#", "BOX ", "CARTONS ", "CARTON ", "CTN "))
 
     warehouse_part, brand, placement_type = classify_brand_and_part(style, ln, rw, sec)
 

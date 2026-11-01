@@ -129,7 +129,23 @@ def get_styles_batch(
         func.replace(func.upper(InventoryItem.style), " ", "").in_(no_space_list),
     ]
     for tok in raw_list:
-        match_clauses.append(func.upper(InventoryItem.style).like(f"{tok}%"))
+        if tok.startswith("LINE ") or tok.startswith("LINE-") or tok.startswith("LINE#") or (tok.startswith("LINE") and tok[4:].strip().isdigit()):
+            ln_val = tok.replace("LINE#", "").replace("LINE-", "").replace("LINE", "").strip()
+            if ln_val:
+                match_clauses.append(func.upper(func.coalesce(InventoryItem.line, "")) == ln_val)
+        elif tok.startswith("ROW ") or tok.startswith("ROW-") or tok.startswith("ROW#") or (tok.startswith("ROW") and tok[3:].strip()):
+            rw_val = tok.replace("ROW#", "").replace("ROW-", "").replace("ROW", "").strip()
+            if rw_val:
+                match_clauses.append(func.upper(func.coalesce(InventoryItem.row_pos, "")) == rw_val)
+        elif tok in ("WALL", "WALL ZONE"):
+            match_clauses.append(func.upper(func.coalesce(InventoryItem.row_pos, "")) == "WALL")
+            match_clauses.append(func.upper(func.coalesce(InventoryItem.section, "")) == "WALL")
+        elif tok.isdigit() and int(tok) in range(1, 16):
+            match_clauses.append(func.upper(func.coalesce(InventoryItem.line, "")) == tok)
+            match_clauses.append(func.upper(func.coalesce(InventoryItem.row_pos, "")) == tok)
+            match_clauses.append(func.upper(InventoryItem.style).like(f"{tok}%"))
+        else:
+            match_clauses.append(func.upper(InventoryItem.style).like(f"{tok}%"))
 
     items = db.query(InventoryItem).filter(
         or_(*match_clauses)
@@ -382,11 +398,19 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
             action = (raw.action or "IN").strip().upper()
             color = (_clean_str(raw.color) or "STANDARD").upper()
             size = (_clean_str(raw.size) or "OS").upper()
-            line = _clean_str(raw.line)
-            section = _clean_str(raw.section)
-            level = _clean_str(raw.level)
-            row_pos = _clean_str(raw.row_pos)
-            box_num = _clean_str(raw.box_num)
+            loc_meta = build_location_info(
+                style=style,
+                line=_clean_str(raw.line),
+                section=_clean_str(raw.section),
+                level=_clean_str(raw.level),
+                row_pos=_clean_str(raw.row_pos),
+                box_num=_clean_str(raw.box_num),
+            )
+            line = loc_meta["line"]
+            section = loc_meta["section"]
+            level = loc_meta["level"]
+            row_pos = loc_meta["row_pos"]
+            box_num = loc_meta["box_num"]
             pcs_per_box = raw.pcs_per_box if (raw.pcs_per_box and raw.pcs_per_box > 0) else None
             qty = int(raw.quantity or 0)
 
@@ -524,12 +548,7 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                     pcs_per_box=pcs_per_box,
                     quantity=qty,
                 )
-                db.add(new_item)
-                db.flush()
-                inserted_count += 1
-                total_pieces_in += qty
-                db.add(StockMovement(
-                    item_id=new_item.id,
+                new_item.movements.append(StockMovement(
                     style=new_item.style,
                     change_amount=qty,
                     quantity_after=new_item.quantity,
@@ -537,6 +556,9 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                     reason=f"{note} (New location entry)",
                     staff_name=staff,
                 ))
+                db.add(new_item)
+                inserted_count += 1
+                total_pieces_in += qty
 
         db.commit()
     except HTTPException:
