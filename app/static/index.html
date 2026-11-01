@@ -31,7 +31,11 @@
       </div>
 
       <!-- Right Header Controls -->
-      <div class="flex items-center space-x-2 sm:space-x-3">
+      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+        <button onclick="openUserAccessModal()" class="bg-purple-500 hover:bg-purple-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-purple-500/20 transition">
+          <span>👥</span>
+          <span>Give Access / Manage Users</span>
+        </button>
         <a href="/manage" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition">
           <span>📋</span>
           <span>Sheet Entry / Manage Data</span>
@@ -232,7 +236,7 @@
                 <div id="currentStyleTotalQty" class="text-2xl font-black text-amber-400 mt-0.5">-</div>
               </div>
 
-              <button onclick="openAddLocationModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 p-3 rounded-2xl transition" title="Add Location / Stock">
+              <button onclick="openAddLocationModal()" class="admin-only-control bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 p-3 rounded-2xl transition" title="Add Location / Stock">
                 <span>➕</span>
               </button>
             </div>
@@ -266,8 +270,8 @@
                   <th class="py-3.5 px-4 text-center">Size</th>
                   <th class="py-3.5 px-4 text-center">Boxes / Pcs</th>
                   <th class="py-3.5 px-4 text-center">In-Stock Quantity</th>
-                  <th class="py-3.5 px-4 text-center">Realtime Quantity Actions</th>
-                  <th class="py-3.5 px-4 text-right">Delete</th>
+                  <th class="admin-only-control py-3.5 px-4 text-center">Realtime Quantity Actions</th>
+                  <th class="admin-only-control py-3.5 px-4 text-right">Delete</th>
                 </tr>
               </thead>
               <tbody id="styleLocationTableBody" class="divide-y divide-slate-800/60 text-sm">
@@ -525,7 +529,7 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=6.0"></script>
-  <script src="/static/auth_client.js?v=1.0"></script>
+  <script src="/static/app.js?v=7.0"></script>
+  <script src="/static/auth_client.js?v=2.0"></script>
 </body>
 </html>

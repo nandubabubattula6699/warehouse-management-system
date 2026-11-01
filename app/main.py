@@ -1229,4 +1229,7 @@ if os.path.exists(static_dir):
         user = get_optional_user(request, db)
         if not user:
             return RedirectResponse(url="/login", status_code=302)
+        if user.role != "ADMIN":
+            # Manager & Floor Staff only get the Single-View Lookup & Print Pick Sheet dashboard
+            return RedirectResponse(url="/", status_code=302)
         return FileResponse(os.path.join(static_dir, "manage.html"))

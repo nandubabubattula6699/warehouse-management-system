@@ -11,6 +11,14 @@ async function initWarehouseAuth() {
     if (!res.ok) return;
     const data = await res.json();
     window.currentWarehouseUser = data.user;
+    const isAdmin = data.user && data.user.role === "ADMIN";
+    document.querySelectorAll(".admin-only-control").forEach(el => {
+      if (isAdmin) {
+        el.classList.remove("hidden");
+      } else {
+        el.classList.add("hidden");
+      }
+    });
 
     // Auto-fill staff name input on /manage if present
     const staffInput = document.getElementById("sheetStaffInput");
