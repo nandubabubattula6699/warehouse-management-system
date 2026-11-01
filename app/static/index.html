@@ -30,21 +30,21 @@
         </div>
       </div>
 
-      <!-- Right Header Controls -->
+      <!-- Right Header Controls (Hidden by default; shown ONLY when logged in as Admin Nandu) -->
       <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-        <button onclick="openUserAccessModal()" class="bg-purple-500 hover:bg-purple-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-purple-500/20 transition">
+        <button id="headerGiveAccessBtn" onclick="openUserAccessModal()" class="admin-only-control hidden bg-purple-500 hover:bg-purple-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-purple-500/20 transition">
           <span>👥</span>
           <span>Give Access / Manage Users</span>
         </button>
-        <a href="/manage" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition">
+        <a id="headerManageDataBtn" href="/manage" class="admin-only-control hidden bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition">
           <span>📋</span>
           <span>Sheet Entry / Manage Data</span>
         </a>
-        <button onclick="openModal('movementModal')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition">
+        <button onclick="openModal('movementModal')" class="admin-only-control hidden bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition">
           <span>📜</span>
           <span class="hidden sm:inline">Audit Trail</span>
         </button>
-        <button onclick="openAddLocationModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg transition">
+        <button onclick="openAddLocationModal()" class="admin-only-control hidden bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg transition">
           <span>➕</span>
           <span>Add Location / Stock</span>
         </button>
@@ -236,7 +236,7 @@
                 <div id="currentStyleTotalQty" class="text-2xl font-black text-amber-400 mt-0.5">-</div>
               </div>
 
-              <button onclick="openAddLocationModal()" class="admin-only-control bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 p-3 rounded-2xl transition" title="Add Location / Stock">
+              <button onclick="openAddLocationModal()" class="admin-only-control hidden bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 p-3 rounded-2xl transition" title="Add Location / Stock">
                 <span>➕</span>
               </button>
             </div>
@@ -270,8 +270,8 @@
                   <th class="py-3.5 px-4 text-center">Size</th>
                   <th class="py-3.5 px-4 text-center">Boxes / Pcs</th>
                   <th class="py-3.5 px-4 text-center">In-Stock Quantity</th>
-                  <th class="admin-only-control py-3.5 px-4 text-center">Realtime Quantity Actions</th>
-                  <th class="admin-only-control py-3.5 px-4 text-right">Delete</th>
+                  <th class="admin-only-control hidden py-3.5 px-4 text-center">Realtime Quantity Actions</th>
+                  <th class="admin-only-control hidden py-3.5 px-4 text-right">Delete</th>
                 </tr>
               </thead>
               <tbody id="styleLocationTableBody" class="divide-y divide-slate-800/60 text-sm">
@@ -529,7 +529,7 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=7.0"></script>
-  <script src="/static/auth_client.js?v=2.0"></script>
+  <script src="/static/app.js?v=8.0"></script>
+  <script src="/static/auth_client.js?v=3.0"></script>
 </body>
 </html>

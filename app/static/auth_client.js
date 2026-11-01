@@ -26,6 +26,7 @@ async function initWarehouseAuth() {
       staffInput.value = data.user.full_name;
     }
 
+    if (typeof renderFilteredRows === 'function') renderFilteredRows();
     renderAuthHeaderControls(data);
     injectAccessControlModal();
   } catch (err) {

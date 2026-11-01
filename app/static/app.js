@@ -433,7 +433,7 @@ function renderFilteredRows() {
           </span>
         </td>
 
-        <td class="admin-only-control py-3.5 px-4 text-center ${window.currentWarehouseUser && window.currentWarehouseUser.role !== 'ADMIN' ? 'hidden' : ''}">
+        <td class="admin-only-control py-3.5 px-4 text-center ${window.currentWarehouseUser && window.currentWarehouseUser.role === 'ADMIN' ? '' : 'hidden'}">
           <div class="inline-flex items-center space-x-1.5 bg-slate-950 border border-slate-800 rounded-xl p-1 shadow-md">
             <button 
               onclick="realtimeQuickAdjust(${item.id}, -1)" 
@@ -463,7 +463,7 @@ function renderFilteredRows() {
           </div>
         </td>
 
-        <td class="admin-only-control py-3.5 px-4 text-right ${window.currentWarehouseUser && window.currentWarehouseUser.role !== 'ADMIN' ? 'hidden' : ''}">
+        <td class="admin-only-control py-3.5 px-4 text-right ${window.currentWarehouseUser && window.currentWarehouseUser.role === 'ADMIN' ? '' : 'hidden'}">
           <button onclick="deleteLocationRecord(${item.id})" class="p-1.5 text-slate-600 hover:text-red-400 rounded-lg transition text-xs" title="Remove Location Record">
             🗑️
           </button>
