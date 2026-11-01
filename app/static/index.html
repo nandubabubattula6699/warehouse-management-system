@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Warehouse OS - Manager Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/static/styles.css?v=10.0">
+  <link rel="stylesheet" href="/static/styles.css?v=11.0">
 </head>
-<body class="bg-slate-100 text-slate-900 h-screen overflow-hidden flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+<body class="bg-[#e6f1fb] text-slate-900 h-screen overflow-hidden flex flex-col font-sans selection:bg-blue-600 selection:text-white">
 
   <!-- ================= WEB VIEW (1280x720 Clean Single-Screen Layout) ================= -->
   <div class="web-only flex flex-col h-screen overflow-hidden">
 
     <!-- Clean White Top Bar -->
-    <header class="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between gap-3 shrink-0 shadow-sm z-30">
+    <header class="bg-white border-b border-blue-200 px-4 py-2.5 flex items-center justify-between gap-3 shrink-0 shadow-sm z-30">
       <div class="flex items-center gap-3">
         <div class="bg-blue-600 text-white w-9 h-9 rounded-lg font-black flex items-center justify-center text-base shrink-0">
           📦
@@ -59,7 +59,7 @@
       <section class="col-span-12 lg:col-span-4 flex flex-col gap-3 overflow-hidden min-h-0">
 
         <!-- 1. Search Box Card -->
-        <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm space-y-2.5 shrink-0">
+        <div class="bg-white border border-blue-200/80 rounded-xl p-3.5 shadow-sm space-y-2.5 shrink-0">
           <div class="flex items-center justify-between">
             <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">
               1. Search Style or Line / Row
@@ -97,7 +97,7 @@
         </div>
 
         <!-- 2. Simple Warehouse Zone Browser (Part 1 Lines 1-14 / Part 2 Rows 1-14) -->
-        <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex-1 flex flex-col overflow-hidden min-h-0">
+        <div class="bg-white border border-blue-200/80 rounded-xl p-3.5 shadow-sm flex-1 flex flex-col overflow-hidden min-h-0">
           <div class="flex items-center justify-between pb-2 border-b border-slate-200 shrink-0">
             <span class="text-xs font-bold uppercase tracking-wider text-slate-700">
               2. Browse by Warehouse Zone
@@ -107,7 +107,7 @@
           </div>
 
           <!-- Clean 2-Button Zone Switcher -->
-          <div class="grid grid-cols-2 gap-1.5 my-2.5 shrink-0 bg-slate-100 p-1 rounded-lg border border-slate-200">
+          <div class="grid grid-cols-2 gap-1.5 my-2.5 shrink-0 bg-blue-100/70 p-1 rounded-lg border border-blue-200">
             <button id="tabPart1Btn" onclick="switchWarehousePart('PART_1')"
               class="px-2.5 py-1.5 rounded-md text-xs font-bold transition bg-blue-600 text-white shadow-sm">
               Part 1: Allbirds (Lines 1–14)
@@ -156,7 +156,7 @@
       <section id="styleDetailContainer" class="col-span-12 lg:col-span-8 flex flex-col gap-3 overflow-hidden min-h-0">
 
         <!-- Clean White Summary & Print Bar -->
-        <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm shrink-0">
+        <div class="bg-white border border-blue-200/80 rounded-xl p-3.5 shadow-sm shrink-0">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="min-w-0">
               <div class="flex items-center gap-2">
@@ -203,10 +203,10 @@
         </div>
 
         <!-- Clean White Sorted Locations Table -->
-        <div class="bg-white border border-slate-200 rounded-xl flex-1 overflow-hidden shadow-sm flex flex-col min-h-0">
+        <div class="bg-white border border-blue-200/80 rounded-xl flex-1 overflow-hidden shadow-sm flex flex-col min-h-0">
           <div class="flex-1 overflow-y-auto">
             <table class="w-full text-left border-collapse">
-              <thead class="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[11px] text-slate-600 uppercase tracking-wider font-bold">
+              <thead class="sticky top-0 z-10 bg-blue-50/90 border-b border-blue-200 text-[11px] text-blue-950 uppercase tracking-wider font-bold">
                 <tr>
                   <th class="py-2.5 px-3">Style (SKU)</th>
                   <th class="py-2.5 px-3">Location (Line/Row &bull; Sec &bull; Lvl)</th>
@@ -445,7 +445,7 @@
 
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=10.0"></script>
+  <script src="/static/app.js?v=11.0"></script>
   <script src="/static/auth_client.js?v=5.0"></script>
 </body>
 </html>

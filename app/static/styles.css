@@ -1,20 +1,25 @@
-/* Clean, minimal light theme styles for Warehouse OS */
-.location-tag {
-  background-color: #f1f5f9;
-  border: 1px solid #cbd5e1;
+/* Clean, minimal Light Blue theme styles for Warehouse OS */
+body {
+  background-color: #e6f1fb !important;
   color: #0f172a;
 }
 
-.style-tag-badge {
+.location-tag {
   background-color: #eff6ff;
   border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+}
+
+.style-tag-badge {
+  background-color: #dbeafe;
+  border: 1px solid #93c5fd;
   color: #1e40af;
 }
 
 .style-chip {
-  background-color: #f8fafc;
-  border: 1px solid #cbd5e1;
-  color: #334155;
+  background-color: #ffffff;
+  border: 1px solid #bfdbfe;
+  color: #1e293b;
   transition: all 0.12s ease-in-out;
 }
 

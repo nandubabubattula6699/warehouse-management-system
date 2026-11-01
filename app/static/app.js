@@ -444,7 +444,7 @@ function renderFilteredRows() {
       : `Line ${escapeHtml(item.line || "-")} • Sec ${escapeHtml(item.section || "-")} • Lvl ${escapeHtml(item.level || "-")}`;
 
     return `
-      <tr class="hover:bg-slate-50 transition">
+      <tr class="hover:bg-blue-50/60 transition">
         <td class="py-2.5 px-3 font-mono font-bold text-slate-900">
           ${escapeHtml(item.style)}
         </td>
@@ -472,7 +472,7 @@ function renderFilteredRows() {
         </td>
 
         <td class="py-2.5 px-3 text-center">
-          <span class="inline-block px-3 py-1 rounded-md text-xs font-bold font-mono bg-slate-100 text-slate-900 border border-slate-300">
+          <span class="inline-block px-3 py-1 rounded-md text-xs font-bold font-mono bg-blue-50 text-blue-950 border border-blue-200">
             ${item.quantity.toLocaleString()} pcs
           </span>
         </td>
