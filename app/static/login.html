@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warehouse OS - Sign In & Access Request</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-center items-center p-4 font-sans selection:bg-amber-500 selection:text-slate-950">
+
+  <!-- Background Subtle Glow -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden">
+    <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-amber-500/10 blur-[130px] rounded-full"></div>
+    <div class="absolute bottom-0 right-10 w-[400px] h-[250px] bg-blue-500/10 blur-[120px] rounded-full"></div>
+  </div>
+
+  <div class="relative z-10 w-full max-w-md space-y-6">
+    <!-- Brand Header -->
+    <div class="text-center space-y-2">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500 text-slate-950 text-3xl font-black shadow-xl shadow-amber-500/20">
+        📦
+      </div>
+      <h1 class="text-2xl font-black tracking-wider uppercase text-white">Warehouse OS</h1>
+      <p class="text-xs text-slate-400">50,000+ sq ft Multi-Zone Inventory &amp; Location System</p>
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Protected Warehouse Portal • Authorized Staff Only</span>
+      </div>
+    </div>
+
+    <!-- Main Auth Card -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5">
+      <!-- Mode Switch Tabs -->
+      <div class="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+        <button id="tabLoginBtn" onclick="switchAuthTab('LOGIN')"
+          class="py-2 rounded-lg text-xs font-black uppercase tracking-wider transition bg-amber-500 text-slate-950 shadow">
+          🔐 Sign In
+        </button>
+        <button id="tabSignupBtn" onclick="switchAuthTab('SIGNUP')"
+          class="py-2 rounded-lg text-xs font-black uppercase tracking-wider transition text-slate-400 hover:text-white">
+          📝 Sign Up / Request Access
+        </button>
+      </div>
+
+      <!-- Alert Banner -->
+      <div id="authAlertBox" class="hidden rounded-xl p-3.5 text-xs font-semibold border"></div>
+
+      <!-- LOGIN FORM -->
+      <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Username or Email</label>
+          <input type="text" id="loginUsername" required autocomplete="username" placeholder="e.g. nandu or email@example.com"
+            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-amber-500" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
+          <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••"
+            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500" />
+        </div>
+
+        <button type="submit" id="loginSubmitBtn"
+          class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 rounded-xl text-sm shadow-lg shadow-amber-500/20 transition">
+          Sign In to Warehouse OS →
+        </button>
+      </form>
+
+      <!-- SIGN UP / REQUEST ACCESS FORM -->
+      <form id="signupForm" onsubmit="handleSignupSubmit(event)" class="hidden space-y-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Full Name *</label>
+          <input type="text" id="signupFullName" required placeholder="e.g. Carlos (Part 1 Lead)"
+            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Username *</label>
+            <input type="text" id="signupUsername" required placeholder="e.g. carlos"
+              class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-amber-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Email (Optional)</label>
+            <input type="email" id="signupEmail" placeholder="carlos@warehouse.com"
+              class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-amber-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Role</label>
+            <select id="signupRole" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
+              <option value="STAFF">Warehouse Floor Staff</option>
+              <option value="PART_1_LEAD">Part 1 Lead (Allbirds E-Com)</option>
+              <option value="PART_2_LEAD">Part 2 Lead (VD &amp; Valentino Wholesale)</option>
+              <option value="MANAGER">Warehouse Manager</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Warehouse Zone</label>
+            <select id="signupZone" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
+              <option value="ALL_ZONES">All Zones (Part 1 &amp; Part 2)</option>
+              <option value="PART_1_ALLBIRDS">Part 1: Allbirds (Lines 1–14)</option>
+              <option value="PART_2_VD_VALENTINO">Part 2: Von Dutch &amp; Valentino (Rows 1–14)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Create Password *</label>
+          <input type="password" id="signupPassword" required minlength="4" placeholder="At least 4 characters"
+            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+        </div>
+
+        <button type="submit" id="signupSubmitBtn"
+          class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 rounded-xl text-sm shadow-lg shadow-emerald-500/20 transition">
+          Submit Sign-Up Request →
+        </button>
+
+        <p class="text-[11px] text-slate-400 text-center">
+          🔒 New sign-up requests require 1-click approval from <strong>Admin (Nandu)</strong> before accessing inventory data.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function switchAuthTab(mode) {
+      const loginForm = document.getElementById("loginForm");
+      const signupForm = document.getElementById("signupForm");
+      const btnLogin = document.getElementById("tabLoginBtn");
+      const btnSignup = document.getElementById("tabSignupBtn");
+      const alertBox = document.getElementById("authAlertBox");
+      alertBox.classList.add("hidden");
+
+      if (mode === "LOGIN") {
+        loginForm.classList.remove("hidden");
+        signupForm.classList.add("hidden");
+        btnLogin.className = "py-2 rounded-lg text-xs font-black uppercase tracking-wider transition bg-amber-500 text-slate-950 shadow";
+        btnSignup.className = "py-2 rounded-lg text-xs font-black uppercase tracking-wider transition text-slate-400 hover:text-white";
+      } else {
+        loginForm.classList.add("hidden");
+        signupForm.classList.remove("hidden");
+        btnSignup.className = "py-2 rounded-lg text-xs font-black uppercase tracking-wider transition bg-emerald-500 text-slate-950 shadow";
+        btnLogin.className = "py-2 rounded-lg text-xs font-black uppercase tracking-wider transition text-slate-400 hover:text-white";
+      }
+    }
+
+    function showAuthAlert(msg, isError = true) {
+      const box = document.getElementById("authAlertBox");
+      box.className = isError
+        ? "rounded-xl p-3.5 text-xs font-semibold border bg-red-500/15 border-red-500/40 text-red-300"
+        : "rounded-xl p-3.5 text-xs font-semibold border bg-emerald-500/15 border-emerald-500/40 text-emerald-200";
+      box.textContent = msg;
+      box.classList.remove("hidden");
+    }
+
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      const username = document.getElementById("loginUsername").value.trim();
+      const password = document.getElementById("loginPassword").value;
+      const btn = document.getElementById("loginSubmitBtn");
+      btn.disabled = true;
+      btn.textContent = "Signing in...";
+
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showAuthAlert(data.detail || "Invalid login credentials.", true);
+          return;
+        }
+        window.location.href = "/";
+      } catch (err) {
+        showAuthAlert("Network error connecting to server.", true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Sign In to Warehouse OS →";
+      }
+    }
+
+    async function handleSignupSubmit(e) {
+      e.preventDefault();
+      const full_name = document.getElementById("signupFullName").value.trim();
+      const username = document.getElementById("signupUsername").value.trim();
+      const email = document.getElementById("signupEmail").value.trim() || null;
+      const role = document.getElementById("signupRole").value;
+      const assigned_zone = document.getElementById("signupZone").value;
+      const password = document.getElementById("signupPassword").value;
+
+      const btn = document.getElementById("signupSubmitBtn");
+      btn.disabled = true;
+      btn.textContent = "Submitting Request...";
+
+      try {
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ full_name, username, email, role, assigned_zone, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showAuthAlert(data.detail || "Sign up failed.", true);
+          return;
+        }
+        document.getElementById("signupForm").reset();
+        switchAuthTab("LOGIN");
+        showAuthAlert(data.message || "Account created! Waiting for Admin (Nandu) to grant access.", false);
+      } catch (err) {
+        showAuthAlert("Network error submitting request.", true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Submit Sign-Up Request →";
+      }
+    }
+  </script>
+</body>
+</html>

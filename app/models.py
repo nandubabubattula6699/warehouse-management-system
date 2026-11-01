@@ -76,3 +76,25 @@ class StockMovement(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     item = relationship("InventoryItem", back_populates="movements")
+
+
+class WarehouseUser(Base):
+    """
+    User accounts & access control for Warehouse OS:
+      - role: ADMIN | MANAGER | PART_1_LEAD | PART_2_LEAD | STAFF
+      - assigned_zone: ALL_ZONES | PART_1_ALLBIRDS | PART_2_VD_VALENTINO
+      - is_approved: 1 (Approved/Active), 0 (Pending Admin Approval), -1 (Revoked/Blocked)
+    """
+    __tablename__ = "warehouse_users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), unique=True, index=True, nullable=False)
+    email = Column(String(150), unique=True, index=True, nullable=True)
+    full_name = Column(String(120), nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(String(50), default="STAFF", nullable=False)
+    assigned_zone = Column(String(80), default="ALL_ZONES", nullable=False)
+    is_approved = Column(Integer, default=0, nullable=False, index=True)  # 1=Active, 0=Pending, -1=Revoked
+    session_token = Column(String(128), index=True, nullable=True)
+    last_seen_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

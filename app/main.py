@@ -4,12 +4,18 @@ from typing import Optional, List
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import Request, Response
+from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, distinct
 
 from app.database import get_db, init_db, SessionLocal
-from app.models import WarehouseLocation, InventoryItem, StockMovement
+from app.models import WarehouseLocation, InventoryItem, StockMovement, WarehouseUser
+from app.auth import (
+    SESSION_COOKIE_NAME, hash_password, verify_password,
+    ensure_default_admin, get_optional_user, require_user, require_admin
+)
 from app.location_engine import build_location_info, ensure_schema_and_locations_seeded
 from app.schemas import (
     ItemCreate, ItemUpdatePayload, ItemResponse, StyleSummary,
@@ -24,6 +30,7 @@ def seed_if_empty():
         db_map = SessionLocal()
         try:
             ensure_schema_and_locations_seeded(db_map)
+            ensure_default_admin(db_map)
         finally:
             db_map.close()
 
@@ -963,14 +970,263 @@ def get_warehouse_aisle_detail(
         "sections": sorted_sections,
     }
 
+
+
+# ================= AUTHENTICATION & USER ACCESS CONTROL ENDPOINTS =================
+class LoginPayload(BaseModel):
+    username: str
+    password: str
+
+
+class SignupPayload(BaseModel):
+    full_name: str
+    username: str
+    email: Optional[str] = None
+    password: str
+    role: Optional[str] = "STAFF"
+    assigned_zone: Optional[str] = "ALL_ZONES"
+
+
+class AdminCreateUserPayload(BaseModel):
+    full_name: str
+    username: str
+    email: Optional[str] = None
+    password: str
+    role: Optional[str] = "STAFF"
+    assigned_zone: Optional[str] = "ALL_ZONES"
+
+
+class AdminUpdateStatusPayload(BaseModel):
+    is_approved: int
+
+
+@app.post("/api/auth/login")
+def login_user(payload: LoginPayload, response: Response, db: Session = Depends(get_db)):
+    from datetime import datetime
+    import secrets
+    ensure_default_admin(db)
+    ident = payload.username.strip().lower()
+    user = db.query(WarehouseUser).filter(
+        or_(
+            func.lower(WarehouseUser.username) == ident,
+            func.lower(func.coalesce(WarehouseUser.email, "")) == ident,
+        )
+    ).first()
+
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid username/email or password.")
+
+    if user.is_approved == 0:
+        raise HTTPException(
+            status_code=403,
+            detail="Your account is pending approval. Please ask Admin (Nandu) to grant you access."
+        )
+    if user.is_approved < 0:
+        raise HTTPException(
+            status_code=403,
+            detail="Your access to Warehouse OS has been revoked by the Admin."
+        )
+
+    token = secrets.token_hex(32)
+    user.session_token = token
+    user.last_seen_at = datetime.utcnow()
+    db.commit()
+
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        max_age=60 * 60 * 24 * 14,  # 14 days
+        samesite="lax",
+    )
+    return {
+        "status": "ok",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "full_name": user.full_name,
+            "role": user.role,
+            "assigned_zone": user.assigned_zone,
+        }
+    }
+
+
+@app.post("/api/auth/signup")
+def signup_user(payload: SignupPayload, db: Session = Depends(get_db)):
+    from datetime import datetime
+    ensure_default_admin(db)
+    uname = payload.username.strip().lower()
+    if not uname or len(uname) < 2:
+        raise HTTPException(status_code=400, detail="Username must be at least 2 characters.")
+
+    existing = db.query(WarehouseUser).filter(func.lower(WarehouseUser.username) == uname).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Username '{uname}' is already registered.")
+
+    email_clean = payload.email.strip().lower() if payload.email and payload.email.strip() else None
+    if email_clean:
+        ex_email = db.query(WarehouseUser).filter(func.lower(WarehouseUser.email) == email_clean).first()
+        if ex_email:
+            raise HTTPException(status_code=400, detail=f"Email '{email_clean}' is already registered.")
+
+    new_u = WarehouseUser(
+        username=uname,
+        email=email_clean,
+        full_name=payload.full_name.strip(),
+        password_hash=hash_password(payload.password),
+        role=(payload.role or "STAFF").upper(),
+        assigned_zone=(payload.assigned_zone or "ALL_ZONES").upper(),
+        is_approved=0,  # Requires Admin (Nandu) approval
+        created_at=datetime.utcnow(),
+    )
+    db.add(new_u)
+    db.commit()
+    return {
+        "status": "ok",
+        "message": f"Sign-up request submitted for '{new_u.full_name}' (@{new_u.username})! Admin (Nandu) can now approve your access in 1 click."
+    }
+
+
+@app.post("/api/auth/logout")
+def logout_user(request: Request, response: Response, db: Session = Depends(get_db)):
+    user = get_optional_user(request, db)
+    if user:
+        user.session_token = None
+        db.commit()
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return {"status": "ok"}
+
+
+@app.get("/api/auth/me")
+def get_current_user_info(request: Request, db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta
+    user = get_optional_user(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not logged in")
+
+    cutoff = datetime.utcnow() - timedelta(minutes=5)
+    online_count = db.query(WarehouseUser).filter(
+        WarehouseUser.is_approved == 1,
+        WarehouseUser.last_seen_at >= cutoff
+    ).count()
+    pending_count = db.query(WarehouseUser).filter(WarehouseUser.is_approved == 0).count()
+
+    return {
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,
+            "assigned_zone": user.assigned_zone,
+        },
+        "online_users_count": max(1, online_count),
+        "pending_users_count": pending_count,
+    }
+
+
+@app.get("/api/admin/users")
+def admin_list_users(admin: WarehouseUser = Depends(require_admin), db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta
+    cutoff = datetime.utcnow() - timedelta(minutes=5)
+    users = db.query(WarehouseUser).order_by(WarehouseUser.is_approved.asc(), WarehouseUser.id.asc()).all()
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "full_name": u.full_name,
+            "role": u.role,
+            "assigned_zone": u.assigned_zone,
+            "is_approved": u.is_approved,
+            "is_online": bool(u.last_seen_at and u.last_seen_at >= cutoff and u.session_token),
+            "last_seen_at": u.last_seen_at.strftime("%Y-%m-%d %H:%M:%S") if u.last_seen_at else None,
+            "created_at": u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else None,
+        }
+        for u in users
+    ]
+
+
+@app.post("/api/admin/users")
+def admin_create_approved_user(
+    payload: AdminCreateUserPayload,
+    admin: WarehouseUser = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    from datetime import datetime
+    uname = payload.username.strip().lower()
+    if db.query(WarehouseUser).filter(func.lower(WarehouseUser.username) == uname).first():
+        raise HTTPException(status_code=400, detail=f"Username '{uname}' already exists.")
+    u = WarehouseUser(
+        username=uname,
+        email=payload.email.strip().lower() if payload.email and payload.email.strip() else None,
+        full_name=payload.full_name.strip(),
+        password_hash=hash_password(payload.password),
+        role=(payload.role or "STAFF").upper(),
+        assigned_zone=(payload.assigned_zone or "ALL_ZONES").upper(),
+        is_approved=1,  # Directly approved by Admin!
+        created_at=datetime.utcnow(),
+    )
+    db.add(u)
+    db.commit()
+    return {"status": "ok", "id": u.id, "username": u.username}
+
+
+@app.post("/api/admin/users/{user_id}/status")
+def admin_update_user_status(
+    user_id: int,
+    payload: AdminUpdateStatusPayload,
+    admin: WarehouseUser = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    u = db.query(WarehouseUser).filter(WarehouseUser.id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    if u.username == "nandu" and payload.is_approved != 1:
+        raise HTTPException(status_code=400, detail="Cannot revoke primary Admin account.")
+    u.is_approved = payload.is_approved
+    if payload.is_approved != 1:
+        u.session_token = None
+    db.commit()
+    return {"status": "ok", "id": u.id, "is_approved": u.is_approved}
+
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(
+    user_id: int,
+    admin: WarehouseUser = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    u = db.query(WarehouseUser).filter(WarehouseUser.id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    if u.username == "nandu":
+        raise HTTPException(status_code=400, detail="Cannot delete primary Admin account.")
+    db.delete(u)
+    db.commit()
+    return {"status": "ok"}
+
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+    @app.get("/login")
+    def serve_login_page(request: Request, db: Session = Depends(get_db)):
+        user = get_optional_user(request, db)
+        if user:
+            return RedirectResponse(url="/", status_code=302)
+        return FileResponse(os.path.join(static_dir, "login.html"))
+
     @app.get("/")
-    def serve_frontend():
+    def serve_frontend(request: Request, db: Session = Depends(get_db)):
+        user = get_optional_user(request, db)
+        if not user:
+            return RedirectResponse(url="/login", status_code=302)
         return FileResponse(os.path.join(static_dir, "index.html"))
 
     @app.get("/manage")
-    def serve_manage_page():
+    def serve_manage_page(request: Request, db: Session = Depends(get_db)):
+        user = get_optional_user(request, db)
+        if not user:
+            return RedirectResponse(url="/login", status_code=302)
         return FileResponse(os.path.join(static_dir, "manage.html"))
