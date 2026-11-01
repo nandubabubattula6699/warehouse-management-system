@@ -455,7 +455,7 @@ function renderFilteredRows() {
             ${escapeHtml(item.location || coordSummary)}
           </div>
           <div class="text-[10px] text-[#64748b] font-mono">
-            ${isPart2 ? 'Part 2 (' + escapeHtml(item.brand || 'Wholesale') + ')' : 'Part 1 (Allbirds)'} • ${coordSummary}
+            ${isPart2 ? ('Part 2 • ' + escapeHtml(item.brand || 'Wholesale')) : 'Part 1 • Allbirds'}
           </div>
         </td>
 
@@ -500,21 +500,80 @@ function triggerPrintPickSheet() {
     return;
   }
 
-  const items = getActiveFilteredItems();
-  if (items.length === 0) {
+  const rawItems = getActiveFilteredItems();
+  if (rawItems.length === 0) {
     showToast("No locations found to print", "error");
     return;
   }
 
+  // 1. Consolidate items by (style, location, color, size) so no address or size is printed multiple times
+  const grouped = new Map();
+  rawItems.forEach(item => {
+    const locKey = (item.location || `${item.line || ''}-${item.row_pos || ''}-${item.section || ''}-${item.level || ''}`).trim();
+    const key = `${item.style}|${locKey}|${item.color || 'STANDARD'}|${item.size || 'OS'}`.toUpperCase();
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        style: item.style,
+        location: item.location || 'Unassigned',
+        line: item.line,
+        row_pos: item.row_pos,
+        section: item.section,
+        level: item.level,
+        color: item.color || 'STANDARD',
+        size: item.size || 'OS',
+        warehouse_part: item.warehouse_part,
+        brand: item.brand,
+        total_quantity: 0,
+        box_count: 0,
+        boxes: [],
+        pcs_per_box: item.pcs_per_box
+      });
+    }
+
+    const g = grouped.get(key);
+    g.total_quantity += (item.quantity || 0);
+    g.box_count += 1;
+    if (item.box_num) g.boxes.push(item.box_num);
+  });
+
+  const consolidatedItems = Array.from(grouped.values()).map(g => {
+    let boxDetails = "-";
+    if (g.boxes.length > 0) {
+      boxDetails = `Box #${g.boxes.join(", #")}`;
+      if (g.pcs_per_box) boxDetails += ` (${g.pcs_per_box} pcs/box)`;
+    } else if (g.box_count > 1) {
+      boxDetails = `${g.box_count} Boxes${g.pcs_per_box ? ` (${g.pcs_per_box} pcs/box)` : ''}`;
+    } else if (g.pcs_per_box) {
+      boxDetails = `${g.pcs_per_box} pcs/box`;
+    }
+
+    return {
+      style: g.style,
+      location: g.location,
+      line: g.line,
+      row_pos: g.row_pos,
+      section: g.section,
+      level: g.level,
+      color: g.color,
+      size: g.size,
+      warehouse_part: g.warehouse_part,
+      brand: g.brand,
+      quantity: g.total_quantity,
+      box_details: boxDetails
+    };
+  });
+
+  // 2. Strict physical walking order sort: Line/Row -> Section -> Level -> Color -> Size
+  const sortedItems = sortItemsByLocationColorSize(consolidatedItems);
+
   document.getElementById("printStyleCode").textContent = batchData.found_styles.join(", ");
   const now = new Date();
   document.getElementById("printTimestamp").textContent = now.toLocaleDateString() + " " + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  document.getElementById("printTotalLocations").textContent = `${items.length} locations`;
+  document.getElementById("printTotalLocations").textContent = `${sortedItems.length} locations`;
   
-  const totalUnits = items.reduce((sum, i) => sum + i.quantity, 0);
+  const totalUnits = sortedItems.reduce((sum, i) => sum + i.quantity, 0);
   document.getElementById("printTotalUnits").textContent = `${totalUnits.toLocaleString()} units`;
-
-  const sortedItems = sortItemsByLocationColorSize(items);
 
   const printTbody = document.getElementById("printTableBody");
   printTbody.innerHTML = sortedItems.map((item, idx) => `
@@ -527,7 +586,6 @@ function triggerPrintPickSheet() {
       </td>
       <td class="p-2 border-r border-black">
         <div class="font-bold text-sm font-mono">${escapeHtml(item.location || 'Unassigned')}</div>
-        <div class="text-[10px] text-gray-600">Line: ${escapeHtml(item.line || '-')} | Sec: ${escapeHtml(item.section || '-')} | Lvl: ${escapeHtml(item.level || '-')} | Row: ${escapeHtml(item.row_pos || '-')}</div>
       </td>
       <td class="p-2 border-r border-black font-semibold">
         ${escapeHtml(item.color || 'STANDARD')}
@@ -535,9 +593,8 @@ function triggerPrintPickSheet() {
       <td class="p-2 border-r border-black text-center font-bold font-mono text-sm">
         ${escapeHtml(item.size || 'OS')}
       </td>
-      <td class="p-2 border-r border-black text-center font-mono">
-        ${item.box_num ? `Box #${escapeHtml(item.box_num)}` : '-'}
-        ${item.pcs_per_box ? ` (${item.pcs_per_box} pcs/box)` : ''}
+      <td class="p-2 border-r border-black text-center font-mono text-xs">
+        ${escapeHtml(item.box_details || '-')}
       </td>
       <td class="p-2 border-r border-black text-center font-bold font-mono text-sm">
         ${item.quantity.toLocaleString()}
