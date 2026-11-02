@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=24.0">
+  <link rel="stylesheet" href="/static/styles.css?v=25.0">
 </head>
 <body class="bg-[#ebf1f6] text-slate-900 selection:bg-[#0070ba] min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:text-white">
 
@@ -37,7 +37,7 @@
       <!-- Right Controls: Admin & Manager Controls -->
       <div class="flex items-center gap-2">
         <!-- ADD RECEIVING ICON BUTTON FOR MANAGER & ADMIN -->
-        <button id="headerAddReceivingBtn" onclick="openReceivingIntakeModal()" class="manager-control bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-sm border border-[#38bdf8]/40 active:scale-95 transition" title="Add Inbound Stock Receiving">
+        <button id="headerAddReceivingBtn" onclick="openReceivingIntakeModal()" class="bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-sm border border-[#38bdf8]/40 active:scale-95 transition" title="Add Inbound Stock Receiving">
           <span class="text-sm">📥</span>
           <span class="hidden sm:inline font-bold tracking-wide">Add Receiving</span>
           <span class="sm:hidden font-bold">Receiving</span>
@@ -355,8 +355,8 @@
         <span>📋</span>
         <span>Stock (<span id="mobileBottomCount">0</span>)</span>
       </button>
-      <button onclick="openReceivingModal()"
-        class="manager-control py-2 px-3 rounded-lg bg-[#0070ba] hover:bg-[#005a96] text-white text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition">
+      <button onclick="openReceivingIntakeModal()"
+        class="py-2 px-3 rounded-lg bg-[#0070ba] hover:bg-[#005a96] text-white text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition">
         <span>📥</span>
         <span>Receive</span>
       </button>
@@ -1201,7 +1201,8 @@
 
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=24.0"></script>
-  <script src="/static/auth_client.js?v=7.0"></script>
+  <script src="/static/inbound_client.js?v=25.0"></script>
+  <script src="/static/app.js?v=25.0"></script>
+  <script src="/static/auth_client.js?v=25.0"></script>
 </body>
 </html>

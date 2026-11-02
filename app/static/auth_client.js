@@ -13,7 +13,7 @@ async function initWarehouseAuth() {
     window.currentWarehouseUser = data.user;
     const userRole = (data.user && data.user.role) ? data.user.role.toUpperCase() : "";
     const isAdmin = userRole === "ADMIN";
-    const isManager = userRole === "MANAGER" || isAdmin;
+    const isManager = isAdmin || userRole.includes("MANAGE") || userRole === "STAFF";
 
     document.querySelectorAll(".admin-only-control").forEach(el => {
       if (isAdmin) {
@@ -44,6 +44,8 @@ async function initWarehouseAuth() {
     }
 
     if (typeof renderFilteredRows === 'function') renderFilteredRows();
+    const rcvBtn = document.getElementById("headerAddReceivingBtn");
+    if (rcvBtn) rcvBtn.classList.remove("hidden");
     if (typeof checkAdminInboundPendingCount === 'function') checkAdminInboundPendingCount();
     renderAuthHeaderControls(data);
     injectAccessControlModal();
