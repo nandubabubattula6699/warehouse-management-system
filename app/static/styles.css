@@ -112,3 +112,61 @@ button, select, input {
     page-break-inside: avoid !important;
   }
 }
+
+
+/* NetSuite ERP Modal Styling */
+.netsuite-modal-header {
+  background-color: #173456 !important;
+  color: #ffffff !important;
+  border-bottom: 2px solid #0070ba !important;
+}
+.netsuite-modal-close {
+  color: #ffffff !important;
+  opacity: 0.85;
+  transition: all 0.15s ease;
+}
+.netsuite-modal-close:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+.netsuite-portlet-box {
+  background-color: #ffffff !important;
+  border: 1px solid #c4d3e2 !important;
+  box-shadow: 0 1px 3px rgba(23, 52, 86, 0.06) !important;
+}
+.netsuite-field-label {
+  color: #173456 !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}
+.netsuite-field-input {
+  background-color: #ffffff !important;
+  border: 1px solid #b8d4ee !important;
+  color: #173456 !important;
+  border-radius: 8px !important;
+}
+.netsuite-field-input:focus {
+  border-color: #0070ba !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(0, 112, 186, 0.2) !important;
+}
+.netsuite-btn-primary {
+  background-color: #0070ba !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border: 1px solid #005a96 !important;
+}
+.netsuite-btn-primary:hover {
+  background-color: #005a96 !important;
+}
+.netsuite-btn-secondary {
+  background-color: #ffffff !important;
+  color: #173456 !important;
+  font-weight: 600 !important;
+  border: 1px solid #c4d3e2 !important;
+}
+.netsuite-btn-secondary:hover {
+  background-color: #f0f4f8 !important;
+}

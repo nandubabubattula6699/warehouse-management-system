@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=23.0">
+  <link rel="stylesheet" href="/static/styles.css?v=24.0">
 </head>
 <body class="bg-[#ebf1f6] text-slate-900 selection:bg-[#0070ba] min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:text-white">
 
@@ -427,15 +427,16 @@
   </div>
 
   <!-- Admin Modals -->
-  <div id="adjustModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 text-slate-900">
-      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+  <div id="adjustModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden text-[#173456]">
+      <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex items-center justify-between text-white">
         <div>
-          <h3 id="adjustModalTitle" class="text-lg font-bold text-slate-900">Stock Adjustment</h3>
-          <p id="adjustModalSubtitle" class="text-xs text-blue-600 font-mono mt-0.5"></p>
+          <h3 id="adjustModalTitle" class="text-base font-bold text-white tracking-wide uppercase">Stock Adjustment</h3>
+          <p id="adjustModalSubtitle" class="text-xs text-blue-200 font-mono mt-0.5"></p>
         </div>
-        <button onclick="closeModal('adjustModal')" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+        <button onclick="closeModal('adjustModal')" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition">✕</button>
       </div>
+      <div class="p-5 space-y-4">
       <div class="bg-slate-50 rounded-xl p-3 border border-slate-200 flex justify-between items-center text-xs">
         <div>
           <span class="text-slate-500">Location:</span>
@@ -471,34 +472,36 @@
       </div>
       <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200">
         <button onclick="closeModal('adjustModal')" class="px-4 py-2 rounded-xl text-xs text-slate-500 hover:text-slate-900">Cancel</button>
-        <button onclick="submitStockAdjustment()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-xs">Save Adjustment</button>
+        <button onclick="submitStockAdjustment()" class="bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-5 py-2 rounded-lg text-xs shadow-sm transition">Save Adjustment</button>
       </div>
     </div>
   </div>
 
-  <div id="setQtyModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-slate-900">
-      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
-        <h3 class="text-base font-bold text-slate-900">Set Exact Quantity</h3>
-        <button onclick="closeModal('setQtyModal')" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+  <div id="setQtyModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden text-[#173456]">
+      <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex items-center justify-between text-white">
+        <h3 class="text-base font-bold text-white tracking-wide uppercase">Set Exact Quantity</h3>
+        <button onclick="closeModal('setQtyModal')" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition">✕</button>
       </div>
+      <div class="p-5 space-y-4">
       <div>
         <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">New Total Quantity (Units)</label>
         <input type="number" min="0" id="exactQtyInput" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-center text-xl font-bold text-slate-900" />
       </div>
       <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200">
         <button onclick="closeModal('setQtyModal')" class="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-900">Cancel</button>
-        <button onclick="submitExactQuantity()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-1.5 rounded-xl text-xs">Save</button>
+        <button onclick="submitExactQuantity()" class="bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-4 py-2 rounded-lg text-xs shadow-sm transition">Save Quantity</button>
       </div>
     </div>
   </div>
 
-  <div id="addLocationModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4 text-slate-900">
-      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
-        <h3 class="text-lg font-bold text-slate-900">Add Location / Stock</h3>
-        <button onclick="closeModal('addLocationModal')" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+  <div id="addLocationModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden text-[#173456]">
+      <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex items-center justify-between text-white">
+        <h3 class="text-base font-bold text-white tracking-wide uppercase">Add Location / Stock</h3>
+        <button onclick="closeModal('addLocationModal')" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition">✕</button>
       </div>
+      <div class="p-5">
       <form id="addLocationForm" onsubmit="handleAddLocationSubmit(event)" class="space-y-4">
         <div class="grid grid-cols-3 gap-3">
           <div>
@@ -551,113 +554,118 @@
         </div>
         <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200">
           <button type="button" onclick="closeModal('addLocationModal')" class="px-4 py-2 rounded-xl text-xs text-slate-500 hover:text-slate-900">Cancel</button>
-          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-xs">Save</button>
+          <button type="submit" class="bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-5 py-2 rounded-lg text-xs shadow-sm transition">Save Location</button>
         </div>
       </form>
     </div>
   </div>
 
     
-  <!-- ================= 1. RECEIVING INTAKE SELECTION MODAL (3 OPTIONS) ================= -->
-  <div id="receivingIntakeModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white border border-[#c4d3e2] rounded-3xl w-full max-w-xl p-6 shadow-2xl space-y-5 text-slate-900 animate-in fade-in zoom-in-95 duration-150">
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-[#e2eaf2] pb-3.5">
+  <!-- ================= 1. RECEIVING INTAKE SELECTION MODAL (NETSUITE ERP THEME) ================= -->
+  <div id="receivingIntakeModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden text-[#173456] animate-in fade-in zoom-in-95 duration-150">
+      <!-- NetSuite Deep Navy Header -->
+      <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex items-center justify-between text-white">
         <div class="flex items-center gap-3">
-          <div class="w-12 h-12 rounded-2xl bg-[#0070ba] text-white flex items-center justify-center text-2xl shadow-md shrink-0">
+          <div class="w-9 h-9 rounded-lg bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-inner font-bold">
             📥
           </div>
           <div>
-            <h3 class="text-lg font-bold text-[#173456]">
-              Add Inbound Receiving
+            <h3 class="text-base font-bold text-white tracking-wide uppercase">
+              Inbound Receiving &bull; Document Intake
             </h3>
-            <p class="text-xs text-slate-500">Alexander Warehouse &bull; Shipments of 1 to 20 Pallets (8–40 Boxes/Pallet)</p>
+            <p class="text-[11px] text-blue-200">Alexander Warehouse &bull; Shipments of 1 to 20 Pallets (8–40 Boxes/Pallet)</p>
           </div>
         </div>
-        <button onclick="closeModal('receivingIntakeModal')" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-sm font-bold transition">✕</button>
+        <button onclick="closeModal('receivingIntakeModal')" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition">✕</button>
       </div>
 
-      <div class="text-xs text-slate-600">
-        Choose how you would like to intake arriving freight, cartons, and documentation:
-      </div>
+      <div class="p-5 space-y-4">
+        <div class="text-xs text-[#244b7a] font-medium bg-[#e8f1fa] border border-[#b8d4ee] px-3.5 py-2 rounded-lg flex items-center gap-2">
+          <span>ℹ️</span>
+          <span>Select your intake method for arriving containers, pallets, and documents:</span>
+        </div>
 
-      <!-- 3 Option Cards -->
-      <div class="grid grid-cols-1 gap-3">
-        <!-- Option 1: Mobile Camera Scan -->
-        <div onclick="selectIntakeOption('CAMERA')" class="group p-4 rounded-2xl border-2 border-[#b8d4ee] bg-[#f0f7ff] hover:bg-[#e1effe] hover:border-[#0070ba] cursor-pointer transition shadow-xs flex items-center gap-4">
-          <div class="w-12 h-12 rounded-xl bg-[#0070ba] text-white flex items-center justify-center text-2xl shadow-sm group-hover:scale-105 transition">
-            📸
-          </div>
-          <div class="flex-1">
-            <div class="flex items-center justify-between">
-              <h4 class="text-sm font-bold text-[#173456]">Option 1: Scan with Camera (Phone)</h4>
-              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0070ba] text-white font-mono">Mobile</span>
+        <!-- 3 Option Cards (NetSuite Portlet Style) -->
+        <div class="grid grid-cols-1 gap-3">
+          <!-- Option 1: Mobile Camera Scan -->
+          <div onclick="selectIntakeOption('CAMERA')" class="group p-4 rounded-xl border-2 border-[#0070ba] bg-white hover:bg-[#e8f4fd] cursor-pointer transition shadow-xs flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-[#0070ba] text-white flex items-center justify-center text-2xl shadow-sm group-hover:scale-105 transition">
+              📸
             </div>
-            <p class="text-xs text-slate-600 mt-0.5">
-              Snap photos of physical <strong>Packing List</strong> &amp; <strong>Commercial Invoice</strong> using your phone camera. AI automatically reads products, quantities, and box counts.
-            </p>
+            <div class="flex-1">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-[#173456]">Option 1: Scan with Camera (Phone)</h4>
+                <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#0070ba] text-white font-mono uppercase tracking-wide">Mobile</span>
+              </div>
+              <p class="text-xs text-[#475569] mt-1">
+                Snap photos of physical <strong>Packing List</strong> &amp; <strong>Commercial Invoice</strong> using your phone camera. AI automatically extracts products, styles, sizes, and carton counts.
+              </p>
+            </div>
+          </div>
+
+          <!-- Option 2: Upload Files (Desktop / Phone) -->
+          <div onclick="selectIntakeOption('UPLOAD')" class="group p-4 rounded-xl border border-[#c4d3e2] bg-white hover:bg-[#f0f7ff] hover:border-[#0070ba] cursor-pointer transition shadow-xs flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-[#173456] text-white flex items-center justify-center text-2xl shadow-sm group-hover:scale-105 transition">
+              📁
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-[#173456]">Option 2: Upload Document Scans (PDF / Image)</h4>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-[#e8f1fa] text-[#0d4771] border border-[#b8d4ee] font-mono">Desktop / Phone</span>
+              </div>
+              <p class="text-xs text-[#475569] mt-1">
+                Upload scanned PDF files or high-res images of the Packing List &amp; Invoice from your computer or files app.
+              </p>
+            </div>
+          </div>
+
+          <!-- Option 3: Direct Manual Receiving -->
+          <div onclick="selectIntakeOption('MANUAL')" class="group p-4 rounded-xl border border-[#c4d3e2] bg-white hover:bg-[#f0f7ff] hover:border-[#0070ba] cursor-pointer transition shadow-xs flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-[#244b7a] text-white flex items-center justify-center text-xl shadow-xs group-hover:scale-105 transition">
+              ✍️
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-[#173456]">Option 3: Direct Manual Entry</h4>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-[#e8f1fa] text-[#0d4771] border border-[#b8d4ee] font-mono">Manual</span>
+              </div>
+              <p class="text-xs text-[#475569] mt-1">
+                Check in individual cartons or emergency stock directly without document scans.
+              </p>
+            </div>
           </div>
         </div>
 
-        <!-- Option 2: Upload Files (Desktop / Phone) -->
-        <div onclick="selectIntakeOption('UPLOAD')" class="group p-4 rounded-2xl border-2 border-[#cbd5e1] bg-white hover:bg-[#f8fafc] hover:border-[#0070ba] cursor-pointer transition shadow-xs flex items-center gap-4">
-          <div class="w-12 h-12 rounded-xl bg-[#173456] text-white flex items-center justify-center text-2xl shadow-sm group-hover:scale-105 transition">
-            📁
-          </div>
-          <div class="flex-1">
-            <div class="flex items-center justify-between">
-              <h4 class="text-sm font-bold text-[#173456]">Option 2: Upload Document Scans (PDF / Image)</h4>
-              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-mono">Desktop / Phone</span>
-            </div>
-            <p class="text-xs text-slate-600 mt-0.5">
-              Upload scanned PDF files or high-res images of the Packing List &amp; Invoice from your computer or files app.
-            </p>
-          </div>
+        <div class="bg-[#e8f1fa] border border-[#b8d4ee] rounded-lg p-2.5 text-[11px] text-[#0d4771] text-center flex items-center justify-center gap-2 font-medium">
+          <span>🔒 NetSuite Verification:</span>
+          <span>Manager verifies physical boxes &amp; shelf locations &bull; Admin confirms before updating PostgreSQL inventory.</span>
         </div>
-
-        <!-- Option 3: Direct Manual Receiving -->
-        <div onclick="selectIntakeOption('MANUAL')" class="group p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-400 cursor-pointer transition flex items-center gap-4">
-          <div class="w-12 h-12 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center text-xl shadow-xs group-hover:scale-105 transition">
-            ✍️
-          </div>
-          <div class="flex-1">
-            <div class="flex items-center justify-between">
-              <h4 class="text-sm font-bold text-slate-800">Option 3: Direct Manual Entry</h4>
-              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-600 font-mono">Single Entry</span>
-            </div>
-            <p class="text-xs text-slate-500 mt-0.5">
-              Check in single boxes or emergency stock directly without document scans.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="text-[11px] text-slate-400 text-center pt-2 border-t border-slate-100 flex items-center justify-center gap-2">
-        <span>🔒 Secure Verification:</span>
-        <span>Manager verifies physical boxes &amp; shelf locations &bull; Admin confirms before updating inventory.</span>
       </div>
     </div>
   </div>
 
 
-  <!-- ================= 2. DOCUMENT INGESTION & AI MULTIMODAL EXTRACTION MODAL ================= -->
-  <div id="documentIngestModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white border border-[#c4d3e2] rounded-3xl w-full max-w-2xl p-6 shadow-2xl space-y-4 text-slate-900 max-h-[92vh] overflow-y-auto">
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-[#e2eaf2] pb-3">
+  <!-- ================= 2. DOCUMENT INGESTION & AI MULTIMODAL EXTRACTION MODAL (NETSUITE ERP THEME) ================= -->
+  <div id="documentIngestModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden text-[#173456] max-h-[92vh] flex flex-col">
+      <!-- NetSuite Deep Navy Header -->
+      <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex items-center justify-between text-white shrink-0">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-sm">
+          <div class="w-9 h-9 rounded-lg bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-inner font-bold">
             📄
           </div>
           <div>
-            <h3 class="text-base sm:text-lg font-bold text-[#173456]" id="ingestModalTitle">
+            <h3 class="text-base font-bold text-white tracking-wide uppercase" id="ingestModalTitle">
               Inbound Shipment Documentation
             </h3>
-            <p class="text-xs text-slate-500">Attach Packing List &amp; Commercial Invoice for AI line item extraction</p>
+            <p class="text-[11px] text-blue-200">Attach Packing List &amp; Commercial Invoice for AI line item extraction</p>
           </div>
         </div>
-        <button onclick="closeModal('documentIngestModal')" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-sm font-bold transition">✕</button>
+        <button onclick="closeModal('documentIngestModal')" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition">✕</button>
       </div>
+
+      <div class="p-5 space-y-4 overflow-y-auto">
 
       <!-- Hidden file inputs (with capture attribute for phone camera) -->
       <input type="file" id="cameraPackingListInput" accept="image/*" capture="environment" class="hidden" onchange="handleDocFileChange(event, 'PACKING_LIST')" />
@@ -736,13 +744,13 @@
         <p class="text-[11px] text-slate-600">Extracting product styles, color codes, shoe/apparel sizes, and box counts...</p>
       </div>
 
-      <!-- Action Buttons -->
-      <div class="flex items-center justify-between pt-2 border-t border-[#e2eaf2]">
-        <button type="button" onclick="closeModal('documentIngestModal')" class="px-3.5 py-2 text-xs font-bold text-slate-500 hover:text-slate-800">
+      <!-- NetSuite Action Buttons Footer -->
+      <div class="flex items-center justify-between pt-3 border-t border-[#c4d3e2] bg-[#f0f4f8] -mx-5 -mb-5 px-5 py-3 rounded-b-2xl">
+        <button type="button" onclick="closeModal('documentIngestModal')" class="bg-white hover:bg-[#f0f4f8] text-[#173456] border border-[#c4d3e2] font-semibold px-4 py-2 rounded-lg text-xs transition">
           Cancel
         </button>
         <button type="button" id="startAiExtractBtn" onclick="runAiDocumentExtraction()"
-          class="bg-gradient-to-r from-[#0070ba] to-[#173456] hover:from-[#005a96] hover:to-[#0f243c] text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-blue-500/20 flex items-center gap-2 active:scale-95 transition">
+          class="bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-5 py-2 rounded-lg text-xs shadow-sm flex items-center gap-2 active:scale-95 transition">
           <span>✨</span>
           <span>Extract Shipment with AI &amp; Stage Locations</span>
         </button>
@@ -751,36 +759,36 @@
   </div>
 
 
-  <!-- ================= 3. INBOUND STAGING & LOCATION ASSIGNMENT WORKSPACE ================= -->
-  <div id="inboundStagingModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-    <div class="bg-white border border-[#c4d3e2] rounded-3xl w-full max-w-5xl p-4 sm:p-6 shadow-2xl space-y-4 text-slate-900 max-h-[95vh] flex flex-col">
-      <!-- Header & Document Preview Link -->
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#e2eaf2] pb-3 shrink-0">
+  <!-- ================= 3. INBOUND STAGING & LOCATION ASSIGNMENT WORKSPACE (NETSUITE ERP THEME) ================= -->
+  <div id="inboundStagingModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden text-[#173456] max-h-[95vh] flex flex-col">
+      <!-- NetSuite Deep Navy Header -->
+      <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 text-white shrink-0">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-xs">
+          <div class="w-9 h-9 rounded-lg bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-inner font-bold">
             📦
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h3 class="text-base sm:text-lg font-bold text-[#173456]">
+              <h3 class="text-base font-bold text-white tracking-wide uppercase">
                 Stage Physical Locations for Arriving Shipment
               </h3>
-              <span id="stagingStatusBadge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+              <span id="stagingStatusBadge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#e8f1fa] text-[#0d4771] border border-[#b8d4ee]">
                 PENDING ADMIN APPROVAL
               </span>
             </div>
-            <p class="text-xs text-slate-500">
-              Verified by Manager on floor &bull; Assign exact physical Line / Row &bull; Will not alter inventory until Admin confirms
+            <p class="text-[11px] text-blue-200">
+              Verified by Manager on floor &bull; Assign physical Line / Row &bull; Reflected in inventory upon Admin confirmation
             </p>
           </div>
         </div>
 
         <div class="flex items-center gap-2">
-          <button type="button" onclick="openDocPreviewLightbox()" class="bg-[#f0f7ff] hover:bg-[#e1effe] text-[#0070ba] border border-[#b8d4ee] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition">
+          <button type="button" onclick="openDocPreviewLightbox()" class="bg-[#244b7a] hover:bg-[#2e5d95] text-white border border-[#3b669b] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
             <span>🖼️</span>
             <span>View Attached Documents</span>
           </button>
-          <button onclick="closeModal('inboundStagingModal')" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-sm font-bold transition">✕</button>
+          <button onclick="closeModal('inboundStagingModal')" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition">✕</button>
         </div>
       </div>
 
@@ -840,19 +848,19 @@
         </table>
       </div>
 
-      <!-- Inbound Notes & Manager Submit Bar -->
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-[#e2eaf2] shrink-0">
+      <!-- Inbound Notes & Manager Submit Bar (NetSuite Footer) -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#c4d3e2] bg-[#f0f4f8] p-3 rounded-b-2xl shrink-0">
         <div class="w-full sm:w-auto flex-1 max-w-lg">
           <input type="text" id="stagingShipmentNotes" placeholder="Floor Notes: e.g. Pallet 1 placed in Line 3, verified by Floor Lead"
-            class="w-full bg-[#f8fafc] border border-[#cbd5e1] rounded-xl px-3 py-2 text-xs text-slate-800" />
+            class="w-full bg-white border border-[#b8d4ee] rounded-lg px-3 py-2 text-xs text-[#173456] focus:border-[#0070ba]" />
         </div>
 
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <button type="button" onclick="closeModal('inboundStagingModal')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition">
+          <button type="button" onclick="closeModal('inboundStagingModal')" class="bg-white hover:bg-[#f0f4f8] text-[#173456] border border-[#c4d3e2] font-semibold px-4 py-2 rounded-lg text-xs transition">
             Save Draft &amp; Close
           </button>
           <button type="button" id="submitStagedShipmentBtn" onclick="submitInboundShipmentForApproval()"
-            class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-5 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-600/20 flex items-center gap-2 active:scale-95 transition">
+            class="bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-5 py-2 rounded-lg text-xs shadow-sm flex items-center gap-2 active:scale-95 transition">
             <span>🚀</span>
             <span>Submit Shipment for Admin Approval</span>
           </button>
@@ -862,30 +870,30 @@
   </div>
 
 
-  <!-- ================= 4. ADMIN APPROVAL & AUDIT REVIEW MODAL ================= -->
-  <div id="adminShipmentsModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-    <div class="bg-white border border-[#c4d3e2] rounded-3xl w-full max-w-5xl p-4 sm:p-6 shadow-2xl space-y-4 text-slate-900 max-h-[95vh] flex flex-col">
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-[#e2eaf2] pb-3 shrink-0">
+  <!-- ================= 4. ADMIN APPROVAL & AUDIT REVIEW MODAL (NETSUITE ERP THEME) ================= -->
+  <div id="adminShipmentsModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden text-[#173456] max-h-[95vh] flex flex-col">
+      <!-- NetSuite Deep Navy Header -->
+      <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex items-center justify-between text-white shrink-0">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center text-xl font-black shadow-xs">
+          <div class="w-9 h-9 rounded-lg bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-inner font-bold">
             👑
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h3 class="text-base sm:text-lg font-bold text-[#173456]">
+              <h3 class="text-base font-bold text-white tracking-wide uppercase">
                 Inbound Shipments Approval Queue (Admin: Nandu)
               </h3>
-              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#244b7a] text-blue-100 border border-[#3b669b]">
                 Live Inventory Gatekeeper
               </span>
             </div>
-            <p class="text-xs text-slate-500">
-              Cross-check Manager's physical box count &amp; locations against uploaded documents before committing to PostgreSQL
+            <p class="text-[11px] text-blue-200">
+              Cross-check Manager's physical box counts &amp; locations against uploaded documents before committing to PostgreSQL
             </p>
           </div>
         </div>
-        <button onclick="closeModal('adminShipmentsModal')" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-sm font-bold transition">✕</button>
+        <button onclick="closeModal('adminShipmentsModal')" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition">✕</button>
       </div>
 
       <!-- Filter Tabs: Pending vs Approved History -->
@@ -1001,24 +1009,26 @@
   </div>
 
 
-<!-- ================= INBOUND STOCK RECEIVING MODAL (MANAGER & ADMIN) ================= -->
-  <div id="receivingModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white border border-[#c4d3e2] rounded-2xl w-full max-w-xl p-5 sm:p-6 shadow-2xl space-y-4 text-slate-900 max-h-[92vh] overflow-y-auto">
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-[#e2eaf2] pb-3">
-        <div class="flex items-center gap-2.5">
-          <div class="w-10 h-10 rounded-xl bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-sm shrink-0">
+<!-- ================= INBOUND STOCK RECEIVING MODAL (NETSUITE ERP THEME) ================= -->
+  <div id="receivingModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden text-[#173456] max-h-[92vh] flex flex-col">
+      <!-- NetSuite Deep Navy Header -->
+      <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex items-center justify-between text-white shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-inner font-bold">
             📥
           </div>
           <div>
-            <h3 class="text-base sm:text-lg font-bold text-[#173456] flex items-center gap-2">
+            <h3 class="text-base font-bold text-white tracking-wide uppercase">
               Inbound Stock Receiving
             </h3>
-            <p class="text-xs text-slate-500">Alexander Warehouse &bull; Check in new stock &amp; assign location</p>
+            <p class="text-[11px] text-blue-200">Alexander Warehouse &bull; Check in new stock &amp; assign shelf location</p>
           </div>
         </div>
-        <button onclick="closeModal('receivingModal')" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-sm font-bold transition">✕</button>
+        <button onclick="closeModal('receivingModal')" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition">✕</button>
       </div>
+
+      <div class="p-5 space-y-4 overflow-y-auto">
 
       <!-- Quick Warehouse Zone Selector -->
       <div class="grid grid-cols-2 gap-2 bg-[#f0f4f8] p-1.5 rounded-xl border border-[#cbd8e5] text-xs font-bold">
@@ -1164,12 +1174,13 @@
     </div>
   </div>
 
-<div id="movementModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-3xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col text-slate-900">
-      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
-        <h3 class="text-lg font-bold text-slate-900">Stock Movement Audit Trail</h3>
-        <button onclick="closeModal('movementModal')" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+<div id="movementModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col text-[#173456]">
+      <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex items-center justify-between text-white shrink-0">
+        <h3 class="text-base font-bold text-white tracking-wide uppercase">Stock Movement Audit Trail</h3>
+        <button onclick="closeModal('movementModal')" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition">✕</button>
       </div>
+      <div class="p-5 flex-1 flex flex-col overflow-hidden">
       <div class="flex-1 overflow-y-auto">
         <table class="w-full text-left text-xs">
           <thead>
@@ -1190,7 +1201,7 @@
 
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=23.0"></script>
+  <script src="/static/app.js?v=24.0"></script>
   <script src="/static/auth_client.js?v=7.0"></script>
 </body>
 </html>

@@ -91,18 +91,19 @@ function injectAccessControlModal() {
   div.id = "userAccessModal";
   div.className = "hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4";
   div.innerHTML = `
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl p-6 shadow-2xl space-y-5 max-h-[90vh] flex flex-col">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+    <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col text-[#173456]">
+      <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex items-center justify-between text-white shrink-0">
         <div>
-          <h3 class="text-lg font-black text-white flex items-center gap-2">
+          <h3 class="text-base font-bold text-white tracking-wide uppercase flex items-center gap-2">
             <span>👥</span> User Access Control &amp; Team Accounts (Admin Only)
           </h3>
-          <p class="text-xs text-slate-400 mt-0.5">
-            Approve sign-up requests, create accounts for your Manager or Floor Leads, assign Part 1 / Part 2 zones, and see who is online right now.
+          <p class="text-[11px] text-blue-200 mt-0.5">
+            Approve sign-up requests, create accounts for Manager or Floor Leads, assign Part 1 / Part 2 zones, and see active users.
           </p>
         </div>
-        <button onclick="closeUserAccessModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
+        <button onclick="closeUserAccessModal()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition">✕</button>
       </div>
+      <div class="p-5 space-y-4 overflow-y-auto">
 
       <!-- Create / Give Access directly form -->
       <form onsubmit="handleAdminCreateUser(event)" class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
