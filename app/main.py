@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, distinct
 
 from app.database import get_db, init_db, SessionLocal
-from app.models import WarehouseLocation, InventoryItem, StockMovement, WarehouseUser
+from app.models import WarehouseLocation, InventoryItem, StockMovement, WarehouseUser, InboundShipment, InboundShipmentItem
+from app.llm_parser import parse_inbound_documents
 from app.auth import (
     SESSION_COOKIE_NAME, hash_password, verify_password,
     ensure_default_admin, get_optional_user, require_user, require_admin
@@ -21,7 +22,9 @@ from app.schemas import (
     ItemCreate, ItemUpdatePayload, ItemResponse, StyleSummary,
     StockAdjustPayload, SetQuantityPayload, WarehouseStats,
     SheetRowItem, SheetSubmitPayload, BulkDeletePayload, StyleRenamePayload,
-    ReceivingPayload
+    ReceivingPayload,
+    InboundItemPayload, InboundItemResponse, InboundShipmentCreate,
+    InboundShipmentResponse, InboundParseRequest, InboundApprovePayload, InboundRejectPayload
 )
 
 def seed_if_empty():
@@ -1364,6 +1367,326 @@ def receive_stock(payload: ReceivingPayload, db: Session = Depends(get_db)):
             "message": f"Received {new_item.quantity} pcs at new location {new_item.location}",
             "location": new_item.location
         }
+
+
+# ================= MULTI-PALLET INBOUND RECEIVING & ADMIN APPROVAL ENDPOINTS =================
+
+@app.post("/api/inbound/parse-docs")
+def api_parse_inbound_documents(payload: InboundParseRequest):
+    """
+    Multimodal AI document reader: Reads photographs/scans of Packing List & Commercial Invoice,
+    extracts all products, styles, colors, sizes, box counts, and total pieces.
+    """
+    try:
+        extracted = parse_inbound_documents(
+            packing_list_data=payload.packing_list_data,
+            commercial_invoice_data=payload.commercial_invoice_data,
+            packing_list_filename=payload.packing_list_filename,
+            commercial_invoice_filename=payload.commercial_invoice_filename,
+            raw_text=payload.raw_text
+        )
+        return {"status": "success", "data": extracted}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Document parsing error: {str(e)}")
+
+
+@app.post("/api/inbound/shipments", response_model=InboundShipmentResponse)
+def create_inbound_shipment(payload: InboundShipmentCreate, db: Session = Depends(get_db)):
+    """
+    Manager stages and submits a verified inbound shipment (1 to 20 pallets, 8 to 40 boxes/pallet)
+    with assigned warehouse shelf locations for Admin Approval.
+    """
+    from datetime import datetime
+    import os
+
+    shipment_num = payload.shipment_number
+    if not shipment_num or not shipment_num.strip():
+        date_str = datetime.utcnow().strftime("%Y%m%d")
+        rand_hex = os.urandom(2).hex().upper()
+        shipment_num = f"SHP-{date_str}-{rand_hex}"
+
+    tot_boxes = sum(i.box_count or 1 for i in payload.items) if payload.items else (payload.total_boxes or 0)
+    tot_units = sum(i.quantity or 0 for i in payload.items) if payload.items else (payload.total_units or 0)
+
+    shipment = InboundShipment(
+        shipment_number=shipment_num,
+        po_number=payload.po_number,
+        carrier_vendor=payload.carrier_vendor,
+        pallets_count=payload.pallets_count or 1,
+        total_boxes=tot_boxes,
+        total_units=tot_units,
+        status="PENDING_APPROVAL",
+        packing_list_filename=payload.packing_list_filename,
+        packing_list_data=payload.packing_list_data,
+        commercial_invoice_filename=payload.commercial_invoice_filename,
+        commercial_invoice_data=payload.commercial_invoice_data,
+        ai_extracted_raw=payload.ai_extracted_raw,
+        notes=payload.notes,
+        created_by=payload.created_by or "Warehouse Manager",
+        created_at=datetime.utcnow()
+    )
+    db.add(shipment)
+    db.flush()
+
+    for it in payload.items:
+        style_clean = it.style.strip().upper()
+        line_clean = it.line.strip() if it.line and it.line.strip() else None
+        row_clean = it.row_pos.strip() if it.row_pos and it.row_pos.strip() else None
+        sec_clean = it.section.strip() if it.section and it.section.strip() else None
+        lvl_clean = it.level.strip() if it.level and it.level.strip() else None
+        box_clean = it.box_num.strip() if it.box_num and it.box_num.strip() else None
+
+        loc_meta = build_location_info(
+            style=style_clean,
+            line=line_clean,
+            section=sec_clean,
+            level=lvl_clean,
+            row_pos=row_clean,
+            box_num=box_clean
+        )
+
+        item_row = InboundShipmentItem(
+            shipment_id=shipment.id,
+            style=style_clean,
+            brand=it.brand or loc_meta["brand"],
+            warehouse_part=loc_meta["warehouse_part"],
+            color=(it.color or "STANDARD").strip().upper(),
+            size=(it.size or "OS").strip().upper(),
+            line=loc_meta["line"],
+            row_pos=loc_meta["row_pos"],
+            section=loc_meta["section"],
+            level=loc_meta["level"],
+            box_num=loc_meta["box_num"],
+            box_count=it.box_count or 1,
+            pcs_per_box=it.pcs_per_box,
+            quantity=it.quantity or 0,
+            expected_quantity=it.expected_quantity,
+            location=it.location or loc_meta["location"],
+            notes=it.notes
+        )
+        db.add(item_row)
+
+    db.commit()
+    db.refresh(shipment)
+    return shipment
+
+
+@app.get("/api/inbound/shipments")
+def list_inbound_shipments(
+    status_filter: Optional[str] = Query(None, description="PENDING_APPROVAL | APPROVED | REJECTED"),
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """
+    List inbound shipments with summary counts.
+    Used for Admin notification badge & history review.
+    """
+    q = db.query(InboundShipment)
+    if status_filter:
+        q = q.filter(InboundShipment.status == status_filter.upper())
+
+    shipments = q.order_by(InboundShipment.created_at.desc()).limit(limit).all()
+
+    pending_count = db.query(func.count(InboundShipment.id)).filter(
+        InboundShipment.status == "PENDING_APPROVAL"
+    ).scalar() or 0
+
+    approved_count = db.query(func.count(InboundShipment.id)).filter(
+        InboundShipment.status == "APPROVED"
+    ).scalar() or 0
+
+    return {
+        "pending_count": pending_count,
+        "approved_count": approved_count,
+        "total_count": len(shipments),
+        "shipments": [
+            {
+                "id": s.id,
+                "shipment_number": s.shipment_number,
+                "po_number": s.po_number,
+                "carrier_vendor": s.carrier_vendor,
+                "pallets_count": s.pallets_count,
+                "total_boxes": s.total_boxes,
+                "total_units": s.total_units,
+                "status": s.status,
+                "created_by": s.created_by,
+                "approved_by": s.approved_by,
+                "approved_at": s.approved_at.isoformat() if s.approved_at else None,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "items_count": len(s.items),
+                "has_packing_list": bool(s.packing_list_data or s.packing_list_filename),
+                "has_commercial_invoice": bool(s.commercial_invoice_data or s.commercial_invoice_filename)
+            }
+            for s in shipments
+        ]
+    }
+
+
+@app.get("/api/inbound/shipments/{shipment_id}", response_model=InboundShipmentResponse)
+def get_inbound_shipment_detail(shipment_id: int, db: Session = Depends(get_db)):
+    """Retrieve full shipment details, line items, and document scan preview."""
+    shipment = db.query(InboundShipment).filter(InboundShipment.id == shipment_id).first()
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Inbound shipment not found.")
+    return shipment
+
+
+@app.post("/api/inbound/shipments/{shipment_id}/approve")
+def approve_inbound_shipment(
+    shipment_id: int,
+    payload: InboundApprovePayload,
+    db: Session = Depends(get_db)
+):
+    """
+    ADMIN CONFIRMATION:
+    When Admin clicks Confirm, all verified line items in the shipment
+    are automatically committed to PostgreSQL inventory and recorded in the audit trail.
+    """
+    from datetime import datetime
+
+    shipment = db.query(InboundShipment).filter(InboundShipment.id == shipment_id).with_for_update().first()
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Inbound shipment not found.")
+    if shipment.status == "APPROVED":
+        raise HTTPException(status_code=400, detail="Shipment has already been approved.")
+
+    admin_name = (payload.approved_by or "Nandu (Admin)").strip()
+    reason_note = f"Approved Inbound Shipment {shipment.shipment_number} (PO: {shipment.po_number or 'N/A'}, Pallets: {shipment.pallets_count})"
+    if payload.notes:
+        reason_note += f" - {payload.notes.strip()}"
+
+    created_records = 0
+    merged_records = 0
+    total_units_committed = 0
+
+    for it in shipment.items:
+        if it.quantity <= 0:
+            continue
+
+        loc_meta = build_location_info(
+            style=it.style,
+            line=it.line,
+            section=it.section,
+            level=it.level,
+            row_pos=it.row_pos,
+            box_num=it.box_num
+        )
+
+        q = db.query(InventoryItem).filter(
+            func.upper(InventoryItem.style) == it.style.upper(),
+            func.upper(func.coalesce(InventoryItem.color, "STANDARD")) == it.color.upper(),
+            func.upper(func.coalesce(InventoryItem.size, "OS")) == it.size.upper(),
+            func.coalesce(InventoryItem.line, "") == (loc_meta["line"] or ""),
+            func.coalesce(InventoryItem.section, "") == (loc_meta["section"] or ""),
+            func.coalesce(InventoryItem.level, "") == (loc_meta["level"] or ""),
+            func.coalesce(InventoryItem.row_pos, "") == (loc_meta["row_pos"] or ""),
+        )
+        if loc_meta["box_num"]:
+            target = q.filter(func.coalesce(InventoryItem.box_num, "") == loc_meta["box_num"]).first()
+        else:
+            target = q.first()
+
+        if target:
+            target.quantity += it.quantity
+            if it.pcs_per_box:
+                target.pcs_per_box = it.pcs_per_box
+            merged_records += 1
+            total_units_committed += it.quantity
+
+            db.add(StockMovement(
+                item_id=target.id,
+                style=target.style,
+                change_amount=it.quantity,
+                quantity_after=target.quantity,
+                movement_type="INBOUND_SHIPMENT_APPROVED",
+                reason=reason_note,
+                staff_name=admin_name
+            ))
+        else:
+            new_item = InventoryItem(
+                style=it.style.upper(),
+                brand=it.brand or loc_meta["brand"],
+                warehouse_part=loc_meta["warehouse_part"],
+                placement_type=loc_meta["placement_type"],
+                location_code=loc_meta["location_code"],
+                location=it.location or loc_meta["location"],
+                color=it.color.upper(),
+                size=it.size.upper(),
+                line=loc_meta["line"],
+                section=loc_meta["section"],
+                level=loc_meta["level"],
+                row_pos=loc_meta["row_pos"],
+                box_num=loc_meta["box_num"],
+                pcs_per_box=it.pcs_per_box,
+                quantity=it.quantity
+            )
+            db.add(new_item)
+            db.flush()
+            created_records += 1
+            total_units_committed += it.quantity
+
+            db.add(StockMovement(
+                item_id=new_item.id,
+                style=new_item.style,
+                change_amount=it.quantity,
+                quantity_after=new_item.quantity,
+                movement_type="INBOUND_SHIPMENT_APPROVED",
+                reason=reason_note,
+                staff_name=admin_name
+            ))
+
+    shipment.status = "APPROVED"
+    shipment.approved_by = admin_name
+    shipment.approved_at = datetime.utcnow()
+    if payload.notes:
+        shipment.notes = f"{shipment.notes or ''}\n[Admin Notes]: {payload.notes.strip()}".strip()
+
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": f"Successfully approved {shipment.shipment_number}! {total_units_committed:,} pieces committed to PostgreSQL across {len(shipment.items)} items ({merged_records} merged, {created_records} new locations).",
+        "shipment_id": shipment.id,
+        "total_units_committed": total_units_committed,
+        "merged_records": merged_records,
+        "created_records": created_records
+    }
+
+
+@app.post("/api/inbound/shipments/{shipment_id}/reject")
+def reject_inbound_shipment(
+    shipment_id: int,
+    payload: InboundRejectPayload,
+    db: Session = Depends(get_db)
+):
+    """Admin rejects shipment with revision instructions."""
+    from datetime import datetime
+
+    shipment = db.query(InboundShipment).filter(InboundShipment.id == shipment_id).first()
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Inbound shipment not found.")
+
+    shipment.status = "REJECTED"
+    admin_name = (payload.rejected_by or "Nandu (Admin)").strip()
+    shipment.notes = f"{shipment.notes or ''}\n[Rejected by {admin_name}]: {payload.reason.strip()}".strip()
+    db.commit()
+
+    return {"status": "success", "message": f"Shipment {shipment.shipment_number} rejected: {payload.reason}"}
+
+
+@app.delete("/api/inbound/shipments/{shipment_id}")
+def delete_inbound_shipment(shipment_id: int, db: Session = Depends(get_db)):
+    """Delete draft or rejected shipment."""
+    shipment = db.query(InboundShipment).filter(InboundShipment.id == shipment_id).first()
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Inbound shipment not found.")
+    if shipment.status == "APPROVED":
+        raise HTTPException(status_code=400, detail="Cannot delete an approved shipment.")
+
+    db.delete(shipment)
+    db.commit()
+    return {"status": "success", "message": f"Shipment {shipment.shipment_number} deleted."}
+
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):

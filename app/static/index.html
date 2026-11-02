@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=22.0">
+  <link rel="stylesheet" href="/static/styles.css?v=23.0">
 </head>
 <body class="bg-[#ebf1f6] text-slate-900 selection:bg-[#0070ba] min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:text-white">
 
@@ -37,7 +37,7 @@
       <!-- Right Controls: Admin & Manager Controls -->
       <div class="flex items-center gap-2">
         <!-- ADD RECEIVING ICON BUTTON FOR MANAGER & ADMIN -->
-        <button id="headerAddReceivingBtn" onclick="openReceivingModal()" class="manager-control bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-sm border border-[#38bdf8]/40 active:scale-95 transition" title="Add Inbound Stock Receiving">
+        <button id="headerAddReceivingBtn" onclick="openReceivingIntakeModal()" class="manager-control bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-sm border border-[#38bdf8]/40 active:scale-95 transition" title="Add Inbound Stock Receiving">
           <span class="text-sm">📥</span>
           <span class="hidden sm:inline font-bold tracking-wide">Add Receiving</span>
           <span class="sm:hidden font-bold">Receiving</span>
@@ -61,6 +61,13 @@
         <button onclick="openAddLocationModal()" class="admin-only-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white border border-[#3b669b] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
           <span>➕</span>
           <span class="hidden md:inline">Add Stock</span>
+        </button>
+
+                <!-- ADMIN INBOUND SHIPMENT APPROVAL QUEUE BADGE -->
+        <button id="adminInboundPendingBtn" onclick="openAdminShipmentsModal()" class="admin-only-control hidden bg-[#d97706] hover:bg-[#b45309] text-white font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition" title="Inbound Shipments Pending Admin Approval">
+          <span class="animate-pulse">📥</span>
+          <span class="hidden sm:inline">Inbound Queue</span>
+          <span id="adminPendingBadgeCount" class="px-1.5 py-0.5 rounded-full bg-white text-[#b45309] font-black text-[10px]">0</span>
         </button>
 
         <div id="warehouseAuthUserBar" class="flex items-center gap-2"></div>
@@ -550,7 +557,451 @@
     </div>
   </div>
 
-    <!-- ================= INBOUND STOCK RECEIVING MODAL (MANAGER & ADMIN) ================= -->
+    
+  <!-- ================= 1. RECEIVING INTAKE SELECTION MODAL (3 OPTIONS) ================= -->
+  <div id="receivingIntakeModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white border border-[#c4d3e2] rounded-3xl w-full max-w-xl p-6 shadow-2xl space-y-5 text-slate-900 animate-in fade-in zoom-in-95 duration-150">
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-[#e2eaf2] pb-3.5">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-[#0070ba] text-white flex items-center justify-center text-2xl shadow-md shrink-0">
+            📥
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-[#173456]">
+              Add Inbound Receiving
+            </h3>
+            <p class="text-xs text-slate-500">Alexander Warehouse &bull; Shipments of 1 to 20 Pallets (8–40 Boxes/Pallet)</p>
+          </div>
+        </div>
+        <button onclick="closeModal('receivingIntakeModal')" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-sm font-bold transition">✕</button>
+      </div>
+
+      <div class="text-xs text-slate-600">
+        Choose how you would like to intake arriving freight, cartons, and documentation:
+      </div>
+
+      <!-- 3 Option Cards -->
+      <div class="grid grid-cols-1 gap-3">
+        <!-- Option 1: Mobile Camera Scan -->
+        <div onclick="selectIntakeOption('CAMERA')" class="group p-4 rounded-2xl border-2 border-[#b8d4ee] bg-[#f0f7ff] hover:bg-[#e1effe] hover:border-[#0070ba] cursor-pointer transition shadow-xs flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-[#0070ba] text-white flex items-center justify-center text-2xl shadow-sm group-hover:scale-105 transition">
+            📸
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-bold text-[#173456]">Option 1: Scan with Camera (Phone)</h4>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0070ba] text-white font-mono">Mobile</span>
+            </div>
+            <p class="text-xs text-slate-600 mt-0.5">
+              Snap photos of physical <strong>Packing List</strong> &amp; <strong>Commercial Invoice</strong> using your phone camera. AI automatically reads products, quantities, and box counts.
+            </p>
+          </div>
+        </div>
+
+        <!-- Option 2: Upload Files (Desktop / Phone) -->
+        <div onclick="selectIntakeOption('UPLOAD')" class="group p-4 rounded-2xl border-2 border-[#cbd5e1] bg-white hover:bg-[#f8fafc] hover:border-[#0070ba] cursor-pointer transition shadow-xs flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-[#173456] text-white flex items-center justify-center text-2xl shadow-sm group-hover:scale-105 transition">
+            📁
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-bold text-[#173456]">Option 2: Upload Document Scans (PDF / Image)</h4>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-mono">Desktop / Phone</span>
+            </div>
+            <p class="text-xs text-slate-600 mt-0.5">
+              Upload scanned PDF files or high-res images of the Packing List &amp; Invoice from your computer or files app.
+            </p>
+          </div>
+        </div>
+
+        <!-- Option 3: Direct Manual Receiving -->
+        <div onclick="selectIntakeOption('MANUAL')" class="group p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-400 cursor-pointer transition flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center text-xl shadow-xs group-hover:scale-105 transition">
+            ✍️
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-bold text-slate-800">Option 3: Direct Manual Entry</h4>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-600 font-mono">Single Entry</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Check in single boxes or emergency stock directly without document scans.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-[11px] text-slate-400 text-center pt-2 border-t border-slate-100 flex items-center justify-center gap-2">
+        <span>🔒 Secure Verification:</span>
+        <span>Manager verifies physical boxes &amp; shelf locations &bull; Admin confirms before updating inventory.</span>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================= 2. DOCUMENT INGESTION & AI MULTIMODAL EXTRACTION MODAL ================= -->
+  <div id="documentIngestModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white border border-[#c4d3e2] rounded-3xl w-full max-w-2xl p-6 shadow-2xl space-y-4 text-slate-900 max-h-[92vh] overflow-y-auto">
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-[#e2eaf2] pb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-sm">
+            📄
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-bold text-[#173456]" id="ingestModalTitle">
+              Inbound Shipment Documentation
+            </h3>
+            <p class="text-xs text-slate-500">Attach Packing List &amp; Commercial Invoice for AI line item extraction</p>
+          </div>
+        </div>
+        <button onclick="closeModal('documentIngestModal')" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-sm font-bold transition">✕</button>
+      </div>
+
+      <!-- Hidden file inputs (with capture attribute for phone camera) -->
+      <input type="file" id="cameraPackingListInput" accept="image/*" capture="environment" class="hidden" onchange="handleDocFileChange(event, 'PACKING_LIST')" />
+      <input type="file" id="cameraInvoiceInput" accept="image/*" capture="environment" class="hidden" onchange="handleDocFileChange(event, 'INVOICE')" />
+      <input type="file" id="filePackingListInput" accept="image/*,.pdf" class="hidden" onchange="handleDocFileChange(event, 'PACKING_LIST')" />
+      <input type="file" id="fileInvoiceInput" accept="image/*,.pdf" class="hidden" onchange="handleDocFileChange(event, 'INVOICE')" />
+
+      <!-- Document Upload Cards (Two side by side) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- Doc 1: Packing List -->
+        <div class="border-2 border-dashed border-[#b8d4ee] rounded-2xl p-4 bg-[#f8fbfe] flex flex-col items-center justify-center text-center space-y-2 relative min-h-[160px]">
+          <div id="packingListPreviewContainer" class="hidden w-full flex flex-col items-center">
+            <img id="packingListThumb" src="" alt="Packing List" class="max-h-28 rounded-lg border border-slate-200 shadow-xs object-cover cursor-pointer" onclick="previewDocInLightbox('PACKING_LIST')" />
+            <div class="text-[11px] font-mono text-emerald-700 font-bold mt-1 flex items-center gap-1">
+              <span>✓</span><span id="packingListFileNameLabel">Packing List Loaded</span>
+            </div>
+            <button type="button" onclick="triggerDocInput('PACKING_LIST')" class="text-[11px] text-blue-600 hover:underline mt-0.5">Retake / Change</button>
+          </div>
+          <div id="packingListPlaceholder" class="flex flex-col items-center space-y-2">
+            <span class="text-3xl">📋</span>
+            <div class="font-bold text-xs text-[#173456]">1. Packing List *</div>
+            <p class="text-[10px] text-slate-500 px-2">Shows item styles, sizes, color codes, carton counts &amp; pcs/box</p>
+            <button type="button" onclick="triggerDocInput('PACKING_LIST')" class="bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition">
+              <span id="packingListBtnIcon">📸</span>
+              <span id="packingListBtnText">Snap Photo</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Doc 2: Commercial Invoice -->
+        <div class="border-2 border-dashed border-[#cbd5e1] rounded-2xl p-4 bg-white flex flex-col items-center justify-center text-center space-y-2 relative min-h-[160px]">
+          <div id="invoicePreviewContainer" class="hidden w-full flex flex-col items-center">
+            <img id="invoiceThumb" src="" alt="Commercial Invoice" class="max-h-28 rounded-lg border border-slate-200 shadow-xs object-cover cursor-pointer" onclick="previewDocInLightbox('INVOICE')" />
+            <div class="text-[11px] font-mono text-emerald-700 font-bold mt-1 flex items-center gap-1">
+              <span>✓</span><span id="invoiceFileNameLabel">Commercial Invoice Loaded</span>
+            </div>
+            <button type="button" onclick="triggerDocInput('INVOICE')" class="text-[11px] text-blue-600 hover:underline mt-0.5">Retake / Change</button>
+          </div>
+          <div id="invoicePlaceholder" class="flex flex-col items-center space-y-2">
+            <span class="text-3xl">🧾</span>
+            <div class="font-bold text-xs text-[#173456]">2. Commercial Invoice *</div>
+            <p class="text-[10px] text-slate-500 px-2">Shows vendor billing, PO number, total units &amp; pallet breakdown</p>
+            <button type="button" onclick="triggerDocInput('INVOICE')" class="bg-[#173456] hover:bg-[#244b7a] text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition">
+              <span id="invoiceBtnIcon">📸</span>
+              <span id="invoiceBtnText">Snap Photo</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shipment Metadata Fields -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-[#f0f4f8] p-3 rounded-2xl border border-[#d3dfea]">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Estimated Pallets</label>
+          <input type="number" id="ingestPalletCount" value="1" min="1" max="50"
+            class="w-full bg-white border border-[#cbd5e1] rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-[#173456]" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">PO / Invoice # (Optional)</label>
+          <input type="text" id="ingestPoNumber" placeholder="Auto-extracted by AI"
+            class="w-full bg-white border border-[#cbd5e1] rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-800" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Carrier / Vendor</label>
+          <input type="text" id="ingestVendor" placeholder="e.g. FastFreight / Factory"
+            class="w-full bg-white border border-[#cbd5e1] rounded-lg px-2.5 py-1.5 text-xs text-slate-800" />
+        </div>
+      </div>
+
+      <!-- AI Progress Indicator (Hidden initially) -->
+      <div id="aiProcessingBar" class="hidden p-4 rounded-2xl bg-[#e8f4fd] border border-[#b8daf7] text-center space-y-2">
+        <div class="flex items-center justify-center gap-2 text-xs font-bold text-[#0070ba]">
+          <span class="animate-spin text-lg">⚙️</span>
+          <span>Alexander AI is analyzing Packing List &amp; Commercial Invoice...</span>
+        </div>
+        <p class="text-[11px] text-slate-600">Extracting product styles, color codes, shoe/apparel sizes, and box counts...</p>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center justify-between pt-2 border-t border-[#e2eaf2]">
+        <button type="button" onclick="closeModal('documentIngestModal')" class="px-3.5 py-2 text-xs font-bold text-slate-500 hover:text-slate-800">
+          Cancel
+        </button>
+        <button type="button" id="startAiExtractBtn" onclick="runAiDocumentExtraction()"
+          class="bg-gradient-to-r from-[#0070ba] to-[#173456] hover:from-[#005a96] hover:to-[#0f243c] text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-blue-500/20 flex items-center gap-2 active:scale-95 transition">
+          <span>✨</span>
+          <span>Extract Shipment with AI &amp; Stage Locations</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================= 3. INBOUND STAGING & LOCATION ASSIGNMENT WORKSPACE ================= -->
+  <div id="inboundStagingModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-white border border-[#c4d3e2] rounded-3xl w-full max-w-5xl p-4 sm:p-6 shadow-2xl space-y-4 text-slate-900 max-h-[95vh] flex flex-col">
+      <!-- Header & Document Preview Link -->
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#e2eaf2] pb-3 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-xs">
+            📦
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base sm:text-lg font-bold text-[#173456]">
+                Stage Physical Locations for Arriving Shipment
+              </h3>
+              <span id="stagingStatusBadge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                PENDING ADMIN APPROVAL
+              </span>
+            </div>
+            <p class="text-xs text-slate-500">
+              Verified by Manager on floor &bull; Assign exact physical Line / Row &bull; Will not alter inventory until Admin confirms
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="openDocPreviewLightbox()" class="bg-[#f0f7ff] hover:bg-[#e1effe] text-[#0070ba] border border-[#b8d4ee] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition">
+            <span>🖼️</span>
+            <span>View Attached Documents</span>
+          </button>
+          <button onclick="closeModal('inboundStagingModal')" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-sm font-bold transition">✕</button>
+        </div>
+      </div>
+
+      <!-- Shipment Meta Counters Bar -->
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-[#f0f4f8] p-2.5 rounded-2xl border border-[#cbd8e5] text-xs font-mono shrink-0">
+        <div>
+          <span class="text-[10px] text-slate-500 uppercase block">Shipment #</span>
+          <span id="stgShipmentNumber" class="font-bold text-[#173456]">-</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-500 uppercase block">PO Number</span>
+          <span id="stgPoNumber" class="font-bold text-[#173456]">-</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-500 uppercase block">Pallet Count</span>
+          <span id="stgPalletsCount" class="font-bold text-blue-700">1 Pallet</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-500 uppercase block">Total Cartons</span>
+          <span id="stgTotalBoxes" class="font-bold text-emerald-700">0 Boxes</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-500 uppercase block">Total Pieces</span>
+          <span id="stgTotalUnits" class="font-bold text-[#0070ba]">0 Units</span>
+        </div>
+      </div>
+
+      <!-- Line Items Section (Scrollable Table) -->
+      <div class="flex-1 overflow-y-auto space-y-2 border border-[#cbd5e1] rounded-2xl p-2 bg-[#f8fafc]">
+        <div class="flex items-center justify-between px-2 pt-1">
+          <div class="text-xs font-bold text-[#173456] uppercase flex items-center gap-1.5">
+            <span>📋</span>
+            <span>Verified Shipment Items (<span id="stgItemsCount">0</span> lines)</span>
+          </div>
+          <button type="button" onclick="addEmptyStagingRow()" class="bg-[#173456] hover:bg-[#244b7a] text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition">
+            <span>+</span><span>Add Item Line</span>
+          </button>
+        </div>
+
+        <!-- Desktop Table / Mobile Responsive Grid -->
+        <table class="w-full text-left text-xs bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <thead>
+            <tr class="bg-[#e8f1fa] text-[#173456] border-b border-[#cbd8e5] font-mono uppercase text-[10px]">
+              <th class="py-2 px-2.5">Style SKU</th>
+              <th class="py-2 px-2 text-center">Color</th>
+              <th class="py-2 px-2 text-center">Size</th>
+              <th class="py-2 px-2 text-center">Boxes</th>
+              <th class="py-2 px-2 text-center">Pcs/Box</th>
+              <th class="py-2 px-2 text-center">Total Pcs</th>
+              <th class="py-2 px-2">Assigned Shelf Location</th>
+              <th class="py-2 px-2 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="stagingItemsTableBody" class="divide-y divide-slate-100 font-mono">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Inbound Notes & Manager Submit Bar -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-[#e2eaf2] shrink-0">
+        <div class="w-full sm:w-auto flex-1 max-w-lg">
+          <input type="text" id="stagingShipmentNotes" placeholder="Floor Notes: e.g. Pallet 1 placed in Line 3, verified by Floor Lead"
+            class="w-full bg-[#f8fafc] border border-[#cbd5e1] rounded-xl px-3 py-2 text-xs text-slate-800" />
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <button type="button" onclick="closeModal('inboundStagingModal')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition">
+            Save Draft &amp; Close
+          </button>
+          <button type="button" id="submitStagedShipmentBtn" onclick="submitInboundShipmentForApproval()"
+            class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-5 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-600/20 flex items-center gap-2 active:scale-95 transition">
+            <span>🚀</span>
+            <span>Submit Shipment for Admin Approval</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================= 4. ADMIN APPROVAL & AUDIT REVIEW MODAL ================= -->
+  <div id="adminShipmentsModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-white border border-[#c4d3e2] rounded-3xl w-full max-w-5xl p-4 sm:p-6 shadow-2xl space-y-4 text-slate-900 max-h-[95vh] flex flex-col">
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-[#e2eaf2] pb-3 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center text-xl font-black shadow-xs">
+            👑
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base sm:text-lg font-bold text-[#173456]">
+                Inbound Shipments Approval Queue (Admin: Nandu)
+              </h3>
+              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                Live Inventory Gatekeeper
+              </span>
+            </div>
+            <p class="text-xs text-slate-500">
+              Cross-check Manager's physical box count &amp; locations against uploaded documents before committing to PostgreSQL
+            </p>
+          </div>
+        </div>
+        <button onclick="closeModal('adminShipmentsModal')" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-sm font-bold transition">✕</button>
+      </div>
+
+      <!-- Filter Tabs: Pending vs Approved History -->
+      <div class="flex items-center gap-2 border-b border-slate-200 pb-2 shrink-0">
+        <button id="adminTabPendingBtn" onclick="switchAdminShipmentsTab('PENDING_APPROVAL')"
+          class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-[#173456] text-white shadow-xs">
+          ⏳ Pending Admin Approval (<span id="adminPendingCountHeader">0</span>)
+        </button>
+        <button id="adminTabApprovedBtn" onclick="switchAdminShipmentsTab('APPROVED')"
+          class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition text-[#2d4b68] hover:text-[#173456]">
+          ✓ Approved History (<span id="adminApprovedCountHeader">0</span>)
+        </button>
+      </div>
+
+      <!-- Main Content Split: Left Shipments List, Right Selected Detail -->
+      <div class="flex-1 grid grid-cols-12 gap-3 overflow-hidden min-h-0">
+        <!-- Shipments Sidebar (4 cols) -->
+        <div id="adminShipmentsListCol" class="col-span-12 md:col-span-4 overflow-y-auto space-y-2 pr-1 border-r border-slate-200">
+          <div id="adminShipmentsListContainer" class="space-y-2">
+            <!-- Dynamic Shipment Cards -->
+          </div>
+        </div>
+
+        <!-- Selected Shipment Inspection Workspace (8 cols) -->
+        <div id="adminShipmentDetailCol" class="col-span-12 md:col-span-8 flex flex-col overflow-y-auto min-h-0 p-3 bg-[#f8fafc] rounded-2xl border border-[#cbd5e1] space-y-3">
+          <div id="adminDetailEmptyPlaceholder" class="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400">
+            <span class="text-4xl mb-2">📋</span>
+            <p class="text-xs font-bold">Select a shipment on the left to review documents, verified pieces, and confirm inventory.</p>
+          </div>
+
+          <div id="adminDetailActiveContent" class="hidden space-y-3 flex-1 flex flex-col">
+            <!-- Top Summary Card -->
+            <div class="bg-white border border-[#cbd8e5] rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 shadow-xs shrink-0">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h4 id="admDetShipmentNum" class="text-sm font-black font-mono text-[#173456]">SHP-20261102</h4>
+                  <span id="admDetStatusBadge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">PENDING</span>
+                </div>
+                <div class="text-[11px] text-slate-500 mt-0.5">
+                  PO: <strong id="admDetPo">-</strong> &bull; Vendor: <strong id="admDetVendor">-</strong> &bull; Pallets: <strong id="admDetPallets">1</strong>
+                </div>
+              </div>
+
+              <!-- Quick Document View Buttons -->
+              <div class="flex items-center gap-1.5">
+                <button type="button" id="admViewPackingListBtn" onclick="previewDocInLightbox('PACKING_LIST')"
+                  class="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#e8f1fa] hover:bg-[#d0e4f7] text-[#0070ba] border border-[#b8d4ee] flex items-center gap-1 transition">
+                  <span>📋</span><span>Packing List</span>
+                </button>
+                <button type="button" id="admViewInvoiceBtn" onclick="previewDocInLightbox('INVOICE')"
+                  class="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#e8f1fa] hover:bg-[#d0e4f7] text-[#0070ba] border border-[#b8d4ee] flex items-center gap-1 transition">
+                  <span>🧾</span><span>Invoice</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Items Table -->
+            <div class="flex-1 overflow-y-auto border border-slate-200 rounded-xl bg-white">
+              <table class="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr class="bg-slate-100 text-slate-700 text-[10px] uppercase border-b border-slate-200">
+                    <th class="p-2">Style</th>
+                    <th class="p-2 text-center">Color</th>
+                    <th class="p-2 text-center">Size</th>
+                    <th class="p-2 text-center">Cartons</th>
+                    <th class="p-2 text-center">Units</th>
+                    <th class="p-2">Assigned Shelf Location</th>
+                  </tr>
+                </thead>
+                <tbody id="admDetItemsTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+
+            <!-- Admin Decision Confirmation Bar -->
+            <div id="admDecisionBar" class="bg-white border border-[#cbd8e5] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs shrink-0">
+              <div class="text-xs text-slate-600">
+                Submitted by: <strong id="admDetSubmittedBy" class="text-slate-900">-</strong>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="adminRejectActiveShipment()" class="px-3.5 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 border border-red-200 transition">
+                  ✕ Request Revision
+                </button>
+                <button type="button" id="admConfirmApproveBtn" onclick="adminApproveActiveShipment()"
+                  class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-5 py-2 rounded-xl text-xs shadow-md shadow-emerald-600/20 flex items-center gap-1.5 active:scale-95 transition">
+                  <span>✅</span>
+                  <span>Confirm &amp; Commit to Live Inventory</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================= 5. HIGH-RESOLUTION DOCUMENT PREVIEW LIGHTBOX ================= -->
+  <div id="documentPreviewLightbox" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
+    <div class="relative w-full max-w-4xl max-h-[92vh] flex flex-col items-center">
+      <div class="w-full flex items-center justify-between text-white pb-3">
+        <h4 id="lightboxDocTitle" class="text-sm font-mono font-bold flex items-center gap-2">
+          <span>📄</span><span>Attached Document Preview</span>
+        </h4>
+        <button onclick="closeModal('documentPreviewLightbox')" class="text-white hover:text-red-400 text-xl font-bold px-3 py-1 bg-white/10 rounded-lg">✕</button>
+      </div>
+      <div class="flex-1 w-full overflow-auto bg-slate-950/80 rounded-2xl p-2 border border-white/20 flex items-center justify-center">
+        <img id="lightboxImg" src="" alt="Document Preview" class="max-h-[80vh] max-w-full object-contain rounded shadow-2xl" />
+        <div id="lightboxNoImgMsg" class="hidden text-white/60 text-xs font-mono p-8 text-center">
+          Document file is PDF or no preview is available.
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+<!-- ================= INBOUND STOCK RECEIVING MODAL (MANAGER & ADMIN) ================= -->
   <div id="receivingModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white border border-[#c4d3e2] rounded-2xl w-full max-w-xl p-5 sm:p-6 shadow-2xl space-y-4 text-slate-900 max-h-[92vh] overflow-y-auto">
       <!-- Header -->
@@ -739,7 +1190,7 @@
 
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=22.0"></script>
+  <script src="/static/app.js?v=23.0"></script>
   <script src="/static/auth_client.js?v=7.0"></script>
 </body>
 </html>

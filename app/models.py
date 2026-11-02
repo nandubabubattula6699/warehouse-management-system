@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index, Text
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -98,3 +98,70 @@ class WarehouseUser(Base):
     session_token = Column(String(128), index=True, nullable=True)
     last_seen_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class InboundShipment(Base):
+    """
+    Tracks inbound warehouse shipments (1 to 20 pallets, 8 to 40 boxes/pallet).
+    Stores uploaded Packing List & Commercial Invoice document scans/photos,
+    AI extracted line items, verified shelf locations, and Admin approval state.
+    """
+    __tablename__ = "inbound_shipments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    shipment_number = Column(String(100), unique=True, index=True, nullable=False)
+    po_number = Column(String(100), index=True, nullable=True)
+    carrier_vendor = Column(String(150), nullable=True)
+    pallets_count = Column(Integer, default=1, nullable=False)
+    total_boxes = Column(Integer, default=0, nullable=False)
+    total_units = Column(Integer, default=0, nullable=False)
+    status = Column(String(50), default="PENDING_APPROVAL", index=True, nullable=False)  # PENDING_APPROVAL | APPROVED | REJECTED | DRAFT
+    packing_list_filename = Column(String(255), nullable=True)
+    packing_list_data = Column(Text, nullable=True)          # Base64 data URI for instant in-browser preview
+    commercial_invoice_filename = Column(String(255), nullable=True)
+    commercial_invoice_data = Column(Text, nullable=True)   # Base64 data URI
+    ai_extracted_raw = Column(Text, nullable=True)          # Raw JSON from LLM document parser
+    notes = Column(Text, nullable=True)
+    created_by = Column(String(120), default="Warehouse Manager", nullable=False)
+    approved_by = Column(String(120), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    items = relationship(
+        "InboundShipmentItem",
+        back_populates="shipment",
+        cascade="all, delete-orphan",
+        order_by="InboundShipmentItem.id"
+    )
+
+
+class InboundShipmentItem(Base):
+    """
+    Staged item line in an inbound shipment.
+    Records style, color, size, quantity, box count, and physical warehouse shelf location
+    entered by the Manager before committing to live inventory.
+    """
+    __tablename__ = "inbound_shipment_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    shipment_id = Column(Integer, ForeignKey("inbound_shipments.id", ondelete="CASCADE"), nullable=False, index=True)
+    style = Column(String(100), index=True, nullable=False)
+    brand = Column(String(60), default="ALLBIRDS")
+    warehouse_part = Column(String(30), default="PART_1")
+    color = Column(String(100), default="STANDARD")
+    size = Column(String(50), default="OS")
+    line = Column(String(50), nullable=True)
+    row_pos = Column(String(50), nullable=True)
+    section = Column(String(50), nullable=True)
+    level = Column(String(50), nullable=True)
+    box_num = Column(String(50), nullable=True)
+    box_count = Column(Integer, default=1)
+    pcs_per_box = Column(Integer, nullable=True)
+    quantity = Column(Integer, default=0, nullable=False)       # Received physical units
+    expected_quantity = Column(Integer, nullable=True)          # Quantity per packing list/invoice
+    location = Column(String(200), default="Unassigned")
+    notes = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    shipment = relationship("InboundShipment", back_populates="items")

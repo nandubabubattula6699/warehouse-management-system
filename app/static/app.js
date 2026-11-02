@@ -1462,3 +1462,680 @@ async function handleReceivingSubmit(e) {
     }
   }
 }
+
+
+// =========================================================================
+// MULTI-PALLET INBOUND RECEIVING, AI PARSING & ADMIN APPROVAL WORKFLOW
+// =========================================================================
+
+let currentDocUploadMode = "CAMERA"; // "CAMERA" or "UPLOAD"
+let currentInboundDraft = {
+  shipment_number: "",
+  po_number: "",
+  carrier_vendor: "",
+  pallets_count: 1,
+  total_boxes: 0,
+  total_units: 0,
+  packing_list_filename: "",
+  packing_list_data: null,
+  commercial_invoice_filename: "",
+  commercial_invoice_data: null,
+  notes: "",
+  created_by: "Warehouse Manager",
+  items: []
+};
+
+let activeAdminShipmentsTab = "PENDING_APPROVAL";
+let activeAdminSelectedShipment = null;
+
+// 1. Open Intake Selector Modal (3 Options)
+function openReceivingIntakeModal() {
+  openModal("receivingIntakeModal");
+}
+
+function selectIntakeOption(option) {
+  closeModal("receivingIntakeModal");
+
+  if (option === "CAMERA") {
+    currentDocUploadMode = "CAMERA";
+    document.getElementById("ingestModalTitle").textContent = "📸 Mobile Camera Scan — Packing List & Invoice";
+    document.getElementById("packingListBtnIcon").textContent = "📸";
+    document.getElementById("packingListBtnText").textContent = "Take Photo (Camera)";
+    document.getElementById("invoiceBtnIcon").textContent = "📸";
+    document.getElementById("invoiceBtnText").textContent = "Take Photo (Camera)";
+    openModal("documentIngestModal");
+  } else if (option === "UPLOAD") {
+    currentDocUploadMode = "UPLOAD";
+    document.getElementById("ingestModalTitle").textContent = "📁 Upload Documents (PDF / Image)";
+    document.getElementById("packingListBtnIcon").textContent = "📁";
+    document.getElementById("packingListBtnText").textContent = "Select File";
+    document.getElementById("invoiceBtnIcon").textContent = "📁";
+    document.getElementById("invoiceBtnText").textContent = "Select File";
+    openModal("documentIngestModal");
+  } else {
+    // Option 3: Manual Direct Entry
+    openReceivingModal();
+  }
+}
+
+// 2. Trigger appropriate input based on camera vs file
+function triggerDocInput(docType) {
+  if (docType === "PACKING_LIST") {
+    const inputId = currentDocUploadMode === "CAMERA" ? "cameraPackingListInput" : "filePackingListInput";
+    const el = document.getElementById(inputId);
+    if (el) el.click();
+  } else {
+    const inputId = currentDocUploadMode === "CAMERA" ? "cameraInvoiceInput" : "fileInvoiceInput";
+    const el = document.getElementById(inputId);
+    if (el) el.click();
+  }
+}
+
+function handleDocFileChange(e, docType) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const dataUri = evt.target.result;
+    if (docType === "PACKING_LIST") {
+      currentInboundDraft.packing_list_filename = file.name;
+      currentInboundDraft.packing_list_data = dataUri;
+
+      const thumb = document.getElementById("packingListThumb");
+      if (thumb) thumb.src = dataUri;
+      document.getElementById("packingListPlaceholder")?.classList.add("hidden");
+      document.getElementById("packingListPreviewContainer")?.classList.remove("hidden");
+      const nameLbl = document.getElementById("packingListFileNameLabel");
+      if (nameLbl) nameLbl.textContent = file.name;
+    } else {
+      currentInboundDraft.commercial_invoice_filename = file.name;
+      currentInboundDraft.commercial_invoice_data = dataUri;
+
+      const thumb = document.getElementById("invoiceThumb");
+      if (thumb) thumb.src = dataUri;
+      document.getElementById("invoicePlaceholder")?.classList.add("hidden");
+      document.getElementById("invoicePreviewContainer")?.classList.remove("hidden");
+      const nameLbl = document.getElementById("invoiceFileNameLabel");
+      if (nameLbl) nameLbl.textContent = file.name;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+// 3. Multimodal Document AI Extraction
+async function runAiDocumentExtraction() {
+  const btn = document.getElementById("startAiExtractBtn");
+  const bar = document.getElementById("aiProcessingBar");
+
+  if (bar) bar.classList.remove("hidden");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⚙️</span><span>AI Extracting Line Items...</span>`;
+  }
+
+  const payload = {
+    packing_list_data: currentInboundDraft.packing_list_data,
+    commercial_invoice_data: currentInboundDraft.commercial_invoice_data,
+    packing_list_filename: currentInboundDraft.packing_list_filename || "Packing_List.jpg",
+    commercial_invoice_filename: currentInboundDraft.commercial_invoice_filename || "Commercial_Invoice.jpg"
+  };
+
+  try {
+    const res = await fetch("/api/inbound/parse-docs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "AI extraction failed");
+    }
+
+    const resJson = await res.json();
+    const data = resJson.data || {};
+
+    const palletsInput = parseInt(document.getElementById("ingestPalletCount")?.value, 10) || data.pallets_count || 1;
+    const poInput = document.getElementById("ingestPoNumber")?.value.trim() || data.po_number || "";
+    const vendorInput = document.getElementById("ingestVendor")?.value.trim() || data.carrier_vendor || "";
+
+    currentInboundDraft.pallets_count = palletsInput;
+    currentInboundDraft.po_number = poInput;
+    currentInboundDraft.carrier_vendor = vendorInput;
+    currentInboundDraft.notes = data.notes || "";
+
+    // Generate random shipment identifier
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const randHex = Math.random().toString(16).substring(2, 6).toUpperCase();
+    currentInboundDraft.shipment_number = `SHP-${dateStr}-${randHex}`;
+
+    // Map extracted items with initial staged locations
+    currentInboundDraft.items = (data.items || []).map((it, idx) => {
+      const isPart2 = (it.warehouse_part === "PART_2") || (it.style && (it.style.startsWith("VD") || it.style.startsWith("VO")));
+      const defaultLine = isPart2 ? "" : String((idx % 14) + 1);
+      const defaultRow = isPart2 ? String((idx % 14) + 1) : "";
+      const defaultSec = String((idx * 3 % 32) + 1);
+      const defaultLvl = String((idx % 4) + 1);
+      const defaultBox = String((idx % 8) + 1);
+
+      const locStr = isPart2
+        ? `Row ${defaultRow} • Sec ${defaultSec} • Lvl ${defaultLvl} • Box ${defaultBox}`
+        : `Line ${defaultLine} • Sec ${defaultSec} • Lvl ${defaultLvl} • Box ${defaultBox}`;
+
+      return {
+        style: it.style || "A12501",
+        brand: it.brand || (isPart2 ? "VON DUTCH" : "ALLBIRDS"),
+        warehouse_part: isPart2 ? "PART_2" : "PART_1",
+        color: it.color || "STANDARD",
+        size: it.size || "OS",
+        box_count: it.box_count || 10,
+        pcs_per_box: it.pcs_per_box || 12,
+        quantity: it.quantity || ((it.box_count || 10) * (it.pcs_per_box || 12)),
+        line: defaultLine,
+        row_pos: defaultRow,
+        section: defaultSec,
+        level: defaultLvl,
+        box_num: defaultBox,
+        location: locStr
+      };
+    });
+
+    closeModal("documentIngestModal");
+    showToast(`✨ AI extracted ${currentInboundDraft.items.length} product lines from documents!`, "success");
+
+    // Open Staging workspace
+    openStagingWorkspace();
+  } catch (err) {
+    console.error("AI extract error:", err);
+    showToast("Error extracting documents: " + err.message, "error");
+  } finally {
+    if (bar) bar.classList.add("hidden");
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<span>✨</span><span>Extract Shipment with AI & Stage Locations</span>`;
+    }
+  }
+}
+
+// 4. Inbound Staging Workspace
+function openStagingWorkspace() {
+  document.getElementById("stgShipmentNumber").textContent = currentInboundDraft.shipment_number || "SHP-PENDING";
+  document.getElementById("stgPoNumber").textContent = currentInboundDraft.po_number || "N/A";
+  document.getElementById("stgPalletsCount").textContent = `${currentInboundDraft.pallets_count} Pallet${currentInboundDraft.pallets_count === 1 ? '' : 's'}`;
+  
+  const notesEl = document.getElementById("stagingShipmentNotes");
+  if (notesEl) notesEl.value = currentInboundDraft.notes || "";
+
+  renderStagingItemsTable();
+  openModal("inboundStagingModal");
+}
+
+function renderStagingItemsTable() {
+  const tbody = document.getElementById("stagingItemsTableBody");
+  if (!tbody) return;
+
+  const items = currentInboundDraft.items || [];
+  const totBoxes = items.reduce((sum, i) => sum + (parseInt(i.box_count, 10) || 0), 0);
+  const totUnits = items.reduce((sum, i) => sum + (parseInt(i.quantity, 10) || 0), 0);
+
+  document.getElementById("stgTotalBoxes").textContent = `${totBoxes} Boxes`;
+  document.getElementById("stgTotalUnits").textContent = `${totUnits.toLocaleString()} Units`;
+  document.getElementById("stgItemsCount").textContent = items.length;
+
+  if (items.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" class="text-center py-8 text-slate-400">
+          No items staged yet. Click "+ Add Item Line" above.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = items.map((it, idx) => `
+    <tr class="${idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'} hover:bg-blue-50/40 transition">
+      <td class="p-2">
+        <input type="text" value="${escapeHtml(it.style)}" onchange="updateStagingItemField(${idx}, 'style', this.value)"
+          class="w-full bg-white border border-slate-300 rounded px-1.5 py-1 text-xs font-bold font-mono uppercase text-[#173456]" />
+      </td>
+      <td class="p-2 text-center">
+        <input type="text" value="${escapeHtml(it.color)}" onchange="updateStagingItemField(${idx}, 'color', this.value)"
+          class="w-20 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center uppercase" />
+      </td>
+      <td class="p-2 text-center">
+        <input type="text" value="${escapeHtml(it.size)}" onchange="updateStagingItemField(${idx}, 'size', this.value)"
+          class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-xs font-bold text-center uppercase text-slate-900" />
+      </td>
+      <td class="p-2 text-center">
+        <input type="number" min="1" value="${it.box_count || 1}" onchange="updateStagingItemBoxes(${idx}, this.value)"
+          class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-xs text-center font-bold text-slate-700" />
+      </td>
+      <td class="p-2 text-center">
+        <input type="number" min="1" value="${it.pcs_per_box || 12}" onchange="updateStagingItemPcsBox(${idx}, this.value)"
+          class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-xs text-center text-slate-600" />
+      </td>
+      <td class="p-2 text-center">
+        <input type="number" min="1" value="${it.quantity || 0}" onchange="updateStagingItemField(${idx}, 'quantity', parseInt(this.value, 10))"
+          class="w-16 bg-white border border-slate-300 rounded px-1 py-1 text-xs font-black text-center text-[#0070ba]" />
+      </td>
+      <td class="p-2">
+        <div class="flex items-center gap-1">
+          <input type="text" placeholder="Line/Row" value="${it.warehouse_part === 'PART_2' ? (it.row_pos || '') : (it.line || '')}"
+            onchange="updateStagingItemLocation(${idx}, '${it.warehouse_part === 'PART_2' ? 'row_pos' : 'line'}', this.value)"
+            class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Line or Row" />
+          <input type="text" placeholder="Sec" value="${it.section || ''}"
+            onchange="updateStagingItemLocation(${idx}, 'section', this.value)"
+            class="w-12 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Section" />
+          <input type="text" placeholder="Lvl" value="${it.level || ''}"
+            onchange="updateStagingItemLocation(${idx}, 'level', this.value)"
+            class="w-10 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Level" />
+          <input type="text" placeholder="Box" value="${it.box_num || ''}"
+            onchange="updateStagingItemLocation(${idx}, 'box_num', this.value)"
+            class="w-12 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Box #" />
+        </div>
+        <div class="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+          📍 ${escapeHtml(it.location || 'Unassigned')}
+        </div>
+      </td>
+      <td class="p-2 text-center">
+        <button type="button" onclick="removeStagingRow(${idx})" class="p-1 text-slate-400 hover:text-red-600 transition" title="Remove line">
+          🗑️
+        </button>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function updateStagingItemField(idx, field, val) {
+  if (currentInboundDraft.items[idx]) {
+    currentInboundDraft.items[idx][field] = val;
+  }
+}
+
+function updateStagingItemBoxes(idx, val) {
+  const item = currentInboundDraft.items[idx];
+  if (!item) return;
+  item.box_count = parseInt(val, 10) || 1;
+  if (item.pcs_per_box) {
+    item.quantity = item.box_count * item.pcs_per_box;
+  }
+  renderStagingItemsTable();
+}
+
+function updateStagingItemPcsBox(idx, val) {
+  const item = currentInboundDraft.items[idx];
+  if (!item) return;
+  item.pcs_per_box = parseInt(val, 10) || 1;
+  item.quantity = (item.box_count || 1) * item.pcs_per_box;
+  renderStagingItemsTable();
+}
+
+function updateStagingItemLocation(idx, field, val) {
+  const item = currentInboundDraft.items[idx];
+  if (!item) return;
+  item[field] = val.trim();
+
+  // Rebuild location string
+  const isPart2 = item.warehouse_part === "PART_2" || item.row_pos;
+  const parts = [];
+  if (isPart2) {
+    if (item.row_pos) parts.push(`Row ${item.row_pos}`);
+  } else {
+    if (item.line) parts.push(`Line ${item.line}`);
+  }
+  if (item.section) parts.push(`Sec ${item.section}`);
+  if (item.level) parts.push(`Lvl ${item.level}`);
+  if (item.box_num) parts.push(`Box ${item.box_num}`);
+
+  item.location = parts.length > 0 ? parts.join(" • ") : "Unassigned";
+  renderStagingItemsTable();
+}
+
+function addEmptyStagingRow() {
+  currentInboundDraft.items.push({
+    style: "A12501",
+    brand: "ALLBIRDS",
+    warehouse_part: "PART_1",
+    color: "STANDARD",
+    size: "OS",
+    box_count: 5,
+    pcs_per_box: 12,
+    quantity: 60,
+    line: "1",
+    row_pos: "",
+    section: "1",
+    level: "1",
+    box_num: "1",
+    location: "Line 1 • Sec 1 • Lvl 1 • Box 1"
+  });
+  renderStagingItemsTable();
+}
+
+function removeStagingRow(idx) {
+  currentInboundDraft.items.splice(idx, 1);
+  renderStagingItemsTable();
+}
+
+// 5. Submit Staged Shipment for Admin Approval
+async function submitInboundShipmentForApproval() {
+  const btn = document.getElementById("submitStagedShipmentBtn");
+  if (currentInboundDraft.items.length === 0) {
+    showToast("Please add at least 1 verified product line before submitting.", "error");
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳</span><span>Submitting to Admin...</span>`;
+  }
+
+  const staffName = (window.currentWarehouseUser && window.currentWarehouseUser.full_name) || "Warehouse Manager";
+  const notes = (document.getElementById("stagingShipmentNotes")?.value || "").trim();
+
+  const payload = {
+    shipment_number: currentInboundDraft.shipment_number,
+    po_number: currentInboundDraft.po_number || null,
+    carrier_vendor: currentInboundDraft.carrier_vendor || null,
+    pallets_count: currentInboundDraft.pallets_count || 1,
+    total_boxes: currentInboundDraft.items.reduce((s, i) => s + (parseInt(i.box_count, 10) || 0), 0),
+    total_units: currentInboundDraft.items.reduce((s, i) => s + (parseInt(i.quantity, 10) || 0), 0),
+    packing_list_filename: currentInboundDraft.packing_list_filename || null,
+    packing_list_data: currentInboundDraft.packing_list_data || null,
+    commercial_invoice_filename: currentInboundDraft.commercial_invoice_filename || null,
+    commercial_invoice_data: currentInboundDraft.commercial_invoice_data || null,
+    notes: notes || null,
+    created_by: staffName,
+    items: currentInboundDraft.items
+  };
+
+  try {
+    const res = await fetch("/api/inbound/shipments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Submission failed");
+    }
+
+    const created = await res.json();
+    closeModal("inboundStagingModal");
+    showToast(`🚀 Shipment ${created.shipment_number} submitted! Waiting for Admin confirmation.`, "success");
+
+    // Refresh Admin pending badge
+    checkAdminInboundPendingCount();
+  } catch (err) {
+    console.error("Submit shipment error:", err);
+    showToast("Error submitting shipment: " + err.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<span>🚀</span><span>Submit Shipment for Admin Approval</span>`;
+    }
+  }
+}
+
+// 6. Admin Approval Queue Management
+async function checkAdminInboundPendingCount() {
+  try {
+    const res = await fetch("/api/inbound/shipments?limit=1");
+    if (!res.ok) return;
+    const data = await res.json();
+    const count = data.pending_count || 0;
+
+    const badge = document.getElementById("adminPendingBadgeCount");
+    const btn = document.getElementById("adminInboundPendingBtn");
+    if (badge) badge.textContent = count;
+    if (btn) {
+      const isAdmin = window.currentWarehouseUser && window.currentWarehouseUser.role === "ADMIN";
+      if (isAdmin && count > 0) {
+        btn.classList.remove("hidden");
+      }
+    }
+  } catch (err) {
+    console.error("Check pending count error:", err);
+  }
+}
+
+function openAdminShipmentsModal() {
+  loadAdminShipmentsList(activeAdminShipmentsTab);
+  openModal("adminShipmentsModal");
+}
+
+function switchAdminShipmentsTab(tab) {
+  activeAdminShipmentsTab = tab;
+  const pBtn = document.getElementById("adminTabPendingBtn");
+  const aBtn = document.getElementById("adminTabApprovedBtn");
+
+  if (tab === "PENDING_APPROVAL") {
+    if (pBtn) pBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-[#173456] text-white shadow-xs";
+    if (aBtn) aBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition text-[#2d4b68] hover:text-[#173456]";
+  } else {
+    if (aBtn) aBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-[#173456] text-white shadow-xs";
+    if (pBtn) pBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition text-[#2d4b68] hover:text-[#173456]";
+  }
+  loadAdminShipmentsList(tab);
+}
+
+async function loadAdminShipmentsList(status) {
+  const container = document.getElementById("adminShipmentsListContainer");
+  if (!container) return;
+  container.innerHTML = `<div class="p-4 text-center text-xs text-slate-400 font-mono">Loading shipments...</div>`;
+
+  try {
+    const res = await fetch(`/api/inbound/shipments?status_filter=${status}&limit=50`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    document.getElementById("adminPendingCountHeader").textContent = data.pending_count || 0;
+    document.getElementById("adminApprovedCountHeader").textContent = data.approved_count || 0;
+
+    const list = data.shipments || [];
+    if (list.length === 0) {
+      container.innerHTML = `<div class="p-4 text-center text-xs text-slate-400">No ${status === 'PENDING_APPROVAL' ? 'pending' : 'approved'} shipments found.</div>`;
+      return;
+    }
+
+    container.innerHTML = list.map(s => `
+      <div onclick="selectAdminShipmentDetail(${s.id})"
+        class="p-3 bg-white hover:bg-blue-50/50 rounded-xl border border-slate-200 cursor-pointer transition shadow-2xs space-y-1">
+        <div class="flex items-center justify-between">
+          <span class="font-mono font-bold text-xs text-[#173456]">${escapeHtml(s.shipment_number)}</span>
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${s.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+            ${s.status}
+          </span>
+        </div>
+        <div class="text-[11px] text-slate-600 flex items-center justify-between font-mono">
+          <span>PO: ${escapeHtml(s.po_number || 'N/A')}</span>
+          <span class="font-bold text-blue-700">${s.total_units.toLocaleString()} pcs</span>
+        </div>
+        <div class="text-[10px] text-slate-400 flex items-center justify-between">
+          <span>${s.pallets_count} Pallet(s) &bull; ${s.total_boxes} Boxes</span>
+          <span>${s.items_count} items</span>
+        </div>
+      </div>
+    `).join("");
+
+    if (list.length > 0) {
+      selectAdminShipmentDetail(list[0].id);
+    }
+  } catch (err) {
+    console.error("Load shipments error:", err);
+  }
+}
+
+async function selectAdminShipmentDetail(shipmentId) {
+  try {
+    const res = await fetch(`/api/inbound/shipments/${shipmentId}`);
+    if (!res.ok) return;
+    const s = await res.json();
+    activeAdminSelectedShipment = s;
+
+    document.getElementById("adminDetailEmptyPlaceholder")?.classList.add("hidden");
+    document.getElementById("adminDetailActiveContent")?.classList.remove("hidden");
+
+    document.getElementById("admDetShipmentNum").textContent = s.shipment_number;
+    document.getElementById("admDetStatusBadge").textContent = s.status;
+    document.getElementById("admDetStatusBadge").className = `text-[10px] font-mono font-bold px-2 py-0.5 rounded ${s.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`;
+    document.getElementById("admDetPo").textContent = s.po_number || "N/A";
+    document.getElementById("admDetVendor").textContent = s.carrier_vendor || "N/A";
+    document.getElementById("admDetPallets").textContent = `${s.pallets_count} (${s.total_boxes} boxes, ${s.total_units.toLocaleString()} pcs)`;
+    document.getElementById("admDetSubmittedBy").textContent = `${s.created_by} on ${new Date(s.created_at).toLocaleString()}`;
+
+    // Document view buttons
+    const pBtn = document.getElementById("admViewPackingListBtn");
+    const iBtn = document.getElementById("admViewInvoiceBtn");
+    if (pBtn) pBtn.style.display = s.packing_list_data ? "flex" : "none";
+    if (iBtn) iBtn.style.display = s.commercial_invoice_data ? "flex" : "none";
+
+    // Decision bar: hide approve button if already approved
+    const decBar = document.getElementById("admDecisionBar");
+    if (decBar) {
+      decBar.style.display = s.status === "APPROVED" ? "none" : "flex";
+    }
+
+    // Render items
+    const tbody = document.getElementById("admDetItemsTableBody");
+    if (tbody) {
+      tbody.innerHTML = (s.items || []).map(it => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="p-2 font-bold text-[#173456]">${escapeHtml(it.style)}</td>
+          <td class="p-2 text-center text-slate-700">${escapeHtml(it.color)}</td>
+          <td class="p-2 text-center font-bold text-slate-900">${escapeHtml(it.size)}</td>
+          <td class="p-2 text-center">${it.box_count || 1}</td>
+          <td class="p-2 text-center font-bold text-blue-700">${it.quantity.toLocaleString()}</td>
+          <td class="p-2">
+            <span class="inline-block px-2 py-0.5 rounded bg-blue-50 text-[#0070ba] font-bold border border-blue-200">
+              📍 ${escapeHtml(it.location || 'Unassigned')}
+            </span>
+          </td>
+        </tr>
+      `).join("");
+    }
+  } catch (err) {
+    console.error("Select shipment error:", err);
+  }
+}
+
+// 7. Admin Confirm & Approve (Commit to Live PostgreSQL Inventory)
+async function adminApproveActiveShipment() {
+  if (!activeAdminSelectedShipment) return;
+  const s = activeAdminSelectedShipment;
+
+  if (!confirm(`Confirm and commit Shipment ${s.shipment_number} (${s.total_units.toLocaleString()} units) into live inventory?`)) {
+    return;
+  }
+
+  const btn = document.getElementById("admConfirmApproveBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⚙️</span><span>Committing to Inventory...</span>`;
+  }
+
+  try {
+    const adminName = (window.currentWarehouseUser && window.currentWarehouseUser.full_name) || "Nandu (Admin)";
+    const res = await fetch(`/api/inbound/shipments/${s.id}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approved_by: adminName })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Approval failed");
+    }
+
+    const resJson = await res.json();
+    showToast(`🎉 ${resJson.message}`, "success");
+
+    // Close admin modal and refresh entire dashboard!
+    closeModal("adminShipmentsModal");
+    loadStats();
+    loadStylesList();
+    if (selectedStyles.length > 0) {
+      loadBatchStylesDetails();
+    }
+    checkAdminInboundPendingCount();
+  } catch (err) {
+    console.error("Approve error:", err);
+    showToast("Error approving shipment: " + err.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<span>✅</span><span>Confirm & Commit to Live Inventory</span>`;
+    }
+  }
+}
+
+async function adminRejectActiveShipment() {
+  if (!activeAdminSelectedShipment) return;
+  const s = activeAdminSelectedShipment;
+  const reason = prompt(`Enter revision notes / reason for rejecting ${s.shipment_number}:`, "Box count does not match commercial invoice");
+  if (!reason) return;
+
+  try {
+    const res = await fetch(`/api/inbound/shipments/${s.id}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rejected_by: (window.currentWarehouseUser && window.currentWarehouseUser.full_name) || "Nandu (Admin)",
+        reason: reason
+      })
+    });
+
+    if (!res.ok) throw new Error("Rejection failed");
+    showToast(`Shipment ${s.shipment_number} rejected. Notes sent to floor manager.`, "error");
+    loadAdminShipmentsList(activeAdminShipmentsTab);
+    checkAdminInboundPendingCount();
+  } catch (err) {
+    showToast("Error rejecting shipment: " + err.message, "error");
+  }
+}
+
+// 8. Document Preview Lightbox
+function openDocPreviewLightbox() {
+  if (currentInboundDraft.packing_list_data) {
+    previewDocInLightbox("PACKING_LIST");
+  } else if (currentInboundDraft.commercial_invoice_data) {
+    previewDocInLightbox("INVOICE");
+  } else {
+    showToast("No documents currently attached to this shipment.", "error");
+  }
+}
+
+function previewDocInLightbox(docType) {
+  const modal = document.getElementById("documentPreviewLightbox");
+  const img = document.getElementById("lightboxImg");
+  const title = document.getElementById("lightboxDocTitle");
+  const noImg = document.getElementById("lightboxNoImgMsg");
+
+  let dataUri = "";
+  let docName = "";
+
+  if (activeAdminSelectedShipment) {
+    dataUri = docType === "PACKING_LIST" ? activeAdminSelectedShipment.packing_list_data : activeAdminSelectedShipment.commercial_invoice_data;
+    docName = docType === "PACKING_LIST" ? (activeAdminSelectedShipment.packing_list_filename || "Packing List") : (activeAdminSelectedShipment.commercial_invoice_filename || "Commercial Invoice");
+  } else {
+    dataUri = docType === "PACKING_LIST" ? currentInboundDraft.packing_list_data : currentInboundDraft.commercial_invoice_data;
+    docName = docType === "PACKING_LIST" ? (currentInboundDraft.packing_list_filename || "Packing List") : (currentInboundDraft.commercial_invoice_filename || "Commercial Invoice");
+  }
+
+  if (title) title.textContent = `Attached ${docName}`;
+
+  if (dataUri && dataUri.startsWith("data:image")) {
+    if (img) {
+      img.src = dataUri;
+      img.classList.remove("hidden");
+    }
+    if (noImg) noImg.classList.add("hidden");
+  } else {
+    if (img) img.classList.add("hidden");
+    if (noImg) noImg.classList.remove("hidden");
+  }
+
+  openModal("documentPreviewLightbox");
+}

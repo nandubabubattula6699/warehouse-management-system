@@ -44,6 +44,7 @@ async function initWarehouseAuth() {
     }
 
     if (typeof renderFilteredRows === 'function') renderFilteredRows();
+    if (typeof checkAdminInboundPendingCount === 'function') checkAdminInboundPendingCount();
     renderAuthHeaderControls(data);
     injectAccessControlModal();
   } catch (err) {
