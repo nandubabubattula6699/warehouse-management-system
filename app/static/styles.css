@@ -1,6 +1,20 @@
 .font-handwritten {
   font-family: 'Caveat', 'Segoe Script', 'Brush Script MT', cursive;
 }
+.alexander-hero-title {
+  font-family: 'Caveat', 'Segoe Script', 'Brush Script MT', cursive !important;
+  font-size: 72px !important;
+  line-height: 1.1 !important;
+  font-weight: 700 !important;
+  color: #173456 !important;
+}
+.alexander-hero-subtitle {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 24px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  color: #475569 !important;
+}
 /* ================= Oracle NetSuite Theme for Warehouse OS (Mobile & Desktop) ================= */
 body {
   background-color: #ebf1f6 !important;

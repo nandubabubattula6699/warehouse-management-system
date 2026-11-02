@@ -2,13 +2,13 @@
 function getAlexanderEmptyStateHtml(isTable = true) {
   const content = `
     <div class="max-w-xl mx-auto flex flex-col items-center text-center py-10 px-4 select-none">
-      <!-- Line 1: Handwritten style in 36px font -->
-      <div style="font-family: 'Caveat', 'Segoe Script', 'Brush Script MT', cursive; font-size: 72px; line-height: 1.1; line-height: 1.25;" class="font-bold text-[#173456] tracking-wide">
+      <!-- Line 1: Handwritten style in 72px font -->
+      <div style="font-family: 'Caveat', 'Segoe Script', 'Brush Script MT', cursive; font-size: 72px; line-height: 1.1;" class="alexander-hero-title font-bold text-[#173456] tracking-wide">
         Alexander
       </div>
 
       <!-- Line 2: Normal style in 24px font -->
-      <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 24px; font-weight: normal; line-height: 1.4;" class="text-[#475569] mt-3">
+      <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 24px; font-weight: normal; line-height: 1.4;" class="alexander-hero-subtitle text-[#475569] mt-3">
         please search style location
       </div>
 
@@ -371,7 +371,11 @@ function renderStyleDropdown(query) {
 }
 
 async function loadBatchStylesDetails() {
-  if (selectedStyles.length === 0) return;
+  if (selectedStyles.length === 0) {
+    batchData = null;
+    renderAlexanderEmptyState();
+    return;
+  }
 
   const tbody = document.getElementById("styleLocationTableBody");
   if (tbody) {
