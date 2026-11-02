@@ -20,7 +20,8 @@ from app.location_engine import build_location_info, ensure_schema_and_locations
 from app.schemas import (
     ItemCreate, ItemUpdatePayload, ItemResponse, StyleSummary,
     StockAdjustPayload, SetQuantityPayload, WarehouseStats,
-    SheetRowItem, SheetSubmitPayload, BulkDeletePayload, StyleRenamePayload
+    SheetRowItem, SheetSubmitPayload, BulkDeletePayload, StyleRenamePayload,
+    ReceivingPayload
 )
 
 def seed_if_empty():
@@ -1256,6 +1257,114 @@ def admin_delete_user(
     db.commit()
     return {"status": "ok"}
 
+
+@app.post("/api/receiving")
+def receive_stock(payload: ReceivingPayload, db: Session = Depends(get_db)):
+    """
+    Dedicated Inbound Stock Receiving Endpoint for Manager & Admin.
+    Checks in incoming inventory, creates or merges into shelf location,
+    and logs a StockMovement audit record with type 'RECEIVING'.
+    """
+    style = payload.style.strip().upper()
+    if not style:
+        raise HTTPException(status_code=400, detail="Style code is required.")
+    color = (payload.color or "STANDARD").strip().upper()
+    size = (payload.size or "OS").strip().upper()
+    line = payload.line.strip() if payload.line and payload.line.strip() else None
+    row_pos = payload.row_pos.strip() if payload.row_pos and payload.row_pos.strip() else None
+    section = payload.section.strip() if payload.section and payload.section.strip() else None
+    level = payload.level.strip() if payload.level and payload.level.strip() else None
+    box_num = payload.box_num.strip() if payload.box_num and payload.box_num.strip() else None
+    staff = (payload.staff_name or "Warehouse Manager").strip()
+    po = (payload.po_number or "").strip()
+    notes = (payload.notes or "").strip()
+    reason = f"Inbound Receiving PO: {po}" if po else (notes or "Inbound Stock Receiving")
+
+    loc_meta = build_location_info(
+        style=style,
+        line=line,
+        section=section,
+        level=level,
+        row_pos=row_pos,
+        box_num=box_num
+    )
+
+    q = db.query(InventoryItem).filter(
+        func.upper(InventoryItem.style) == style,
+        func.upper(func.coalesce(InventoryItem.color, "STANDARD")) == color,
+        func.upper(func.coalesce(InventoryItem.size, "OS")) == size,
+        func.coalesce(InventoryItem.line, "") == (loc_meta["line"] or ""),
+        func.coalesce(InventoryItem.section, "") == (loc_meta["section"] or ""),
+        func.coalesce(InventoryItem.level, "") == (loc_meta["level"] or ""),
+        func.coalesce(InventoryItem.row_pos, "") == (loc_meta["row_pos"] or ""),
+    )
+    if loc_meta["box_num"]:
+        target = q.filter(func.coalesce(InventoryItem.box_num, "") == loc_meta["box_num"]).first()
+    else:
+        target = q.first()
+
+    if target:
+        target.quantity += payload.quantity
+        if payload.pcs_per_box:
+            target.pcs_per_box = payload.pcs_per_box
+        db.add(StockMovement(
+            item_id=target.id,
+            style=target.style,
+            change_amount=payload.quantity,
+            quantity_after=target.quantity,
+            movement_type="RECEIVING",
+            reason=reason,
+            staff_name=staff
+        ))
+        db.commit()
+        db.refresh(target)
+        return {
+            "status": "success",
+            "action": "merged",
+            "item": ItemResponse.model_validate(target),
+            "message": f"Added {payload.quantity} pcs to existing location {target.location} (New Stock: {target.quantity} pcs)",
+            "location": target.location
+        }
+    else:
+        brand = payload.brand or loc_meta["brand"]
+        new_item = InventoryItem(
+            style=style,
+            brand=brand,
+            warehouse_part=loc_meta["warehouse_part"],
+            placement_type=loc_meta["placement_type"],
+            location_code=loc_meta["location_code"],
+            location=loc_meta["location"],
+            color=color,
+            size=size,
+            line=loc_meta["line"],
+            section=loc_meta["section"],
+            level=loc_meta["level"],
+            row_pos=loc_meta["row_pos"],
+            box_num=loc_meta["box_num"],
+            pcs_per_box=payload.pcs_per_box,
+            quantity=payload.quantity
+        )
+        db.add(new_item)
+        db.commit()
+        db.refresh(new_item)
+        db.add(StockMovement(
+            item_id=new_item.id,
+            style=new_item.style,
+            change_amount=payload.quantity,
+            quantity_after=new_item.quantity,
+            movement_type="RECEIVING",
+            reason=reason,
+            staff_name=staff
+        ))
+        db.commit()
+        return {
+            "status": "success",
+            "action": "created",
+            "item": ItemResponse.model_validate(new_item),
+            "message": f"Received {new_item.quantity} pcs at new location {new_item.location}",
+            "location": new_item.location
+        }
+
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -1279,7 +1388,7 @@ if os.path.exists(static_dir):
         user = get_optional_user(request, db)
         if not user:
             return RedirectResponse(url="/login", status_code=302)
-        if user.role != "ADMIN":
+        if user.role != "ADMIN" and user.role != "MANAGER":
             # Manager & Floor Staff only get the Single-View Lookup & Print Pick Sheet dashboard
             return RedirectResponse(url="/", status_code=302)
         return FileResponse(os.path.join(static_dir, "manage.html"))

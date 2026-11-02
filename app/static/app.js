@@ -1242,3 +1242,223 @@ function loadActiveAisleIntoLookup() {
   renderSelectedStylesChips();
   loadBatchStylesDetails(); autoSwitchToMobileLocations();
 }
+
+
+// ================= INBOUND STOCK RECEIVING WORKFLOW (MANAGER & ADMIN) =================
+function openReceivingModal() {
+  const current = selectedStyles.length > 0 ? selectedStyles[0] : "";
+  const styleInput = document.getElementById("rcvStyleInput");
+  if (styleInput) {
+    if (!styleInput.value && current) {
+      styleInput.value = current;
+    }
+  }
+
+  // Pre-fill staff name from auth if available
+  const staffInput = document.getElementById("rcvStaffInput");
+  if (staffInput && window.currentWarehouseUser && window.currentWarehouseUser.full_name) {
+    staffInput.value = window.currentWarehouseUser.full_name;
+  }
+
+  updateReceivingLocationPreview();
+  openModal("receivingModal");
+}
+
+function switchReceivingZone(part) {
+  const partInput = document.getElementById("rcvWarehousePart");
+  const p1Btn = document.getElementById("rcvPart1Btn");
+  const p2Btn = document.getElementById("rcvPart2Btn");
+  const lineCol = document.getElementById("rcvLineCol");
+  const rowCol = document.getElementById("rcvRowCol");
+  const zoneTitle = document.getElementById("rcvLocZoneTitle");
+  const brandSelect = document.getElementById("rcvBrandSelect");
+
+  if (!partInput) return;
+  partInput.value = part;
+
+  if (part === "PART_1") {
+    if (p1Btn) p1Btn.className = "py-2 px-3 rounded-lg bg-[#173456] text-white shadow-xs flex items-center justify-center gap-1.5 transition";
+    if (p2Btn) p2Btn.className = "py-2 px-3 rounded-lg text-[#2d4b68] hover:text-[#173456] flex items-center justify-center gap-1.5 transition";
+    if (lineCol) lineCol.classList.remove("hidden");
+    if (rowCol) rowCol.classList.add("hidden");
+    if (zoneTitle) zoneTitle.textContent = "Part 1 Shelf Location Coordinates (Allbirds Lines 1–14)";
+    if (brandSelect && brandSelect.value !== "ALLBIRDS") brandSelect.value = "ALLBIRDS";
+  } else {
+    if (p2Btn) p2Btn.className = "py-2 px-3 rounded-lg bg-[#173456] text-white shadow-xs flex items-center justify-center gap-1.5 transition";
+    if (p1Btn) p1Btn.className = "py-2 px-3 rounded-lg text-[#2d4b68] hover:text-[#173456] flex items-center justify-center gap-1.5 transition";
+    if (lineCol) lineCol.classList.add("hidden");
+    if (rowCol) rowCol.classList.remove("hidden");
+    if (zoneTitle) zoneTitle.textContent = "Part 2 Shelf Location Coordinates (Rows 1–15 / Wall)";
+    if (brandSelect && brandSelect.value === "ALLBIRDS") brandSelect.value = "VON DUTCH";
+  }
+  updateReceivingLocationPreview();
+}
+
+function updateReceivingLocationPreview() {
+  const partInput = document.getElementById("rcvWarehousePart");
+  const part = partInput ? partInput.value : "PART_1";
+  const line = (document.getElementById("rcvLineInput")?.value || "").trim();
+  const row = (document.getElementById("rcvRowInput")?.value || "").trim();
+  const sec = (document.getElementById("rcvSectionInput")?.value || "").trim();
+  const lvl = (document.getElementById("rcvLevelInput")?.value || "").trim();
+  const box = (document.getElementById("rcvBoxInput")?.value || "").trim();
+  const preview = document.getElementById("rcvLocationPreview");
+
+  const parts = [];
+  if (part === "PART_1") {
+    if (line) parts.push(`Line ${line}`);
+  } else {
+    if (row) parts.push(`Row ${row}`);
+  }
+  if (sec) parts.push(`Sec ${sec}`);
+  if (lvl) parts.push(`Lvl ${lvl}`);
+  if (box) parts.push(`Box ${box}`);
+
+  if (preview) {
+    preview.textContent = parts.length > 0 ? parts.join(" • ") : "📍 Unassigned";
+  }
+}
+
+function handleReceivingStyleInput(val) {
+  const query = (val || "").trim().toUpperCase();
+  const dropdown = document.getElementById("rcvStyleSuggestions");
+  if (!dropdown) return;
+
+  if (!query || allStylesList.length === 0) {
+    dropdown.innerHTML = "";
+    dropdown.classList.add("hidden");
+    return;
+  }
+
+  const qNorm = query.replace(/\s+/g, "");
+  const matches = allStylesList.filter(s => {
+    const stUpper = s.style.toUpperCase();
+    return stUpper.includes(query) || stUpper.replace(/\s+/g, "").includes(qNorm);
+  }).slice(0, 8);
+
+  if (matches.length === 0) {
+    dropdown.innerHTML = `<div class="p-2.5 text-xs text-slate-500 font-mono">New Style SKU "${escapeHtml(query)}" (Will be created)</div>`;
+    dropdown.classList.remove("hidden");
+    return;
+  }
+
+  dropdown.innerHTML = matches.map(s => `
+    <div onclick="selectReceivingStyle('${escapeHtml(s.style)}')"
+      class="p-2.5 hover:bg-[#f0f7ff] cursor-pointer flex items-center justify-between text-xs transition">
+      <span class="font-mono font-bold text-[#173456]">${escapeHtml(s.style)}</span>
+      <span class="text-slate-500 font-mono">${s.total_quantity.toLocaleString()} pcs • ${s.location_count} locs</span>
+    </div>
+  `).join("");
+  dropdown.classList.remove("hidden");
+}
+
+function selectReceivingStyle(sku) {
+  const input = document.getElementById("rcvStyleInput");
+  if (input) input.value = sku;
+  const dropdown = document.getElementById("rcvStyleSuggestions");
+  if (dropdown) dropdown.classList.add("hidden");
+
+  // Auto-detect brand & warehouse part from SKU prefix
+  const upper = sku.toUpperCase();
+  if (upper.startsWith("VD") || upper.startsWith("VO") || upper.startsWith("ED") || upper.startsWith("ROW")) {
+    switchReceivingZone("PART_2");
+    const brandSel = document.getElementById("rcvBrandSelect");
+    if (brandSel) {
+      if (upper.startsWith("VD")) brandSel.value = "VON DUTCH";
+      else if (upper.startsWith("VO")) brandSel.value = "VALENTINO";
+      else if (upper.startsWith("ED")) brandSel.value = "ED HARDY";
+    }
+  } else {
+    switchReceivingZone("PART_1");
+  }
+}
+
+async function handleReceivingSubmit(e) {
+  e.preventDefault();
+  const submitBtn = document.getElementById("rcvSubmitBtn");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span>⏳</span><span>Processing Inbound...</span>`;
+  }
+
+  const style = (document.getElementById("rcvStyleInput")?.value || "").trim().toUpperCase();
+  const color = (document.getElementById("rcvColorInput")?.value || "STANDARD").trim().toUpperCase();
+  const size = (document.getElementById("rcvSizeInput")?.value || "OS").trim().toUpperCase();
+  const brand = document.getElementById("rcvBrandSelect")?.value || "ALLBIRDS";
+  const part = document.getElementById("rcvWarehousePart")?.value || "PART_1";
+  const line = (document.getElementById("rcvLineInput")?.value || "").trim();
+  const row_pos = (document.getElementById("rcvRowInput")?.value || "").trim();
+  const section = (document.getElementById("rcvSectionInput")?.value || "").trim();
+  const level = (document.getElementById("rcvLevelInput")?.value || "").trim();
+  const box_num = (document.getElementById("rcvBoxInput")?.value || "").trim();
+  const pcs_per_box = parseInt(document.getElementById("rcvPcsBoxInput")?.value, 10) || null;
+  const qty = parseInt(document.getElementById("rcvQuantityInput")?.value, 10);
+  const po_number = (document.getElementById("rcvPoInput")?.value || "").trim();
+  const staff_name = (document.getElementById("rcvStaffInput")?.value || "Warehouse Manager").trim();
+
+  if (!style) {
+    showToast("Style code is required", "error");
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = `<span>📥</span><span>Check In & Receive Stock</span>`; }
+    return;
+  }
+  if (isNaN(qty) || qty <= 0) {
+    showToast("Received quantity must be greater than 0", "error");
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = `<span>📥</span><span>Check In & Receive Stock</span>`; }
+    return;
+  }
+
+  const payload = {
+    style: style,
+    brand: brand,
+    warehouse_part: part,
+    color: color,
+    size: size,
+    line: part === "PART_1" ? (line || null) : null,
+    row_pos: part === "PART_2" ? (row_pos || null) : null,
+    section: section || null,
+    level: level || null,
+    box_num: box_num || null,
+    pcs_per_box: pcs_per_box,
+    quantity: qty,
+    po_number: po_number || null,
+    notes: po_number ? `Inbound PO: ${po_number}` : "Manager Inbound Receiving",
+    staff_name: staff_name
+  };
+
+  try {
+    const res = await fetch("/api/receiving", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.detail || "Receiving failed", "error");
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = `<span>📥</span><span>Check In & Receive Stock</span>`; }
+      return;
+    }
+
+    const data = await res.json();
+    closeModal("receivingModal");
+    showToast(`📥 Successfully received ${qty} pcs of ${style}!`, "success");
+
+    // Reset form fields
+    document.getElementById("receivingForm")?.reset();
+    document.getElementById("rcvColorInput").value = "STANDARD";
+    document.getElementById("rcvQuantityInput").value = "15";
+
+    // Auto-select this received style so manager immediately sees updated location
+    addStyleToSelection(style);
+    loadStats();
+    loadStylesList();
+  } catch (err) {
+    console.error("Receiving error:", err);
+    showToast("Network error submitting receiving", "error");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<span>📥</span><span>Check In & Receive Stock</span>`;
+    }
+  }
+}

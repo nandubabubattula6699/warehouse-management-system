@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=21.0">
+  <link rel="stylesheet" href="/static/styles.css?v=22.0">
 </head>
 <body class="bg-[#ebf1f6] text-slate-900 selection:bg-[#0070ba] min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:text-white">
 
@@ -34,44 +34,38 @@
         </div>
       </div>
 
-      <!-- Right Controls: Admin-only controls hidden for Manager -->
+      <!-- Right Controls: Admin & Manager Controls -->
       <div class="flex items-center gap-2">
-        <button id="headerGiveAccessBtn" onclick="openUserAccessModal()" class="admin-only-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#3b669b] transition">
-          <span>👥</span>
-          <span>Give Access</span>
+        <!-- ADD RECEIVING ICON BUTTON FOR MANAGER & ADMIN -->
+        <button id="headerAddReceivingBtn" onclick="openReceivingModal()" class="manager-control bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-sm border border-[#38bdf8]/40 active:scale-95 transition" title="Add Inbound Stock Receiving">
+          <span class="text-sm">📥</span>
+          <span class="hidden sm:inline font-bold tracking-wide">Add Receiving</span>
+          <span class="sm:hidden font-bold">Receiving</span>
         </button>
-        <a id="headerManageDataBtn" href="/manage" class="admin-only-control hidden bg-[#0070ba] hover:bg-[#005a96] text-white font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition">
+
+        <a id="headerManageDataBtn" href="/manage" class="manager-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white font-semibold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#3b669b] transition" title="Sheet Entry & Bulk Receiving">
           <span>📋</span>
-          <span>Sheet Entry / Manage Data</span>
+          <span class="hidden md:inline">Sheet Entry</span>
         </a>
-        <button onclick="openModal('movementModal')" class="admin-only-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white border border-[#3b669b] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
-          <span>📜</span>
-          <span>Audit</span>
+
+        <button id="headerGiveAccessBtn" onclick="openUserAccessModal()" class="admin-only-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white font-semibold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#3b669b] transition">
+          <span>👥</span>
+          <span class="hidden md:inline">Give Access</span>
         </button>
+
+        <button onclick="openModal('movementModal')" class="manager-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white border border-[#3b669b] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition" title="Stock Movement Audit Trail">
+          <span>📜</span>
+          <span class="hidden md:inline">Audit</span>
+        </button>
+
         <button onclick="openAddLocationModal()" class="admin-only-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white border border-[#3b669b] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
           <span>➕</span>
-          <span>Add Stock</span>
+          <span class="hidden md:inline">Add Stock</span>
         </button>
 
         <div id="warehouseAuthUserBar" class="flex items-center gap-2"></div>
       </div>
     </header>
-
-    <!-- Mobile Top Navigation Segment Control (Visible on Mobile Screens) -->
-    <div id="mobileTopNav" class="block lg:hidden px-3 pt-2 pb-1.5 bg-[#ebf1f6] shrink-0 border-b border-[#cbd8e5]">
-      <div class="grid grid-cols-2 gap-1.5 bg-[#dfe8f2] p-1 rounded-xl border border-[#c4d4e4] text-xs font-bold">
-        <button id="mobileTabSearchBtn" onclick="switchMobileView('SEARCH')"
-          class="py-2.5 px-3 rounded-lg transition bg-[#173456] text-white shadow-sm flex items-center justify-center gap-1.5 active:scale-95">
-          <span class="text-sm">🔍</span>
-          <span>Search &amp; Zones</span>
-        </button>
-        <button id="mobileTabLocationsBtn" onclick="switchMobileView('LOCATIONS')"
-          class="py-2.5 px-3 rounded-lg transition text-[#2d4b68] hover:text-[#173456] flex items-center justify-center gap-1.5 active:scale-95">
-          <span class="text-sm">📋</span>
-          <span>Locations (<span id="mobileLocationCount">0</span>)</span>
-        </button>
-      </div>
-    </div>
 
     <!-- Mobile Top Navigation Segment Control (Visible on Mobile Screens) -->
     <div id="mobileTopNav" class="block lg:hidden px-3 pt-2 pb-1.5 bg-[#ebf1f6] shrink-0 border-b border-[#cbd8e5]">
@@ -343,37 +337,24 @@
 
     </main>
     <!-- Mobile Fixed Bottom Navigation Bar (Thumb Friendly) -->
-    <nav id="mobileBottomBar" class="block lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#173456] border-t-2 border-[#0070ba] px-3 py-2 shadow-2xl flex items-center justify-between gap-2 mobile-safe-bottom">
+    <nav id="mobileBottomBar" class="block lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#173456] border-t-2 border-[#0070ba] px-2.5 py-2 shadow-2xl flex items-center justify-between gap-1.5 mobile-safe-bottom">
       <button onclick="switchMobileView('SEARCH')" id="mobileBottomSearchBtn"
-        class="flex-1 py-2 px-2.5 rounded-lg bg-[#244b7a] text-white text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#1a385c] transition">
+        class="flex-1 py-2 px-2 rounded-lg bg-[#244b7a] text-white text-xs font-bold flex items-center justify-center gap-1 active:bg-[#1a385c] transition">
         <span>🔍</span>
         <span>Search</span>
       </button>
       <button onclick="switchMobileView('LOCATIONS')" id="mobileBottomLocBtn"
-        class="flex-1 py-2 px-2.5 rounded-lg bg-[#1a385c] text-blue-200 text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#10243c] transition">
+        class="flex-1 py-2 px-2 rounded-lg bg-[#1a385c] text-blue-200 text-xs font-bold flex items-center justify-center gap-1 active:bg-[#10243c] transition">
         <span>📋</span>
         <span>Stock (<span id="mobileBottomCount">0</span>)</span>
       </button>
-      <button onclick="triggerPrintPickSheet()"
-        class="py-2 px-3.5 rounded-lg bg-[#0070ba] hover:bg-[#005a96] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition">
-        <span>🖨️</span>
-        <span>Print</span>
-      </button>
-    </nav>
-    <!-- Mobile Fixed Bottom Navigation Bar (Thumb Friendly) -->
-    <nav id="mobileBottomBar" class="block lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#173456] border-t-2 border-[#0070ba] px-3 py-2 shadow-2xl flex items-center justify-between gap-2 mobile-safe-bottom">
-      <button onclick="switchMobileView('SEARCH')" id="mobileBottomSearchBtn"
-        class="flex-1 py-2 px-2.5 rounded-lg bg-[#244b7a] text-white text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#1a385c] transition">
-        <span>🔍</span>
-        <span>Search</span>
-      </button>
-      <button onclick="switchMobileView('LOCATIONS')" id="mobileBottomLocBtn"
-        class="flex-1 py-2 px-2.5 rounded-lg bg-[#1a385c] text-blue-200 text-xs font-bold flex items-center justify-center gap-1.5 active:bg-[#10243c] transition">
-        <span>📋</span>
-        <span>Stock (<span id="mobileBottomCount">0</span>)</span>
+      <button onclick="openReceivingModal()"
+        class="manager-control py-2 px-3 rounded-lg bg-[#0070ba] hover:bg-[#005a96] text-white text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition">
+        <span>📥</span>
+        <span>Receive</span>
       </button>
       <button onclick="triggerPrintPickSheet()"
-        class="py-2 px-3.5 rounded-lg bg-[#0070ba] hover:bg-[#005a96] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition">
+        class="py-2 px-2.5 rounded-lg bg-[#244b7a] hover:bg-[#1a385c] text-blue-100 text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition">
         <span>🖨️</span>
         <span>Print</span>
       </button>
@@ -569,7 +550,170 @@
     </div>
   </div>
 
-  <div id="movementModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <!-- ================= INBOUND STOCK RECEIVING MODAL (MANAGER & ADMIN) ================= -->
+  <div id="receivingModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white border border-[#c4d3e2] rounded-2xl w-full max-w-xl p-5 sm:p-6 shadow-2xl space-y-4 text-slate-900 max-h-[92vh] overflow-y-auto">
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-[#e2eaf2] pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl bg-[#0070ba] text-white flex items-center justify-center text-xl shadow-sm shrink-0">
+            📥
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-bold text-[#173456] flex items-center gap-2">
+              Inbound Stock Receiving
+            </h3>
+            <p class="text-xs text-slate-500">Alexander Warehouse &bull; Check in new stock &amp; assign location</p>
+          </div>
+        </div>
+        <button onclick="closeModal('receivingModal')" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-sm font-bold transition">✕</button>
+      </div>
+
+      <!-- Quick Warehouse Zone Selector -->
+      <div class="grid grid-cols-2 gap-2 bg-[#f0f4f8] p-1.5 rounded-xl border border-[#cbd8e5] text-xs font-bold">
+        <button type="button" id="rcvPart1Btn" onclick="switchReceivingZone('PART_1')"
+          class="py-2 px-3 rounded-lg bg-[#173456] text-white shadow-xs flex items-center justify-center gap-1.5 transition">
+          <span>👟</span><span>Part 1 (Allbirds • Lines 1–14)</span>
+        </button>
+        <button type="button" id="rcvPart2Btn" onclick="switchReceivingZone('PART_2')"
+          class="py-2 px-3 rounded-lg text-[#2d4b68] hover:text-[#173456] flex items-center justify-center gap-1.5 transition">
+          <span>📦</span><span>Part 2 (VD &amp; VO • Rows 1–15)</span>
+        </button>
+      </div>
+
+      <!-- Receiving Form -->
+      <form id="receivingForm" onsubmit="handleReceivingSubmit(event)" class="space-y-4">
+        <input type="hidden" id="rcvWarehousePart" value="PART_1" />
+
+        <!-- Row 1: Style Code & Autocomplete -->
+        <div class="relative">
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-bold text-[#173456] uppercase">Style Code / SKU *</label>
+            <span class="text-[11px] text-slate-400 font-mono">e.g. A12501 or VDSW-2092</span>
+          </div>
+          <input type="text" id="rcvStyleInput" required placeholder="Type or select style SKU..."
+            autocomplete="off"
+            oninput="handleReceivingStyleInput(this.value)"
+            class="w-full bg-[#f8fafc] border border-[#cbd5e1] focus:border-[#0070ba] focus:bg-white rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-[#173456] uppercase tracking-wide focus:outline-none transition" />
+          <!-- Quick suggestions dropdown -->
+          <div id="rcvStyleSuggestions" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-[#cbd5e1] rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto divide-y divide-slate-100"></div>
+        </div>
+
+        <!-- Row 2: Color, Size & Brand -->
+        <div class="grid grid-cols-3 gap-2.5">
+          <div>
+            <label class="block text-[11px] font-bold text-[#173456] uppercase mb-1">Color *</label>
+            <input type="text" id="rcvColorInput" value="STANDARD" required placeholder="STANDARD"
+              class="w-full bg-[#f8fafc] border border-[#cbd5e1] focus:border-[#0070ba] focus:bg-white rounded-xl px-3 py-2 text-xs font-mono font-semibold uppercase text-slate-800 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-[#173456] uppercase mb-1">Size *</label>
+            <input type="text" id="rcvSizeInput" required placeholder="e.g. 10.5 or M"
+              class="w-full bg-[#f8fafc] border border-[#cbd5e1] focus:border-[#0070ba] focus:bg-white rounded-xl px-3 py-2 text-xs font-mono font-bold text-[#173456] uppercase focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-[#173456] uppercase mb-1">Brand</label>
+            <select id="rcvBrandSelect" class="w-full bg-[#f8fafc] border border-[#cbd5e1] focus:border-[#0070ba] rounded-xl px-2 py-2 text-xs font-bold text-[#173456] focus:outline-none">
+              <option value="ALLBIRDS">Allbirds</option>
+              <option value="VON DUTCH">Von Dutch</option>
+              <option value="VALENTINO">Valentino</option>
+              <option value="ED HARDY">Ed Hardy</option>
+              <option value="OTHER">Other Brand</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Row 3: Physical Warehouse Destination Location -->
+        <div class="bg-[#f0f4f8] border border-[#d3dfea] rounded-xl p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-[#173456] uppercase flex items-center gap-1.5">
+              <span>📍</span>
+              <span id="rcvLocZoneTitle">Part 1 Shelf Location Coordinates</span>
+            </span>
+            <span id="rcvLocationPreview" class="text-xs font-mono font-bold text-[#0070ba] bg-white px-2 py-0.5 rounded border border-[#b8d4ee]">
+              Line 1 • Sec 1 • Lvl 1
+            </span>
+          </div>
+
+          <div class="grid grid-cols-5 gap-2 pt-1">
+            <div id="rcvLineCol">
+              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Line (P1)</label>
+              <input type="text" id="rcvLineInput" placeholder="1–14" oninput="updateReceivingLocationPreview()"
+                class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-900 font-mono font-bold text-center" />
+            </div>
+            <div id="rcvRowCol" class="hidden">
+              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Row (P2)</label>
+              <input type="text" id="rcvRowInput" placeholder="1–15/WALL" oninput="updateReceivingLocationPreview()"
+                class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-900 font-mono font-bold text-center" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Section</label>
+              <input type="text" id="rcvSectionInput" placeholder="1–36" oninput="updateReceivingLocationPreview()"
+                class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-900 font-mono font-bold text-center" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Level</label>
+              <input type="text" id="rcvLevelInput" placeholder="1–4" oninput="updateReceivingLocationPreview()"
+                class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-900 font-mono font-bold text-center" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Box #</label>
+              <input type="text" id="rcvBoxInput" placeholder="e.g. 1" oninput="updateReceivingLocationPreview()"
+                class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-900 font-mono font-bold text-center" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Pcs/Box</label>
+              <input type="number" id="rcvPcsBoxInput" placeholder="15"
+                class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-900 font-mono font-bold text-center" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 4: Quantity Received & PO Tracking -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="bg-[#e8f4fd] border border-[#b8daf7] rounded-xl p-3">
+            <label class="block text-xs font-bold text-[#0d4771] uppercase mb-1 flex items-center justify-between">
+              <span>Received Quantity (Units) *</span>
+              <span class="text-[10px] font-mono text-blue-600">Total Pcs</span>
+            </label>
+            <input type="number" min="1" id="rcvQuantityInput" value="15" required
+              class="w-full bg-white border border-[#9acbf7] rounded-lg px-3 py-2 text-lg font-black font-mono text-[#0070ba] text-center focus:outline-none focus:ring-2 focus:ring-[#0070ba]" />
+          </div>
+
+          <div class="space-y-2">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 uppercase mb-0.5">PO # / Inbound Reference</label>
+              <input type="text" id="rcvPoInput" placeholder="e.g. PO-10492 / Inbound Truck"
+                class="w-full bg-[#f8fafc] border border-[#cbd5e1] rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-800" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 uppercase mb-0.5">Staff / Received By</label>
+              <input type="text" id="rcvStaffInput" value="Warehouse Manager"
+                class="w-full bg-[#f8fafc] border border-[#cbd5e1] rounded-lg px-2.5 py-1.5 text-xs text-slate-800" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 border-t border-[#e2eaf2]">
+          <a href="/manage" class="text-xs text-[#0070ba] hover:underline font-semibold flex items-center gap-1">
+            <span>📋</span><span>Need 25+ rows or CSV? Open Sheet Entry →</span>
+          </a>
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button type="button" onclick="closeModal('receivingModal')" class="flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition">
+              Cancel
+            </button>
+            <button type="submit" id="rcvSubmitBtn" class="flex-1 sm:flex-initial bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 active:scale-95 transition">
+              <span>📥</span>
+              <span>Check In &amp; Receive Stock</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<div id="movementModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-3xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col text-slate-900">
       <div class="flex items-center justify-between border-b border-slate-200 pb-3">
         <h3 class="text-lg font-bold text-slate-900">Stock Movement Audit Trail</h3>
@@ -595,7 +739,7 @@
 
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/app.js?v=21.0"></script>
+  <script src="/static/app.js?v=22.0"></script>
   <script src="/static/auth_client.js?v=7.0"></script>
 </body>
 </html>

@@ -92,3 +92,21 @@ class StyleRenamePayload(BaseModel):
     old_style: str
     new_style: str
     staff_name: Optional[str] = "Nandu"
+
+
+class ReceivingPayload(BaseModel):
+    style: str
+    brand: Optional[str] = "ALLBIRDS"
+    warehouse_part: Optional[str] = "PART_1"
+    color: str = "STANDARD"
+    size: str = "OS"
+    line: Optional[str] = None
+    row_pos: Optional[str] = None
+    section: Optional[str] = None
+    level: Optional[str] = None
+    box_num: Optional[str] = None
+    pcs_per_box: Optional[int] = None
+    quantity: int = Field(..., gt=0)
+    po_number: Optional[str] = None
+    notes: Optional[str] = None
+    staff_name: Optional[str] = "Warehouse Manager"

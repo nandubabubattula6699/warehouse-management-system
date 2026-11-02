@@ -11,7 +11,10 @@ async function initWarehouseAuth() {
     if (!res.ok) return;
     const data = await res.json();
     window.currentWarehouseUser = data.user;
-    const isAdmin = data.user && data.user.role === "ADMIN";
+    const userRole = (data.user && data.user.role) ? data.user.role.toUpperCase() : "";
+    const isAdmin = userRole === "ADMIN";
+    const isManager = userRole === "MANAGER" || isAdmin;
+
     document.querySelectorAll(".admin-only-control").forEach(el => {
       if (isAdmin) {
         el.classList.remove("hidden");
@@ -19,6 +22,20 @@ async function initWarehouseAuth() {
         el.classList.add("hidden");
       }
     });
+
+    document.querySelectorAll(".manager-control").forEach(el => {
+      if (isManager || !data.user) {
+        el.classList.remove("hidden");
+      } else {
+        el.classList.add("hidden");
+      }
+    });
+
+    // Auto-fill staff name on Inbound Receiving modal if present
+    const rcvStaff = document.getElementById("rcvStaffInput");
+    if (rcvStaff && data.user && data.user.full_name) {
+      rcvStaff.value = data.user.full_name;
+    }
 
     // Auto-fill staff name input on /manage if present
     const staffInput = document.getElementById("sheetStaffInput");
