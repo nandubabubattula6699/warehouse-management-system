@@ -1692,6 +1692,14 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon():
+        ico_file = os.path.join(static_dir, "favicon.ico")
+        if os.path.exists(ico_file):
+            return FileResponse(ico_file, media_type="image/x-icon")
+        return FileResponse(os.path.join(static_dir, "favicon.svg"), media_type="image/svg+xml")
+
+
     @app.get("/login")
     def serve_login_page(request: Request, db: Session = Depends(get_db)):
         user = get_optional_user(request, db)
