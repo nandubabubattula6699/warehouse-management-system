@@ -3,8 +3,8 @@ function getAlexanderEmptyStateHtml(isTable = true) {
   const content = `
     <div class="max-w-xl mx-auto flex flex-col items-center text-center py-10 px-4 select-none">
       <!-- Line 1: Handwritten style in 36px font -->
-      <div style="font-family: 'Caveat', 'Segoe Script', 'Brush Script MT', cursive; font-size: 36px; line-height: 1.25;" class="font-bold text-[#173456] tracking-wide">
-        Alexander For AllBirds, VD &amp; VO
+      <div style="font-family: 'Caveat', 'Segoe Script', 'Brush Script MT', cursive; font-size: 72px; line-height: 1.1; line-height: 1.25;" class="font-bold text-[#173456] tracking-wide">
+        Alexander
       </div>
 
       <!-- Line 2: Normal style in 24px font -->
