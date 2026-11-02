@@ -1,3 +1,6 @@
+.font-handwritten {
+  font-family: 'Caveat', 'Segoe Script', 'Brush Script MT', cursive;
+}
 /* ================= Oracle NetSuite Theme for Warehouse OS (Mobile & Desktop) ================= */
 body {
   background-color: #ebf1f6 !important;

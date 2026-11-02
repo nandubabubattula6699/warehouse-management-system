@@ -1,81 +1,28 @@
 // ================= GOOGLE-GRADE ALEXANDER WAREHOUSE ZERO-STATE HERO =================
 function getAlexanderEmptyStateHtml(isTable = true) {
   const content = `
-    <div class="max-w-xl mx-auto flex flex-col items-center text-center py-8 px-4 select-none">
-      
-      <!-- 1. Custom Google-Grade Alexander Warehouse 3D Isometric Emblem -->
-      <div class="relative mb-4 flex flex-col items-center group">
-        <div class="relative w-24 h-24 rounded-3xl bg-gradient-to-br from-[#173456] via-[#1e4875] to-[#0070ba] p-1 shadow-2xl shadow-[#173456]/30 border-2 border-[#38bdf8]/40 flex flex-col items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:shadow-[#0070ba]/25">
-          <!-- 3D Warehouse Isometric Box Vector Icon -->
-          <svg class="w-12 h-12 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-            <line x1="12" y1="22.08" x2="12" y2="12"></line>
-          </svg>
-          <!-- Modern Luminous "Alexander" Typography Badge -->
-          <div class="mt-1 px-3 py-0.5 rounded-full bg-[#0a213a] border border-[#38bdf8]/40 shadow-inner flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8] animate-pulse"></span>
-            <span class="text-[9px] font-black font-mono tracking-widest text-[#bae6fd] uppercase">ALEXANDER</span>
-          </div>
-        </div>
+    <div class="max-w-xl mx-auto flex flex-col items-center text-center py-10 px-4 select-none">
+      <!-- Line 1: Handwritten style in 36px font -->
+      <div style="font-family: 'Caveat', 'Segoe Script', 'Brush Script MT', cursive; font-size: 36px; line-height: 1.25;" class="font-bold text-[#173456] tracking-wide">
+        Alexander For AllBirds, VD &amp; VO
       </div>
 
-      <!-- 2. Facility Pill Badge -->
-      <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#e8f1fa] border border-[#b8d4ee] text-[11px] font-bold text-[#0d4771] mb-2.5 shadow-2xs">
-        <span class="w-2 h-2 rounded-full bg-[#0070ba]"></span>
-        <span>Alexander Warehouse &bull; 50,000+ Sq Ft Active Facility</span>
+      <!-- Line 2: Normal style in 24px font -->
+      <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 24px; font-weight: normal; line-height: 1.4;" class="text-[#475569] mt-3">
+        please search style location
       </div>
 
-      <!-- 3. Prominent Title (Increased Font Size) -->
-      <h3 class="text-xl sm:text-2xl font-black font-mono text-[#173456] tracking-tight">
-        Alexander Inventory &amp; Location Finder
-      </h3>
-
-      <!-- 4. Prominent Subtitle (Increased Font Size) -->
-      <p class="text-sm font-medium text-[#475569] max-w-md mx-auto mt-2 leading-relaxed">
-        Search any style code (e.g. <span class="font-mono font-bold text-[#0070ba] bg-[#f0f4f8] px-1.5 py-0.5 rounded border border-[#cbd5e1]">A12501</span>, <span class="font-mono font-bold text-[#0070ba] bg-[#f0f4f8] px-1.5 py-0.5 rounded border border-[#cbd5e1]">VDSW</span>), browse aisles, or tap a quick category below to look up real-time shelf coordinates.
-      </p>
-
-      <!-- 5. Interactive Google-Style Action Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full max-w-lg mt-5 text-left">
-        <button onclick="switchWarehousePart('PART_1'); inspectWarehouseAisle('PART_1', '1');"
-          class="group p-3 rounded-xl bg-white hover:bg-[#f0f7ff] border border-[#c4d3e2] hover:border-[#0070ba] transition shadow-xs flex items-center gap-2.5 active:scale-98">
-          <div class="w-10 h-10 rounded-lg bg-[#e8f1fa] group-hover:bg-[#0070ba] text-[#0d4771] group-hover:text-white flex items-center justify-center text-lg font-bold shrink-0 transition">
-            👟
-          </div>
-          <div class="min-w-0">
-            <div class="text-xs font-bold text-[#173456] group-hover:text-[#0070ba] truncate">Part 1 (Allbirds)</div>
-            <div class="text-[10px] text-[#64748b]">Lines 1–14 &bull; E-Com</div>
-          </div>
+      <!-- Quick warehouse links -->
+      <div class="flex flex-wrap items-center justify-center gap-2 mt-6">
+        <button onclick="switchWarehousePart('PART_1'); inspectWarehouseAisle('PART_1', '1');" class="px-3.5 py-1.5 rounded-lg bg-[#e8f1fa] hover:bg-[#d0e4f7] border border-[#b8d4ee] text-xs font-mono font-bold text-[#0d4771] transition">
+          👟 Part 1 (Allbirds)
         </button>
-
-        <button onclick="switchWarehousePart('PART_2'); inspectWarehouseAisle('PART_2', '1');"
-          class="group p-3 rounded-xl bg-white hover:bg-[#f0f7ff] border border-[#c4d3e2] hover:border-[#0070ba] transition shadow-xs flex items-center gap-2.5 active:scale-98">
-          <div class="w-10 h-10 rounded-lg bg-[#e8f1fa] group-hover:bg-[#0070ba] text-[#0d4771] group-hover:text-white flex items-center justify-center text-lg font-bold shrink-0 transition">
-            📦
-          </div>
-          <div class="min-w-0">
-            <div class="text-xs font-bold text-[#173456] group-hover:text-[#0070ba] truncate">Part 2 (Wholesale)</div>
-            <div class="text-[10px] text-[#64748b]">Rows 1–15 &bull; VD / Val</div>
-          </div>
+        <button onclick="switchWarehousePart('PART_2'); inspectWarehouseAisle('PART_2', '1');" class="px-3.5 py-1.5 rounded-lg bg-[#e8f1fa] hover:bg-[#d0e4f7] border border-[#b8d4ee] text-xs font-mono font-bold text-[#0d4771] transition">
+          📦 Part 2 (VD &amp; VO)
         </button>
-
-        <button onclick="addStyleToSelection('LINE 14')"
-          class="group p-3 rounded-xl bg-white hover:bg-[#f0f7ff] border border-[#c4d3e2] hover:border-[#0070ba] transition shadow-xs flex items-center gap-2.5 active:scale-98">
-          <div class="w-10 h-10 rounded-lg bg-[#e8f1fa] group-hover:bg-[#0070ba] text-[#0d4771] group-hover:text-white flex items-center justify-center text-lg font-bold shrink-0 transition">
-            ✨
-          </div>
-          <div class="min-w-0">
-            <div class="text-xs font-bold text-[#173456] group-hover:text-[#0070ba] truncate">Line 14 (New)</div>
-            <div class="text-[10px] text-[#64748b]">Sheet 6 &bull; 618 Locs</div>
-          </div>
+        <button onclick="addStyleToSelection('LINE 14')" class="px-3.5 py-1.5 rounded-lg bg-[#e8f1fa] hover:bg-[#d0e4f7] border border-[#b8d4ee] text-xs font-mono font-bold text-[#0d4771] transition">
+          ✨ Line 14
         </button>
-      </div>
-
-      <!-- 6. Google Search Pro-Tip -->
-      <div class="mt-5 pt-3 border-t border-[#e2eaf2] text-[11px] text-[#64748b] flex items-center justify-center gap-1.5 flex-wrap">
-        <span class="font-bold text-[#173456]">Tip:</span>
-        <span>You can search multiple styles or aisles at once (e.g. <span class="font-mono text-[#0070ba] font-semibold">A12501, Line 14, Row 1</span>)</span>
       </div>
     </div>
   `;
@@ -83,7 +30,7 @@ function getAlexanderEmptyStateHtml(isTable = true) {
   if (isTable) {
     return `<tr><td colspan="8" class="text-center py-10 px-4">${content}</td></tr>`;
   } else {
-    return `<div class="bg-white rounded-xl border border-[#c4d3e2] p-4 shadow-sm">${content}</div>`;
+    return `<div class="bg-white rounded-xl border border-[#c4d3e2] p-5 shadow-sm">${content}</div>`;
   }
 }
 
@@ -593,7 +540,7 @@ function renderFilteredRows() {
   if (!tbody) return;
 
   if (items.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">No locations matching active filter.</td></tr>`;
+    tbody.innerHTML = getAlexanderEmptyStateHtml(true);
     return;
   }
 
@@ -665,7 +612,7 @@ function renderFilteredRows() {
   const mobileContainer = document.getElementById("styleLocationMobileCards");
   if (mobileContainer) {
     if (items.length === 0) {
-      mobileContainer.innerHTML = '<div class="text-center py-8 text-[#64748b] bg-white rounded-xl border border-[#c4d3e2] p-4 text-xs">No locations matching active filter.</div>';
+      mobileContainer.innerHTML = getAlexanderEmptyStateHtml(false);
     } else {
       mobileContainer.innerHTML = items.map(item => {
         const isPart2 = item.warehouse_part === "PART_2" || (item.row_pos && !item.line);
