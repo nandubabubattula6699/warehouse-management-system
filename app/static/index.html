@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=25.0">
+  <link rel="stylesheet" href="/static/styles.css?v=26.0">
 </head>
 <body class="bg-[#ebf1f6] text-slate-900 selection:bg-[#0070ba] min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:text-white">
 
@@ -43,7 +43,7 @@
           <span class="sm:hidden font-bold">Receiving</span>
         </button>
 
-        <a id="headerManageDataBtn" href="/manage" class="manager-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white font-semibold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#3b669b] transition" title="Sheet Entry & Bulk Receiving">
+        <a id="headerManageDataBtn" href="/manage" class="admin-only-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white font-semibold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#3b669b] transition" title="Sheet Entry & Bulk Receiving">
           <span>📋</span>
           <span class="hidden md:inline">Sheet Entry</span>
         </a>
@@ -53,7 +53,7 @@
           <span class="hidden md:inline">Give Access</span>
         </button>
 
-        <button onclick="openModal('movementModal')" class="manager-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white border border-[#3b669b] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition" title="Stock Movement Audit Trail">
+        <button onclick="openModal('movementModal')" class="admin-only-control hidden bg-[#244b7a] hover:bg-[#2e5d95] text-white border border-[#3b669b] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition" title="Stock Movement Audit Trail">
           <span>📜</span>
           <span class="hidden md:inline">Audit</span>
         </button>
@@ -477,6 +477,8 @@
     </div>
   </div>
 
+  </div>
+
   <div id="setQtyModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden text-[#173456]">
       <div class="bg-[#173456] border-b-2 border-[#0070ba] px-5 py-3.5 flex items-center justify-between text-white">
@@ -493,6 +495,8 @@
         <button onclick="submitExactQuantity()" class="bg-[#0070ba] hover:bg-[#005a96] text-white font-bold px-4 py-2 rounded-lg text-xs shadow-sm transition">Save Quantity</button>
       </div>
     </div>
+  </div>
+
   </div>
 
   <div id="addLocationModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -561,6 +565,8 @@
   </div>
 
     
+  </div>
+
   <!-- ================= 1. RECEIVING INTAKE SELECTION MODAL (NETSUITE ERP THEME) ================= -->
   <div id="receivingIntakeModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
     <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden text-[#173456] animate-in fade-in zoom-in-95 duration-150">
@@ -758,6 +764,8 @@
     </div>
   </div>
 
+
+  </div>
 
   <!-- ================= 3. INBOUND STAGING & LOCATION ASSIGNMENT WORKSPACE (NETSUITE ERP THEME) ================= -->
   <div id="inboundStagingModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
@@ -1157,7 +1165,7 @@
 
         <!-- Action Buttons -->
         <div class="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 border-t border-[#e2eaf2]">
-          <a href="/manage" class="text-xs text-[#0070ba] hover:underline font-semibold flex items-center gap-1">
+          <a href="/manage" class="admin-only-control hidden text-xs text-[#0070ba] hover:underline font-semibold flex items-center gap-1">
             <span>📋</span><span>Need 25+ rows or CSV? Open Sheet Entry →</span>
           </a>
           <div class="flex items-center gap-2 w-full sm:w-auto">
@@ -1173,6 +1181,8 @@
       </form>
     </div>
   </div>
+
+</div>
 
 <div id="movementModal" class="modal-backdrop hidden fixed inset-0 z-50 bg-[#0e233b]/70 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-[#ebf1f6] border-2 border-[#173456] rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col text-[#173456]">
@@ -1199,10 +1209,12 @@
     </div>
   </div>
 
+  </div>
+
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/inbound_client.js?v=25.0"></script>
-  <script src="/static/app.js?v=25.0"></script>
-  <script src="/static/auth_client.js?v=25.0"></script>
+  <script src="/static/inbound_client.js?v=26.0"></script>
+  <script src="/static/app.js?v=26.0"></script>
+  <script src="/static/auth_client.js?v=26.0"></script>
 </body>
 </html>
