@@ -46,7 +46,7 @@
   <header>
     <div class="tag" id="stationCodeTag">QR Pick Station</div>
     <h1 id="stationLabel">Loading…</h1>
-    <div class="who" id="who"></div>
+    <div class="who">Instant Floor Scan • No Login Needed</div>
   </header>
 
   <div id="alert" class="alert"></div>
@@ -104,14 +104,12 @@
   const rowsFor = (style, level) => items.filter((i) => i.style.toUpperCase() === style && (level == null || String(i.level) === String(level)));
 
   async function load() {
-    const res = await fetch(api, { credentials: "same-origin" });
-    if (res.status === 401) { location.href = `/login?next=${encodeURIComponent(location.pathname)}`; return; }
+    const res = await fetch(api);
     const data = await res.json();
     if (!res.ok) { showAlert(esc(data.detail || "Could not load station."), false); return; }
     station = data.station; items = data.items;
     $("stationCodeTag").textContent = `QR Pick Station • ${station.code}`;
     $("stationLabel").textContent = station.label;
-    $("who").textContent = `Signed in as ${data.user.full_name || data.user.username}`;
     const styles = [...new Set(items.filter((i) => i.quantity > 0).map((i) => i.style.toUpperCase()))].sort();
     $("styleList").innerHTML = styles.map((s) => `<option value="${esc(s)}">`).join("");
     render();
@@ -200,11 +198,10 @@
     const body = { style: styleVal(), level: state.level, quantity: parseInt($("qty").value, 10), item_id: state.itemId };
     try {
       const res = await fetch(`${api}/picks`, {
-        method: "POST", credentials: "same-origin",
+        method: "POST",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (res.status === 401) { location.href = `/login?next=${encodeURIComponent(location.pathname)}`; return; }
       if (!res.ok) {
         const d = data.detail;
         showAlert(esc(typeof d === "object" && d ? d.message : d || "Save failed."), false);

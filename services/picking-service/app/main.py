@@ -2,9 +2,9 @@
 Picking Service (microservice)
 ------------------------------
 QR-code based floor picking for all 14 Allbirds Lines and all 501 Sections.
-A worker scans the 4x6 Zebra QR code pasted on a rack section, enters or taps the style,
-chooses the level (1..4), and taps SAVE. The pick is sent to the Inventory service,
-which deducts stock and records an audit movement.
+No login required: any floor staff can scan the 4x6 Zebra QR code pasted on a rack section,
+enter or tap the style, choose the level (1..4), and tap SAVE. The pick is sent to the
+Inventory service, which deducts stock and records an audit movement.
 
 All routes live under /pick so the service works identically directly or behind the gateway.
 """
@@ -32,7 +32,7 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 app = FastAPI(
     title="Warehouse OS - Picking Service",
-    version="2.0.0",
+    version="2.1.0",
     docs_url="/pick/docs",
     openapi_url="/pick/openapi.json",
 )
@@ -58,70 +58,36 @@ def _scan_url(request: Request, code: str) -> str:
     return f"{_public_base(request)}/pick/s/{code}"
 
 
-async def _user(request: Request) -> Optional[dict]:
-    try:
-        return await inventory_client.get_current_user(
-            request.headers.get("cookie"), request.headers.get("authorization")
-        )
-    except InventoryError:
-        return None
-    except Exception:
-        raise HTTPException(status_code=503, detail="Inventory service is unavailable.")
-
-
-async def _require_user(request: Request) -> dict:
-    user = await _user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Please log in.")
-    return user
-
-
-def _login_redirect(request: Request) -> RedirectResponse:
-    q = f"?{request.url.query}" if request.url.query else ""
-    return RedirectResponse(url=f"/login?next={request.url.path}{q}", status_code=302)
-
-
 # ----------------------------------------------------------------------------- health
 @app.get("/pick/health")
 async def health():
     return {
         "status": "ok",
         "service": "picking-service",
+        "auth_required": False,
         "total_lines": len(LINE_SECTION_COUNTS),
         "total_stations": len(PICK_STATIONS),
     }
 
 
-# ----------------------------------------------------------------------------- pages
+# ----------------------------------------------------------------------------- pages (no login required)
 @app.get("/pick/s/{code}", include_in_schema=False)
-async def scan_page(code: str, request: Request):
-    """Page opened by scanning any section's QR code."""
+async def scan_page(code: str):
+    """Page opened by scanning any section's QR code (no login required)."""
     _station(code)
-    if not await _user(request):
-        return _login_redirect(request)
     return FileResponse(os.path.join(STATIC_DIR, "pick.html"))
 
 
 @app.get("/pick/labels", include_in_schema=False)
-async def labels_hub_page(request: Request):
+async def labels_hub_page():
     """Hub page to browse all 14 Lines / 501 Sections and download 4x6 Zebra PDFs."""
-    user = await _user(request)
-    if not user:
-        return _login_redirect(request)
-    if user.get("role") not in ("ADMIN", "MANAGER"):
-        raise HTTPException(status_code=403, detail="Only Admin or Manager can print QR labels.")
     return FileResponse(os.path.join(STATIC_DIR, "labels_hub.html"))
 
 
 @app.get("/pick/labels/{code}", include_in_schema=False)
-async def label_page(code: str, request: Request):
-    """Printable 4x6 QR label for a single station (Admin / Manager only)."""
+async def label_page(code: str):
+    """Printable 4x6 QR label for a single station."""
     _station(code)
-    user = await _user(request)
-    if not user:
-        return _login_redirect(request)
-    if user.get("role") not in ("ADMIN", "MANAGER"):
-        raise HTTPException(status_code=403, detail="Only Admin or Manager can print QR labels.")
     return FileResponse(os.path.join(STATIC_DIR, "label.html"))
 
 
@@ -138,12 +104,6 @@ async def download_labels_pdf(
       - All sections for one Line (?line=1..14)
       - A single section label (?code=P1-L1-S1)
     """
-    user = await _user(request)
-    if not user:
-        return _login_redirect(request)
-    if user.get("role") not in ("ADMIN", "MANAGER"):
-        raise HTTPException(status_code=403, detail="Only Admin or Manager can download QR label PDFs.")
-
     if code:
         st = _station(code)
         stations = [st]
@@ -188,10 +148,9 @@ async def qr_svg(code: str, request: Request):
     return Response(content=buf.getvalue(), media_type="image/svg+xml")
 
 
-# ----------------------------------------------------------------------------- API
+# ----------------------------------------------------------------------------- API (no login required)
 @app.get("/pick/api/stations")
 async def list_all_stations(request: Request):
-    user = await _require_user(request)
     base = _public_base(request)
     lines = [
         {
@@ -215,7 +174,6 @@ async def list_all_stations(request: Request):
         "total_lines": len(LINE_SECTION_COUNTS),
         "total_stations": len(PICK_STATIONS),
         "master_pdf_url": "/pick/labels.pdf",
-        "user": {"full_name": user.get("full_name"), "username": user.get("username"), "role": user.get("role")},
         "lines": lines,
     }
 
@@ -223,7 +181,6 @@ async def list_all_stations(request: Request):
 @app.get("/pick/api/s/{code}")
 async def station_info(code: str, request: Request):
     station = _station(code)
-    user = await _require_user(request)
     try:
         items = await inventory_client.get_section_stock(
             station["warehouse_part"], station["line"], station["section"]
@@ -234,7 +191,6 @@ async def station_info(code: str, request: Request):
     return {
         "station": station,
         "scan_url": _scan_url(request, station["code"]),
-        "user": {"full_name": user.get("full_name"), "username": user.get("username"), "role": user.get("role")},
         "items": items,
     }
 
@@ -244,12 +200,12 @@ class PickRequest(BaseModel):
     level: str
     quantity: int = Field(1, ge=1)
     item_id: Optional[int] = None
+    staff_name: Optional[str] = None
 
 
 @app.post("/pick/api/s/{code}/picks")
-async def create_pick(code: str, body: PickRequest, request: Request):
+async def create_pick(code: str, body: PickRequest):
     station = _station(code)
-    user = await _require_user(request)
 
     level = body.level.strip()
     if level not in station["levels"]:
@@ -257,9 +213,7 @@ async def create_pick(code: str, body: PickRequest, request: Request):
     if body.quantity > MAX_PICK_QUANTITY:
         raise HTTPException(status_code=400, detail=f"Quantity cannot exceed {MAX_PICK_QUANTITY}.")
 
-    staff = user.get("full_name") or user.get("username") or "Unknown"
-    if user.get("username"):
-        staff = f"{staff} (@{user['username']})"
+    staff = (body.staff_name or "").strip() or "Floor Staff (QR Scan)"
 
     try:
         result = await inventory_client.pick({
