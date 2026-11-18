@@ -3,50 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>QR Label • Warehouse OS</title>
+  <title>4×6 Zebra QR Label • Warehouse OS</title>
   <style>
-    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #0f172a; }
-    .toolbar { padding: 16px; text-align: center; }
-    .toolbar button, .toolbar a { font-size: 16px; font-weight: 700; padding: 10px 18px; border-radius: 10px; border: 0; background: #1e3a8a; color: #fff; cursor: pointer; text-decoration: none; margin: 0 4px; display: inline-block; }
-    .label { width: 4in; margin: 0 auto 24px; background: #fff; border: 3px solid #0f172a; border-radius: 14px; padding: 18px; text-align: center; }
-    .brand { font-size: 14px; font-weight: 900; letter-spacing: .2em; }
-    .loc { font-size: 34px; font-weight: 900; margin: 6px 0 2px; }
-    .levels { font-size: 14px; font-weight: 700; color: #334155; }
-    .label img { width: 3in; height: 3in; display: block; margin: 12px auto; image-rendering: pixelated; }
-    .instr { font-size: 13px; font-weight: 600; color: #334155; }
-    .code { font-family: ui-monospace, monospace; font-size: 12px; color: #64748b; margin-top: 6px; word-break: break-all; }
-    @media print { .toolbar { display: none; } body { background: #fff; } .label { margin-top: 0; } }
+    @page { size: 4in 6in; margin: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #0f172a; }
+    .toolbar { padding: 16px; text-align: center; background: #1e293b; border-bottom: 1px solid #334155; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+    .toolbar button, .toolbar a { font-size: 14px; font-weight: 800; padding: 10px 16px; border-radius: 10px; border: 0; background: #0284c7; color: #fff; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .toolbar .green { background: #16a34a; }
+    .toolbar .dark { background: #334155; }
+    .page-wrap { padding: 24px 12px; display: flex; justify-content: center; }
+    .label { width: 4in; height: 6in; background: #fff; border: 3px solid #000; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; text-align: center; }
+    .hdr { background: #000; color: #fff; padding: 10px 8px; }
+    .hdr .t1 { font-size: 15px; font-weight: 900; letter-spacing: .08em; }
+    .hdr .t2 { font-size: 11px; font-weight: 700; letter-spacing: .06em; margin-top: 2px; }
+    .loc { font-size: 34px; font-weight: 900; margin: 6px 0 4px; color: #000; }
+    .levels { font-size: 11.5px; font-weight: 900; color: #000; border: 2px solid #000; border-radius: 6px; margin: 0 18px; padding: 4px 6px; }
+    .label img { width: 2.45in; height: 2.45in; display: block; margin: 6px auto; image-rendering: pixelated; }
+    .station-id { font-family: ui-monospace, monospace; font-size: 15px; font-weight: 900; color: #000; }
+    .instr { border-top: 1.5px solid #000; margin: 4px 16px 0; padding-top: 6px; text-align: left; font-size: 11px; line-height: 1.35; color: #000; font-weight: 600; }
+    .instr b { display: block; text-align: center; font-size: 11px; margin-bottom: 2px; }
+    .code { font-family: ui-monospace, monospace; font-size: 9px; color: #334155; padding: 4px 10px 8px; word-break: break-all; }
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none; }
+      .page-wrap { padding: 0; }
+      .label { border-radius: 0; }
+    }
   </style>
 </head>
 <body>
   <div class="toolbar">
-    <button onclick="window.print()">🖨 Print label</button>
-    <a id="pngLink" download>⬇ Download PNG</a>
-    <a id="testLink" target="_blank">Test scan page</a>
+    <button onclick="window.print()">🖨️ Print 4×6 Label</button>
+    <a id="singlePdfLink" class="green" target="_blank">⬇ 4×6 Zebra PDF (This Section)</a>
+    <a href="/pick/labels.pdf" class="green" target="_blank">⬇ All 501 Labels 4×6 PDF</a>
+    <a id="pngLink" download>⬇ PNG</a>
+    <a id="testLink" class="dark" target="_blank">Open Worker Scan Page</a>
+    <a href="/pick/labels" class="dark">← All 14 Lines Hub</a>
   </div>
-  <div class="label">
-    <div class="brand" id="brand">ALLBIRDS</div>
-    <div class="loc" id="loc">Loading…</div>
-    <div class="levels" id="levels"></div>
-    <img id="qr" alt="QR code" style="visibility:hidden" onload="this.style.visibility='visible'" />
-    <div class="instr">Scan when you take pieces from ANY level of this section</div>
-    <div class="code" id="url"></div>
+  <div class="page-wrap">
+    <div class="label">
+      <div class="hdr">
+        <div class="t1">ALEXANDER WAREHOUSE OS</div>
+        <div class="t2" id="brand">PART 1 • ALLBIRDS ZONE • QR PICK STATION</div>
+      </div>
+      <div>
+        <div class="loc" id="loc">Loading…</div>
+        <div class="levels" id="levels">COVERS LEVELS 1 • 2 • 3 • 4 (PASTE ON LEVEL 1)</div>
+      </div>
+      <img id="qr" alt="QR code" style="visibility:hidden" onload="this.style.visibility='visible'" />
+      <div class="station-id" id="stationId"></div>
+      <div class="instr">
+        <b>STAFF INSTRUCTIONS (WHEN TAKING ANY PIECE):</b>
+        1. Scan this QR code with your phone camera<br/>
+        2. Enter/Select Style &amp; choose Level (1, 2, 3, or 4)<br/>
+        3. Enter pieces taken &amp; tap SAVE to deduct stock
+      </div>
+      <div class="code" id="url"></div>
+    </div>
   </div>
 <script>
   const code = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop());
   fetch(`/pick/api/s/${encodeURIComponent(code)}`, { credentials: "same-origin" })
     .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
     .then(({ ok, d }) => {
-      if (!ok) { document.body.innerHTML = `<p style="padding:24px">${d.detail || "Error"}</p>`; return; }
+      if (!ok) { document.body.innerHTML = `<p style="padding:24px;color:#fff">${d.detail || "Error"}</p>`; return; }
       const s = d.station;
-      document.getElementById("brand").textContent = s.brand;
-      document.getElementById("loc").textContent = `LINE ${s.line} · SEC ${s.section}`;
-      document.getElementById("levels").textContent = `Levels ${s.levels.join(" · ")}  —  mount on Level ${s.qr_mounted_on_level}`;
+      document.getElementById("loc").textContent = `LINE ${s.line} • SEC ${s.section}`;
+      document.getElementById("levels").textContent = `COVERS LEVELS ${s.levels.join(" • ")}  (PASTE ON LEVEL ${s.qr_mounted_on_level})`;
+      document.getElementById("stationId").textContent = `STATION: ${s.code}`;
       document.getElementById("url").textContent = d.scan_url;
-      const png = `/pick/qr/${encodeURIComponent(code)}.png?scale=16`;
+      const png = `/pick/qr/${encodeURIComponent(s.code)}.png?scale=16`;
       document.getElementById("qr").src = png;
-      const dl = document.getElementById("pngLink"); dl.href = png; dl.download = `QR-${code}.png`;
-      document.getElementById("testLink").href = `/pick/s/${encodeURIComponent(code)}`;
+      const dl = document.getElementById("pngLink"); dl.href = png; dl.download = `QR-${s.code}.png`;
+      document.getElementById("singlePdfLink").href = `/pick/labels.pdf?code=${encodeURIComponent(s.code)}`;
+      document.getElementById("testLink").href = `/pick/s/${encodeURIComponent(s.code)}`;
     });
 </script>
 </body>

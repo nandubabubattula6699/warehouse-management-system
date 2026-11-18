@@ -1875,7 +1875,7 @@ async def gateway_picking_service(request: Request, path: str = ""):
     headers["X-Forwarded-Proto"] = request.headers.get("x-forwarded-proto") or request.url.scheme
     body = await request.body()
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             try:
                 upstream = await client.request(
                     request.method, url, params=request.query_params,

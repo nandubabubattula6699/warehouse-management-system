@@ -10,7 +10,7 @@
     body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
     .wrap { max-width: 520px; margin: 0 auto; padding: 16px; }
     header { background: linear-gradient(135deg, #1e3a8a, #0f766e); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
-    header .tag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; opacity: .8; font-weight: 700; }
+    header .tag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; opacity: .85; font-weight: 800; }
     header h1 { margin: 4px 0 2px; font-size: 22px; }
     header .who { font-size: 13px; opacity: .85; }
     .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 16px; margin-bottom: 14px; }
@@ -19,6 +19,9 @@
     input[type=text]:focus { outline: none; border-color: #38bdf8; }
     .hint { font-size: 13px; margin-top: 8px; color: #94a3b8; min-height: 18px; }
     .hint.warn { color: #fbbf24; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .chip { border: 1.5px solid #475569; background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 7px 11px; font-size: 13px; font-weight: 800; cursor: pointer; }
+    .chip.sel { border-color: #38bdf8; background: #0c4a6e; color: #fff; }
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .opt { border: 2px solid #475569; background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 14px 10px; font-size: 18px; font-weight: 800; cursor: pointer; text-align: center; }
     .opt small { display: block; font-size: 12px; font-weight: 600; color: #94a3b8; margin-top: 4px; }
@@ -26,7 +29,7 @@
     .opt.sel small { color: #bbf7d0; }
     .opt:disabled { opacity: .35; cursor: not-allowed; }
     .qty { display: flex; align-items: center; gap: 10px; }
-    .qty button { flex: 0 0 64px; height: 56px; font-size: 28px; font-weight: 800; border-radius: 12px; border: 2px solid #475569; background: #0f172a; color: #fff; }
+    .qty button { flex: 0 0 64px; height: 56px; font-size: 28px; font-weight: 800; border-radius: 12px; border: 2px solid #475569; background: #0f172a; color: #fff; cursor: pointer; }
     .qty input { flex: 1 1 auto; min-width: 0; width: 100%; text-align: center; font-size: 26px; font-weight: 800; padding: 10px; border-radius: 12px; border: 2px solid #475569; background: #0f172a; color: #fff; -moz-appearance: textfield; appearance: textfield; }
     .qty input::-webkit-outer-spin-button, .qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     #saveBtn { width: 100%; padding: 18px; font-size: 20px; font-weight: 900; border: 0; border-radius: 14px; background: #16a34a; color: #fff; cursor: pointer; letter-spacing: .04em; }
@@ -41,7 +44,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="tag">QR Pick Station</div>
+    <div class="tag" id="stationCodeTag">QR Pick Station</div>
     <h1 id="stationLabel">Loading…</h1>
     <div class="who" id="who"></div>
   </header>
@@ -50,10 +53,11 @@
 
   <form id="pickForm" autocomplete="off">
     <div class="card">
-      <label class="step" for="style">1 · Style</label>
+      <label class="step" for="style">1 · Enter or Tap Style</label>
       <input type="text" id="style" list="styleList" placeholder="e.g. A12501" required />
       <datalist id="styleList"></datalist>
       <div class="hint" id="styleHint"></div>
+      <div class="chips" id="styleChips"></div>
     </div>
 
     <div class="card">
@@ -75,7 +79,7 @@
       </div>
     </div>
 
-    <button type="submit" id="saveBtn" disabled>SAVE</button>
+    <button type="submit" id="saveBtn" disabled>SAVE &amp; DEDUCT STOCK</button>
   </form>
 </div>
 
@@ -105,6 +109,7 @@
     const data = await res.json();
     if (!res.ok) { showAlert(esc(data.detail || "Could not load station."), false); return; }
     station = data.station; items = data.items;
+    $("stationCodeTag").textContent = `QR Pick Station • ${station.code}`;
     $("stationLabel").textContent = station.label;
     $("who").textContent = `Signed in as ${data.user.full_name || data.user.username}`;
     const styles = [...new Set(items.filter((i) => i.quantity > 0).map((i) => i.style.toUpperCase()))].sort();
@@ -115,14 +120,28 @@
   function render() {
     const style = styleVal();
     const known = style && rowsFor(style).length > 0;
+    const activeStyles = [...new Set(items.filter((i) => i.quantity > 0).map((i) => i.style.toUpperCase()))].sort();
+
+    // Quick-tap style chips for styles stocked in this section
+    $("styleChips").innerHTML = activeStyles.map((s) => {
+      const qty = rowsFor(s).reduce((n, r) => n + r.quantity, 0);
+      return `<button type="button" class="chip ${style === s ? "sel" : ""}" data-style="${esc(s)}">${esc(s)} (${qty})</button>`;
+    }).join("");
 
     // Style hint
     const hint = $("styleHint");
-    if (!style) { hint.className = "hint"; hint.textContent = "Type the style printed on the box."; }
-    else if (!known) { hint.className = "hint warn"; hint.textContent = `${style} is not recorded in this section.`; }
-    else {
+    if (!style) {
+      hint.className = "hint";
+      hint.textContent = activeStyles.length
+        ? `Tap a stocked style below or type the style code (${activeStyles.length} styles in this section).`
+        : "Type the style printed on the box.";
+    } else if (!known) {
+      hint.className = "hint warn";
+      hint.textContent = `${style} is not recorded in Line ${station.line} • Sec ${station.section}.`;
+    } else {
       const total = rowsFor(style).reduce((n, r) => n + r.quantity, 0);
-      hint.className = "hint"; hint.textContent = `${total} pcs of ${style} in this section.`;
+      hint.className = "hint";
+      hint.textContent = `${total} pcs of ${style} in Line ${station.line} • Sec ${station.section}.`;
     }
 
     // Levels
@@ -134,6 +153,15 @@
       const disabled = known && rows.length === 0;
       return `<button type="button" class="opt ${state.level === lv ? "sel" : ""}" data-level="${lv}" ${disabled ? "disabled" : ""}>Level ${lv}<small>${sub}</small></button>`;
     }).join("");
+
+    // Auto-select level if the style only exists on 1 level in this section
+    if (known && !state.level) {
+      const populatedLevels = station.levels.filter((lv) => rowsFor(style, lv).some((r) => r.quantity > 0));
+      if (populatedLevels.length === 1) {
+        state.level = populatedLevels[0];
+        return render();
+      }
+    }
 
     // Variants (size/color) when several rows match at the chosen level
     const variants = known && state.level ? rowsFor(style, state.level) : [];
@@ -148,7 +176,12 @@
     $("saveBtn").disabled = !(style && state.level && qty >= 1 && (variants.length <= 1 || state.itemId));
   }
 
-  $("style").addEventListener("input", () => { clearAlert(); render(); });
+  $("style").addEventListener("input", () => { clearAlert(); state.level = null; state.itemId = null; render(); });
+  $("styleChips").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-style]"); if (!b) return;
+    $("style").value = b.dataset.style;
+    clearAlert(); state.level = null; state.itemId = null; render();
+  });
   $("levels").addEventListener("click", (e) => {
     const b = e.target.closest("[data-level]"); if (!b || b.disabled) return;
     state.level = b.dataset.level; state.itemId = null; render();
@@ -176,15 +209,15 @@
         const d = data.detail;
         showAlert(esc(typeof d === "object" && d ? d.message : d || "Save failed."), false);
       } else {
-        showAlert(`✔ Saved: took <b>${data.picked}</b> × <b>${esc(data.style)}</b> (size ${esc(data.size)}) from Level ${esc(data.level)}.<br>${data.quantity_after} pcs left there.`, true);
+        showAlert(`✔ Saved: took <b>${data.picked}</b> × <b>${esc(data.style)}</b> (size ${esc(data.size)}) from Line ${esc(station.line)} • Sec ${esc(station.section)} • Level ${esc(data.level)}.<br>${data.quantity_after} pcs left there.`, true);
         $("style").value = ""; $("qty").value = 1; state.level = null; state.itemId = null;
-        btn.textContent = "SAVE"; render();
+        btn.textContent = "SAVE & DEDUCT STOCK"; render();
       }
       await load();
     } catch (err) {
       showAlert("Network error — check Wi-Fi and try again.", false);
     } finally {
-      btn.textContent = "SAVE"; render();
+      btn.textContent = "SAVE & DEDUCT STOCK"; render();
     }
   });
 

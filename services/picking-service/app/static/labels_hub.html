@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>4×6 Zebra QR Labels • All 14 Lines (501 Sections) • Alexander Warehouse OS</title>
+  <link rel="icon" href="/favicon.ico" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
+    .container { max-width: 1360px; margin: 0 auto; padding: 20px; }
+    .top-bar { background: linear-gradient(135deg, #173456, #0f766e); border: 1px solid #38bdf8; border-radius: 18px; padding: 22px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+    .top-bar h1 { margin: 4px 0 6px; font-size: 24px; font-weight: 900; color: #fff; }
+    .top-bar .tag { font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #7dd3fc; }
+    .top-bar .sub { font-size: 13px; color: #cbd5e1; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 800; text-decoration: none; border: 0; cursor: pointer; transition: transform .1s, opacity .15s; }
+    .btn:active { transform: scale(.98); }
+    .btn-master { background: #22c55e; color: #052e16; font-size: 15px; box-shadow: 0 6px 20px rgba(34,197,94,.35); }
+    .btn-master:hover { background: #4ade80; }
+    .btn-back { background: #1e293b; color: #e2e8f0; border: 1px solid #475569; }
+    .btn-back:hover { background: #334155; }
+    .line-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; background: #1e293b; padding: 12px; border-radius: 14px; border: 1px solid #334155; }
+    .tab { padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 800; background: #0f172a; color: #cbd5e1; border: 1px solid #334155; cursor: pointer; }
+    .tab.active { background: #0284c7; color: #fff; border-color: #38bdf8; }
+    .line-block { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 18px; margin-bottom: 18px; }
+    .line-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid #334155; }
+    .line-header h2 { margin: 0; font-size: 20px; font-weight: 900; color: #fff; }
+    .line-header .meta { font-size: 13px; color: #94a3b8; font-weight: 600; }
+    .btn-line-pdf { background: #0284c7; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-line-pdf:hover { background: #0369a1; }
+    .sec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .sec-card { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 10px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
+    .sec-card .title { font-size: 15px; font-weight: 900; color: #fff; }
+    .sec-card .code { font-family: ui-monospace, monospace; font-size: 11px; color: #38bdf8; font-weight: 700; }
+    .sec-card .links { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
+    .sec-card .links a { flex: 1; padding: 6px 4px; border-radius: 8px; font-size: 11px; font-weight: 800; text-decoration: none; }
+    .link-label { background: #1e3a8a; color: #e0f2fe; border: 1px solid #3b82f6; }
+    .link-pdf { background: #14532d; color: #dcfce7; border: 1px solid #22c55e; }
+    .link-scan { background: #334155; color: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-bar">
+      <div>
+        <div class="tag">Zebra 4×6 Thermal Label Center • Part 1 Allbirds</div>
+        <h1 id="hubTitle">All 14 Lines • 501 Section QR Codes</h1>
+        <div class="sub">1 QR code per Section (mounted on Level 1, covers Levels 1 • 2 • 3 • 4). Formatted at exact 4" × 6" for Zebra label printers.</div>
+      </div>
+      <div class="actions">
+        <a href="/pick/labels.pdf" target="_blank" class="btn btn-master">
+          🖨️ Download Master 4×6 Zebra PDF (All 501 Labels)
+        </a>
+        <a href="/" class="btn btn-back">← Back to Dashboard</a>
+      </div>
+    </div>
+
+    <div class="line-tabs" id="lineTabs"></div>
+    <div id="linesContainer">Loading all 14 lines and 501 sections…</div>
+  </div>
+
+  <script>
+    let allLines = [];
+    let selectedLine = "ALL";
+
+    async function init() {
+      const res = await fetch("/pick/api/stations", { credentials: "same-origin" });
+      if (res.status === 401) { location.href = "/login?next=/pick/labels"; return; }
+      const data = await res.json();
+      allLines = data.lines || [];
+      document.getElementById("hubTitle").textContent =
+        `All ${data.total_lines} Allbirds Lines • ${data.total_stations} Section QR Labels (4×6 Zebra)`;
+      renderTabs();
+      renderLines();
+    }
+
+    function renderTabs() {
+      const tabs = document.getElementById("lineTabs");
+      const total = allLines.reduce((acc, l) => acc + l.sections_count, 0);
+      let html = `<button class="tab ${selectedLine === "ALL" ? "active" : ""}" onclick="selectLine('ALL')">All 14 Lines (${total})</button>`;
+      for (const l of allLines) {
+        html += `<button class="tab ${selectedLine === l.line ? "active" : ""}" onclick="selectLine('${l.line}')">Line ${l.line} (${l.sections_count})</button>`;
+      }
+      tabs.innerHTML = html;
+    }
+
+    function selectLine(ln) {
+      selectedLine = ln;
+      renderTabs();
+      renderLines();
+    }
+
+    function renderLines() {
+      const container = document.getElementById("linesContainer");
+      const visible = selectedLine === "ALL" ? allLines : allLines.filter((l) => l.line === selectedLine);
+      container.innerHTML = visible.map((l) => `
+        <div class="line-block">
+          <div class="line-header">
+            <div>
+              <h2>ALLBIRDS • LINE ${l.line}</h2>
+              <div class="meta">Sections 1 to ${l.sections_count} (${l.sections_count} 4×6 Zebra QR labels • covers Levels 1–4)</div>
+            </div>
+            <a class="btn-line-pdf" href="${l.pdf_url}" target="_blank">
+              ⬇ Download Line ${l.line} 4×6 Zebra PDF (${l.sections_count} Labels)
+            </a>
+          </div>
+          <div class="sec-grid">
+            ${l.sections.map((s) => `
+              <div class="sec-card">
+                <div class="title">Line ${l.line} • Sec ${s.section}</div>
+                <div class="code">${s.code}</div>
+                <div class="links">
+                  <a class="link-label" href="${s.label_url}" title="Open 4x6 Label">4×6 Label</a>
+                  <a class="link-pdf" href="/pick/labels.pdf?code=${s.code}" target="_blank" title="4x6 Zebra PDF">PDF</a>
+                  <a class="link-scan" href="/pick/s/${s.code}" target="_blank" title="Worker Scan Page">Scan</a>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `).join("");
+    }
+
+    init();
+  </script>
+</body>
+</html>
