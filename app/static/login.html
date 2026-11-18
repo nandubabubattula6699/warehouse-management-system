@@ -179,7 +179,9 @@
           showAuthAlert(data.detail || "Invalid login credentials.", true);
           return;
         }
-        window.location.href = "/";
+        const nextParam = new URLSearchParams(window.location.search).get("next");
+        const safeNext = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") && !nextParam.includes("\\") ? nextParam : "/";
+        window.location.href = safeNext;
       } catch (err) {
         showAuthAlert("Network error connecting to server.", true);
       } finally {

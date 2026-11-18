@@ -60,8 +60,30 @@ def seed_if_empty():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import subprocess
+    import sys
     seed_if_empty()
-    yield
+    picking_proc = None
+    picking_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "services", "picking-service"))
+    if os.path.isdir(picking_dir):
+        try:
+            env = os.environ.copy()
+            main_port = env.get("PORT", "8000")
+            env.setdefault("INVENTORY_SERVICE_URL", f"http://127.0.0.1:{main_port}")
+            env.setdefault("INTERNAL_API_KEY", os.getenv("INTERNAL_API_KEY", "wh-internal-default-key-2026"))
+            picking_proc = subprocess.Popen(
+                [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8001"],
+                cwd=picking_dir,
+                env=env,
+            )
+            print("[Gateway] Started local picking-service microservice on 127.0.0.1:8001", flush=True)
+        except Exception as e:
+            print(f"[Gateway] Note: could not auto-start local picking-service: {e}", flush=True)
+    try:
+        yield
+    finally:
+        if picking_proc and picking_proc.poll() is None:
+            picking_proc.terminate()
 
 
 app = FastAPI(
@@ -1688,6 +1710,197 @@ def delete_inbound_shipment(shipment_id: int, db: Session = Depends(get_db)):
     return {"status": "success", "message": f"Shipment {shipment.shipment_number} deleted."}
 
 
+# ======================================================================================
+# INTERNAL SERVICE API (service-to-service only)
+# Used by other microservices (e.g. picking-service). Protected by a shared secret in the
+# X-Internal-Key header. Disabled entirely if INTERNAL_API_KEY is not configured.
+# ======================================================================================
+import hmac as _hmac
+from app.location_engine import _norm_coord
+
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "wh-internal-default-key-2026")
+
+
+def require_internal_service(request: Request):
+    if not INTERNAL_API_KEY:
+        raise HTTPException(status_code=503, detail="Internal service API is not configured (INTERNAL_API_KEY missing).")
+    supplied = request.headers.get("X-Internal-Key", "")
+    if not _hmac.compare_digest(supplied, INTERNAL_API_KEY):
+        raise HTTPException(status_code=403, detail="Invalid internal service key.")
+    return True
+
+
+def _norm_line(v): return _norm_coord(v, ("LINE ", "LINE#", "LINE-", "LN ", "L-", "L"))
+def _norm_section(v): return _norm_coord(v, ("SECTION ", "SECTION#", "SEC ", "SEC#", "SEC-", "S-"))
+def _norm_level(v): return _norm_coord(v, ("LEVEL ", "LEVEL#", "LVL ", "LVL#", "LVL-", "LV-", "LV"))
+
+
+class InternalPickPayload(BaseModel):
+    style: str
+    warehouse_part: str = "PART_1"
+    line: str
+    section: str
+    level: str
+    quantity: int = 1
+    item_id: Optional[int] = None      # required when style has several sizes/colors at this level
+    staff_name: str
+    source: Optional[str] = "QR_PICK"
+
+
+@app.get("/api/internal/locations/stock")
+def internal_location_stock(
+    warehouse_part: str = Query("PART_1"),
+    line: str = Query(...),
+    section: str = Query(...),
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_internal_service),
+):
+    """All inventory rows in one Line/Section (every level). Used by picking-service to build its UI."""
+    ln, sec = _norm_line(line), _norm_section(section)
+    rows = db.query(InventoryItem).filter(
+        InventoryItem.warehouse_part == warehouse_part,
+        InventoryItem.line == ln,
+        InventoryItem.section == sec,
+    ).order_by(InventoryItem.level.asc(), InventoryItem.style.asc(), InventoryItem.size.asc()).all()
+    return {
+        "warehouse_part": warehouse_part,
+        "line": ln,
+        "section": sec,
+        "items": [
+            {
+                "item_id": r.id,
+                "style": r.style,
+                "brand": r.brand,
+                "color": r.color,
+                "size": r.size,
+                "level": r.level,
+                "quantity": r.quantity,
+                "location": r.location,
+            }
+            for r in rows
+        ],
+    }
+
+
+@app.post("/api/internal/inventory/pick")
+def internal_pick(
+    payload: InternalPickPayload,
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_internal_service),
+):
+    """Atomically deduct picked pieces from one exact shelf position and write an audit movement."""
+    if payload.quantity < 1:
+        raise HTTPException(status_code=400, detail="Quantity must be at least 1.")
+    style = (payload.style or "").strip()
+    if not style:
+        raise HTTPException(status_code=400, detail="Style is required.")
+    ln, sec, lvl = _norm_line(payload.line), _norm_section(payload.section), _norm_level(payload.level)
+
+    q = db.query(InventoryItem).filter(
+        InventoryItem.warehouse_part == payload.warehouse_part,
+        InventoryItem.line == ln,
+        InventoryItem.section == sec,
+        InventoryItem.level == lvl,
+        func.upper(InventoryItem.style) == style.upper(),
+    )
+    if payload.item_id is not None:
+        q = q.filter(InventoryItem.id == payload.item_id)
+    matches = q.with_for_update().all()
+
+    where = f"Line {ln} • Sec {sec} • Lvl {lvl}"
+    if not matches:
+        raise HTTPException(status_code=404, detail=f"Style '{style.upper()}' is not stocked at {where}.")
+    if len(matches) > 1:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": f"Style '{style.upper()}' has {len(matches)} sizes/colors at {where}. Choose one.",
+                "options": [
+                    {"item_id": m.id, "size": m.size, "color": m.color, "quantity": m.quantity}
+                    for m in matches
+                ],
+            },
+        )
+
+    item = matches[0]
+    if payload.quantity > item.quantity:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only {item.quantity} pcs of {item.style} (size {item.size}) at {where}. Cannot take {payload.quantity}.",
+        )
+
+    item.quantity -= payload.quantity
+    db.add(StockMovement(
+        item_id=item.id,
+        style=item.style,
+        change_amount=-payload.quantity,
+        quantity_after=item.quantity,
+        movement_type=(payload.source or "QR_PICK")[:50],
+        reason=f"QR pick @ {where}",
+        staff_name=(payload.staff_name or "Unknown")[:100],
+    ))
+    db.commit()
+    db.refresh(item)
+    return {
+        "status": "ok",
+        "item_id": item.id,
+        "style": item.style,
+        "size": item.size,
+        "color": item.color,
+        "level": item.level,
+        "location": item.location,
+        "picked": payload.quantity,
+        "quantity_after": item.quantity,
+    }
+
+
+# ======================================================================================
+# API GATEWAY: forward /pick/* to the picking-service microservice.
+# Keeps one public domain (shared login cookie) while the feature runs as its own service.
+# ======================================================================================
+import httpx
+
+PICKING_SERVICE_URL = os.getenv("PICKING_SERVICE_URL", "http://localhost:8001").rstrip("/")
+_HOP_HEADERS = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te",
+                "trailers", "transfer-encoding", "upgrade", "host", "content-length", "content-encoding"}
+
+
+@app.api_route("/pick", methods=["GET", "POST"], include_in_schema=False)
+@app.api_route("/pick/{path:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False)
+async def gateway_picking_service(request: Request, path: str = ""):
+    url = f"{PICKING_SERVICE_URL}/pick/{path}" if path else f"{PICKING_SERVICE_URL}/pick"
+    fallback_url = f"http://127.0.0.1:8001/pick/{path}" if path else "http://127.0.0.1:8001/pick"
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in _HOP_HEADERS}
+    headers["X-Forwarded-Host"] = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    headers["X-Forwarded-Proto"] = request.headers.get("x-forwarded-proto") or request.url.scheme
+    body = await request.body()
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            try:
+                upstream = await client.request(
+                    request.method, url, params=request.query_params,
+                    headers=headers, content=body,
+                )
+            except httpx.RequestError:
+                if url == fallback_url:
+                    raise
+                upstream = await client.request(
+                    request.method, fallback_url, params=request.query_params,
+                    headers=headers, content=body,
+                )
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="Picking service is unavailable. Please try again shortly.")
+    resp_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in _HOP_HEADERS}
+    return Response(content=upstream.content, status_code=upstream.status_code, headers=resp_headers)
+
+
+def _safe_next(next_url: Optional[str]) -> Optional[str]:
+    """Only allow same-site relative redirects after login (prevents open redirects)."""
+    if next_url and next_url.startswith("/") and not next_url.startswith("//") and "\\" not in next_url:
+        return next_url
+    return None
+
+
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -1704,7 +1917,7 @@ if os.path.exists(static_dir):
     def serve_login_page(request: Request, db: Session = Depends(get_db)):
         user = get_optional_user(request, db)
         if user:
-            return RedirectResponse(url="/", status_code=302)
+            return RedirectResponse(url=_safe_next(request.query_params.get("next")) or "/", status_code=302)
         return FileResponse(os.path.join(static_dir, "login.html"))
 
     @app.get("/")

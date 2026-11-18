@@ -9,3 +9,5 @@ venv/
 .DS_Store
 *.sqlite
 data/*.tmp
+.idea/
+*.db

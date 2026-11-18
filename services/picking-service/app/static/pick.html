@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>QR Pick • Warehouse OS</title>
+  <link rel="icon" href="/favicon.ico" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
+    .wrap { max-width: 520px; margin: 0 auto; padding: 16px; }
+    header { background: linear-gradient(135deg, #1e3a8a, #0f766e); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+    header .tag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; opacity: .8; font-weight: 700; }
+    header h1 { margin: 4px 0 2px; font-size: 22px; }
+    header .who { font-size: 13px; opacity: .85; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+    label.step { display: block; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px; }
+    input[type=text] { width: 100%; font-size: 22px; font-weight: 700; padding: 14px; border-radius: 12px; border: 2px solid #475569; background: #0f172a; color: #fff; text-transform: uppercase; }
+    input[type=text]:focus { outline: none; border-color: #38bdf8; }
+    .hint { font-size: 13px; margin-top: 8px; color: #94a3b8; min-height: 18px; }
+    .hint.warn { color: #fbbf24; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .opt { border: 2px solid #475569; background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 14px 10px; font-size: 18px; font-weight: 800; cursor: pointer; text-align: center; }
+    .opt small { display: block; font-size: 12px; font-weight: 600; color: #94a3b8; margin-top: 4px; }
+    .opt.sel { border-color: #22c55e; background: #14532d; }
+    .opt.sel small { color: #bbf7d0; }
+    .opt:disabled { opacity: .35; cursor: not-allowed; }
+    .qty { display: flex; align-items: center; gap: 10px; }
+    .qty button { flex: 0 0 64px; height: 56px; font-size: 28px; font-weight: 800; border-radius: 12px; border: 2px solid #475569; background: #0f172a; color: #fff; }
+    .qty input { flex: 1 1 auto; min-width: 0; width: 100%; text-align: center; font-size: 26px; font-weight: 800; padding: 10px; border-radius: 12px; border: 2px solid #475569; background: #0f172a; color: #fff; -moz-appearance: textfield; appearance: textfield; }
+    .qty input::-webkit-outer-spin-button, .qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    #saveBtn { width: 100%; padding: 18px; font-size: 20px; font-weight: 900; border: 0; border-radius: 14px; background: #16a34a; color: #fff; cursor: pointer; letter-spacing: .04em; }
+    #saveBtn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+    .alert { border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 600; margin-bottom: 14px; display: none; }
+    .alert.ok { display: block; background: #14532d; border: 1px solid #22c55e; color: #dcfce7; }
+    .alert.err { display: block; background: #7f1d1d; border: 1px solid #ef4444; color: #fee2e2; }
+    .hidden { display: none; }
+    a { color: #7dd3fc; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="tag">QR Pick Station</div>
+    <h1 id="stationLabel">Loading…</h1>
+    <div class="who" id="who"></div>
+  </header>
+
+  <div id="alert" class="alert"></div>
+
+  <form id="pickForm" autocomplete="off">
+    <div class="card">
+      <label class="step" for="style">1 · Style</label>
+      <input type="text" id="style" list="styleList" placeholder="e.g. A12501" required />
+      <datalist id="styleList"></datalist>
+      <div class="hint" id="styleHint"></div>
+    </div>
+
+    <div class="card">
+      <label class="step">2 · Which level did you take it from?</label>
+      <div class="grid" id="levels"></div>
+    </div>
+
+    <div class="card hidden" id="variantCard">
+      <label class="step">3 · Size / Color</label>
+      <div class="grid" id="variants"></div>
+    </div>
+
+    <div class="card">
+      <label class="step" for="qty">Pieces taken</label>
+      <div class="qty">
+        <button type="button" id="minus">−</button>
+        <input type="number" id="qty" min="1" value="1" inputmode="numeric" />
+        <button type="button" id="plus">+</button>
+      </div>
+    </div>
+
+    <button type="submit" id="saveBtn" disabled>SAVE</button>
+  </form>
+</div>
+
+<script>
+  const code = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop());
+  const api = `/pick/api/s/${encodeURIComponent(code)}`;
+  let station = null, items = [];
+  const state = { level: null, itemId: null };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function showAlert(msg, ok) {
+    const a = $("alert");
+    a.className = "alert " + (ok ? "ok" : "err");
+    a.innerHTML = msg;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function clearAlert() { $("alert").className = "alert"; }
+
+  const styleVal = () => $("style").value.trim().toUpperCase();
+  const rowsFor = (style, level) => items.filter((i) => i.style.toUpperCase() === style && (level == null || String(i.level) === String(level)));
+
+  async function load() {
+    const res = await fetch(api, { credentials: "same-origin" });
+    if (res.status === 401) { location.href = `/login?next=${encodeURIComponent(location.pathname)}`; return; }
+    const data = await res.json();
+    if (!res.ok) { showAlert(esc(data.detail || "Could not load station."), false); return; }
+    station = data.station; items = data.items;
+    $("stationLabel").textContent = station.label;
+    $("who").textContent = `Signed in as ${data.user.full_name || data.user.username}`;
+    const styles = [...new Set(items.filter((i) => i.quantity > 0).map((i) => i.style.toUpperCase()))].sort();
+    $("styleList").innerHTML = styles.map((s) => `<option value="${esc(s)}">`).join("");
+    render();
+  }
+
+  function render() {
+    const style = styleVal();
+    const known = style && rowsFor(style).length > 0;
+
+    // Style hint
+    const hint = $("styleHint");
+    if (!style) { hint.className = "hint"; hint.textContent = "Type the style printed on the box."; }
+    else if (!known) { hint.className = "hint warn"; hint.textContent = `${style} is not recorded in this section.`; }
+    else {
+      const total = rowsFor(style).reduce((n, r) => n + r.quantity, 0);
+      hint.className = "hint"; hint.textContent = `${total} pcs of ${style} in this section.`;
+    }
+
+    // Levels
+    if (state.level && known && rowsFor(style, state.level).length === 0) { state.level = null; state.itemId = null; }
+    $("levels").innerHTML = station.levels.map((lv) => {
+      const rows = known ? rowsFor(style, lv) : [];
+      const qty = rows.reduce((n, r) => n + r.quantity, 0);
+      const sub = !style ? "&nbsp;" : rows.length ? `${qty} pcs` : "not here";
+      const disabled = known && rows.length === 0;
+      return `<button type="button" class="opt ${state.level === lv ? "sel" : ""}" data-level="${lv}" ${disabled ? "disabled" : ""}>Level ${lv}<small>${sub}</small></button>`;
+    }).join("");
+
+    // Variants (size/color) when several rows match at the chosen level
+    const variants = known && state.level ? rowsFor(style, state.level) : [];
+    if (variants.length === 1) state.itemId = variants[0].item_id;
+    else if (!variants.some((v) => v.item_id === state.itemId)) state.itemId = null;
+    $("variantCard").classList.toggle("hidden", variants.length <= 1);
+    $("variants").innerHTML = variants.length > 1 ? variants.map((v) =>
+      `<button type="button" class="opt ${state.itemId === v.item_id ? "sel" : ""}" data-item="${v.item_id}" ${v.quantity < 1 ? "disabled" : ""}>Size ${esc(v.size)}<small>${esc(v.color)} · ${v.quantity} pcs</small></button>`
+    ).join("") : "";
+
+    const qty = parseInt($("qty").value, 10);
+    $("saveBtn").disabled = !(style && state.level && qty >= 1 && (variants.length <= 1 || state.itemId));
+  }
+
+  $("style").addEventListener("input", () => { clearAlert(); render(); });
+  $("levels").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-level]"); if (!b || b.disabled) return;
+    state.level = b.dataset.level; state.itemId = null; render();
+  });
+  $("variants").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-item]"); if (!b || b.disabled) return;
+    state.itemId = parseInt(b.dataset.item, 10); render();
+  });
+  $("minus").onclick = () => { $("qty").value = Math.max(1, (parseInt($("qty").value, 10) || 1) - 1); render(); };
+  $("plus").onclick = () => { $("qty").value = (parseInt($("qty").value, 10) || 0) + 1; render(); };
+  $("qty").addEventListener("input", render);
+
+  $("pickForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("saveBtn"); btn.disabled = true; btn.textContent = "SAVING…";
+    const body = { style: styleVal(), level: state.level, quantity: parseInt($("qty").value, 10), item_id: state.itemId };
+    try {
+      const res = await fetch(`${api}/picks`, {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.status === 401) { location.href = `/login?next=${encodeURIComponent(location.pathname)}`; return; }
+      if (!res.ok) {
+        const d = data.detail;
+        showAlert(esc(typeof d === "object" && d ? d.message : d || "Save failed."), false);
+      } else {
+        showAlert(`✔ Saved: took <b>${data.picked}</b> × <b>${esc(data.style)}</b> (size ${esc(data.size)}) from Level ${esc(data.level)}.<br>${data.quantity_after} pcs left there.`, true);
+        $("style").value = ""; $("qty").value = 1; state.level = null; state.itemId = null;
+        btn.textContent = "SAVE"; render();
+      }
+      await load();
+    } catch (err) {
+      showAlert("Network error — check Wi-Fi and try again.", false);
+    } finally {
+      btn.textContent = "SAVE"; render();
+    }
+  });
+
+  load();
+</script>
+</body>
+</html>
