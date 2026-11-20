@@ -13,14 +13,10 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 2. Configure Your PostgreSQL Password
-Open the `.env` file in this directory and update your password:
+### 2. Configure Your PostgreSQL Connection
+Copy `.env.example` to `.env` and set `DATABASE_URL` (the app refuses to start without it):
 ```ini
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=warehouse_db
-DB_USER=postgres
-DB_PASSWORD=your_actual_password_here
+DATABASE_URL=postgresql://postgres:your_actual_password_here@localhost:5432/warehouse_db
 ```
 
 Test your database connection:
