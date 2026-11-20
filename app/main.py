@@ -15,8 +15,13 @@ from app.models import WarehouseLocation, InventoryItem, StockMovement, Warehous
 from app.llm_parser import parse_inbound_documents
 from app.auth import (
     SESSION_COOKIE_NAME, hash_password, verify_password,
-    get_optional_user, require_user, require_admin
+    get_optional_user, require_user, require_supervisor, require_admin
 )
+
+# Route-level access rules (server-side; the frontend's hidden buttons are not security).
+LOGIN_REQUIRED = [Depends(require_user)]        # any approved, logged-in user
+SUPERVISOR_ONLY = [Depends(require_supervisor)]  # ADMIN or MANAGER
+ADMIN_ONLY = [Depends(require_admin)]
 from app.location_engine import build_location_info, ensure_schema_and_locations_seeded
 from app.schemas import (
     ItemCreate, ItemUpdatePayload, ItemResponse, StyleSummary,
@@ -113,7 +118,7 @@ app.add_middleware(
 def health():
     return {"status": "ok", "database": "PostgreSQL"}
 
-@app.get("/api/stats", response_model=WarehouseStats)
+@app.get("/api/stats", response_model=WarehouseStats, dependencies=LOGIN_REQUIRED)
 def get_stats(db: Session = Depends(get_db)):
     total_styles = db.query(func.count(distinct(InventoryItem.style))).scalar() or 0
     total_records = db.query(func.count(InventoryItem.id)).scalar() or 0
@@ -127,7 +132,7 @@ def get_stats(db: Session = Depends(get_db)):
         total_locations=total_locations
     )
 
-@app.get("/api/styles")
+@app.get("/api/styles", dependencies=LOGIN_REQUIRED)
 def list_styles(
     q: Optional[str] = Query(None, description="Search style code e.g. A12"),
     limit: int = Query(2000, ge=1, le=10000),
@@ -207,7 +212,7 @@ def sort_inventory_items_physically(items):
     return sorted(items, key=_sort_key)
 
 # Multi-Style Batch Lookup Endpoint
-@app.get("/api/styles-batch")
+@app.get("/api/styles-batch", dependencies=LOGIN_REQUIRED)
 def get_styles_batch(
     styles: str = Query(..., description="Comma or space-separated style codes e.g. A12501,A12856"),
     db: Session = Depends(get_db)
@@ -272,7 +277,7 @@ def get_styles_batch(
         "items": [ItemResponse.model_validate(i) for i in items]
     }
 
-@app.get("/api/styles/{style_code}")
+@app.get("/api/styles/{style_code}", dependencies=LOGIN_REQUIRED)
 def get_style_detail(style_code: str, db: Session = Depends(get_db)):
     items = db.query(InventoryItem).filter(
         InventoryItem.style.ilike(style_code.strip())
@@ -295,7 +300,7 @@ def get_style_detail(style_code: str, db: Session = Depends(get_db)):
         "items": [ItemResponse.model_validate(i) for i in items]
     }
 
-@app.post("/api/items/{item_id}/adjust", response_model=ItemResponse)
+@app.post("/api/items/{item_id}/adjust", response_model=ItemResponse, dependencies=SUPERVISOR_ONLY)
 def adjust_quantity(
     item_id: int,
     payload: StockAdjustPayload,
@@ -325,7 +330,7 @@ def adjust_quantity(
     db.refresh(item)
     return item
 
-@app.post("/api/items/{item_id}/set-quantity", response_model=ItemResponse)
+@app.post("/api/items/{item_id}/set-quantity", response_model=ItemResponse, dependencies=SUPERVISOR_ONLY)
 def set_quantity(
     item_id: int,
     payload: SetQuantityPayload,
@@ -355,7 +360,7 @@ def set_quantity(
     db.refresh(item)
     return item
 
-@app.post("/api/items", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/api/items", response_model=ItemResponse, status_code=status.HTTP_201_CREATED, dependencies=SUPERVISOR_ONLY)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     data = payload.model_dump()
     info = build_location_info(
@@ -399,7 +404,7 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
 
     return new_item
 
-@app.delete("/api/items/{item_id}")
+@app.delete("/api/items/{item_id}", dependencies=SUPERVISOR_ONLY)
 def delete_item(item_id: int, db: Session = Depends(get_db)):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
@@ -408,7 +413,7 @@ def delete_item(item_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": f"Item {item.style} at location {item.location} deleted."}
 
-@app.get("/api/movements")
+@app.get("/api/movements", dependencies=LOGIN_REQUIRED)
 def get_movements(limit: int = 50, db: Session = Depends(get_db)):
     movements = (
         db.query(StockMovement, InventoryItem.location, InventoryItem.size, InventoryItem.color)
@@ -450,7 +455,7 @@ def _build_location(line, section, level, row_pos, box_num, style: str = "") -> 
     return build_location_info(style, line, section, level, row_pos, box_num)["location"]
 
 
-@app.post("/api/sheet-submit")
+@app.post("/api/sheet-submit", dependencies=SUPERVISOR_ONLY)
 def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_db)):
     """
     Process a Manager Sheet (10-25 rows or 1,000+ rows from CSV):
@@ -675,7 +680,7 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
     }
 
 
-@app.get("/api/location-search")
+@app.get("/api/location-search", dependencies=SUPERVISOR_ONLY)
 def search_locations(
     style: Optional[str] = Query(None),
     line: Optional[str] = Query(None),
@@ -721,7 +726,7 @@ def search_locations(
     return [ItemResponse.model_validate(i) for i in items]
 
 
-@app.put("/api/items/{item_id}", response_model=ItemResponse)
+@app.put("/api/items/{item_id}", response_model=ItemResponse, dependencies=SUPERVISOR_ONLY)
 def update_item_full(item_id: int, payload: ItemUpdatePayload, db: Session = Depends(get_db)):
     """Edit any field of an inventory row (style, color, size, line, section, level, row, box/cartons, quantity)."""
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).with_for_update().first()
@@ -765,7 +770,7 @@ def update_item_full(item_id: int, payload: ItemUpdatePayload, db: Session = Dep
     return item
 
 
-@app.post("/api/items/bulk-delete")
+@app.post("/api/items/bulk-delete", dependencies=SUPERVISOR_ONLY)
 def bulk_delete_items(payload: BulkDeletePayload, db: Session = Depends(get_db)):
     """Delete multiple selected location records at once."""
     if not payload.item_ids:
@@ -775,7 +780,7 @@ def bulk_delete_items(payload: BulkDeletePayload, db: Session = Depends(get_db))
     return {"status": "ok", "deleted_count": deleted}
 
 
-@app.post("/api/styles/rename")
+@app.post("/api/styles/rename", dependencies=SUPERVISOR_ONLY)
 def rename_style(payload: StyleRenamePayload, db: Session = Depends(get_db)):
     """Rename or merge a wrong style code (e.g. 11159 -> A11159) across all locations."""
     old_s = payload.old_style.strip().upper()
@@ -794,7 +799,7 @@ def rename_style(payload: StyleRenamePayload, db: Session = Depends(get_db)):
     return {"status": "ok", "old_style": old_s, "new_style": new_s, "updated_records": len(items)}
 
 
-@app.get("/api/export-csv")
+@app.get("/api/export-csv", dependencies=SUPERVISOR_ONLY)
 def export_inventory_csv(db: Session = Depends(get_db)):
     """Export all inventory rows as a CSV file."""
     import csv
@@ -818,7 +823,7 @@ def export_inventory_csv(db: Session = Depends(get_db)):
     )
 
 
-@app.get("/api/warehouse-overview")
+@app.get("/api/warehouse-overview", dependencies=LOGIN_REQUIRED)
 def get_warehouse_overview(db: Session = Depends(get_db)):
     """
     Complete 50,000+ sq ft 2-Part Warehouse Map Overview:
@@ -982,7 +987,7 @@ def get_warehouse_overview(db: Session = Depends(get_db)):
     }
 
 
-@app.get("/api/warehouse-map/aisle")
+@app.get("/api/warehouse-map/aisle", dependencies=LOGIN_REQUIRED)
 def get_warehouse_aisle_detail(
     part: str = Query(..., description="PART_1 or PART_2"),
     aisle: str = Query(..., description="Line number (1..14) for PART_1, or Row number (1..14 / WALL) for PART_2"),
@@ -1288,7 +1293,7 @@ def admin_delete_user(
     return {"status": "ok"}
 
 
-@app.post("/api/receiving")
+@app.post("/api/receiving", dependencies=LOGIN_REQUIRED)
 def receive_stock(payload: ReceivingPayload, db: Session = Depends(get_db)):
     """
     Dedicated Inbound Stock Receiving Endpoint for Manager & Admin.
@@ -1398,7 +1403,7 @@ def receive_stock(payload: ReceivingPayload, db: Session = Depends(get_db)):
 
 # ================= MULTI-PALLET INBOUND RECEIVING & ADMIN APPROVAL ENDPOINTS =================
 
-@app.post("/api/inbound/parse-docs")
+@app.post("/api/inbound/parse-docs", dependencies=LOGIN_REQUIRED)
 def api_parse_inbound_documents(payload: InboundParseRequest):
     """
     Multimodal AI document reader: Reads photographs/scans of Packing List & Commercial Invoice,
@@ -1417,7 +1422,7 @@ def api_parse_inbound_documents(payload: InboundParseRequest):
         raise HTTPException(status_code=500, detail=f"Document parsing error: {str(e)}")
 
 
-@app.post("/api/inbound/shipments", response_model=InboundShipmentResponse)
+@app.post("/api/inbound/shipments", response_model=InboundShipmentResponse, dependencies=LOGIN_REQUIRED)
 def create_inbound_shipment(payload: InboundShipmentCreate, db: Session = Depends(get_db)):
     """
     Manager stages and submits a verified inbound shipment (1 to 20 pallets, 8 to 40 boxes/pallet)
@@ -1498,7 +1503,7 @@ def create_inbound_shipment(payload: InboundShipmentCreate, db: Session = Depend
     return shipment
 
 
-@app.get("/api/inbound/shipments")
+@app.get("/api/inbound/shipments", dependencies=LOGIN_REQUIRED)
 def list_inbound_shipments(
     status_filter: Optional[str] = Query(None, description="PENDING_APPROVAL | APPROVED | REJECTED"),
     limit: int = 50,
@@ -1549,7 +1554,7 @@ def list_inbound_shipments(
     }
 
 
-@app.get("/api/inbound/shipments/{shipment_id}", response_model=InboundShipmentResponse)
+@app.get("/api/inbound/shipments/{shipment_id}", response_model=InboundShipmentResponse, dependencies=LOGIN_REQUIRED)
 def get_inbound_shipment_detail(shipment_id: int, db: Session = Depends(get_db)):
     """Retrieve full shipment details, line items, and document scan preview."""
     shipment = db.query(InboundShipment).filter(InboundShipment.id == shipment_id).first()
@@ -1558,7 +1563,7 @@ def get_inbound_shipment_detail(shipment_id: int, db: Session = Depends(get_db))
     return shipment
 
 
-@app.post("/api/inbound/shipments/{shipment_id}/approve")
+@app.post("/api/inbound/shipments/{shipment_id}/approve", dependencies=ADMIN_ONLY)
 def approve_inbound_shipment(
     shipment_id: int,
     payload: InboundApprovePayload,
@@ -1680,7 +1685,7 @@ def approve_inbound_shipment(
     }
 
 
-@app.post("/api/inbound/shipments/{shipment_id}/reject")
+@app.post("/api/inbound/shipments/{shipment_id}/reject", dependencies=ADMIN_ONLY)
 def reject_inbound_shipment(
     shipment_id: int,
     payload: InboundRejectPayload,
@@ -1701,7 +1706,7 @@ def reject_inbound_shipment(
     return {"status": "success", "message": f"Shipment {shipment.shipment_number} rejected: {payload.reason}"}
 
 
-@app.delete("/api/inbound/shipments/{shipment_id}")
+@app.delete("/api/inbound/shipments/{shipment_id}", dependencies=ADMIN_ONLY)
 def delete_inbound_shipment(shipment_id: int, db: Session = Depends(get_db)):
     """Delete draft or rejected shipment."""
     shipment = db.query(InboundShipment).filter(InboundShipment.id == shipment_id).first()

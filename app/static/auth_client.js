@@ -1,6 +1,24 @@
 // Shared Authentication & Admin User Access Control Bar for Warehouse OS
 window.currentWarehouseUser = null;
 
+// The server now requires login on every /api call. If the session expires while a page is
+// open, send the user to the login page (and back here afterwards) instead of failing silently.
+(function installSessionExpiryRedirect() {
+  if (window.__whFetchWrapped) return;
+  window.__whFetchWrapped = true;
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async function (input, init) {
+    const res = await originalFetch(input, init);
+    const url = typeof input === "string" ? input : (input && input.url) || "";
+    const path = url.replace(/^https?:\/\/[^/]+/, "");
+    if (res.status === 401 && path.startsWith("/api/") && !path.startsWith("/api/auth/")) {
+      const next = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.href = `/login?next=${next}`;
+    }
+    return res;
+  };
+})();
+
 async function initWarehouseAuth() {
   try {
     const res = await fetch("/api/auth/me");

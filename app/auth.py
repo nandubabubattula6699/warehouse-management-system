@@ -59,7 +59,17 @@ def require_user(request: Request, db: Session = Depends(get_db)) -> WarehouseUs
     return user
 
 
+SUPERVISOR_ROLES = ("ADMIN", "MANAGER")
+
+
+def require_supervisor(user: WarehouseUser = Depends(require_user)) -> WarehouseUser:
+    """Admin or Manager — the same roles that can open the /manage page."""
+    if (user.role or "").upper() not in SUPERVISOR_ROLES:
+        raise HTTPException(status_code=403, detail="Admin or Manager access required.")
+    return user
+
+
 def require_admin(user: WarehouseUser = Depends(require_user)) -> WarehouseUser:
-    if user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="Only Admin (Nandu) can manage user access.")
+    if (user.role or "").upper() != "ADMIN":
+        raise HTTPException(status_code=403, detail="Admin access required.")
     return user
