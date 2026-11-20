@@ -1,0 +1,22 @@
+{
+  "model_name": "Alexander Warehouse Vision SLM v1 (RapidOCR + Contextual BIO Sequence Tagger)",
+  "trained_at": "2026-11-20T17:43:40.747907+00:00",
+  "training_seconds": 22.97,
+  "catalog_styles_count": 612,
+  "catalog_colors_count": 126,
+  "catalog_sizes_count": 41,
+  "feedback_samples_used": 0,
+  "train_documents": 6375,
+  "train_tokens": 120510,
+  "validation_documents": 1125,
+  "validation_tokens": 21485,
+  "vocabulary_features": 13482,
+  "token_validation_accuracy": 0.9921,
+  "macro_f1": 0.9144,
+  "e2e_field_accuracy": {
+    "style": 0.945,
+    "color": 0.975,
+    "quantity": 1.0,
+    "size": 0.95
+  }
+}

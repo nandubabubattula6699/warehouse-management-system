@@ -60,30 +60,40 @@ def seed_if_empty():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import importlib.util
     import subprocess
     import sys
     seed_if_empty()
-    picking_proc = None
-    picking_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "services", "picking-service"))
-    if os.path.isdir(picking_dir):
-        try:
-            env = os.environ.copy()
-            main_port = env.get("PORT", "8000")
-            env.setdefault("INVENTORY_SERVICE_URL", f"http://127.0.0.1:{main_port}")
-            env.setdefault("INTERNAL_API_KEY", os.getenv("INTERNAL_API_KEY", "wh-internal-default-key-2026"))
-            picking_proc = subprocess.Popen(
-                [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8001"],
-                cwd=picking_dir,
-                env=env,
-            )
-            print("[Gateway] Started local picking-service microservice on 127.0.0.1:8001", flush=True)
-        except Exception as e:
-            print(f"[Gateway] Note: could not auto-start local picking-service: {e}", flush=True)
+    child_procs = []
+    services_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "services"))
+    main_port = os.environ.get("PORT", "8000")
+
+    local_services = [
+        ("picking-service", "PICKING_SERVICE_URL", 8001, "segno"),
+        ("vision-llm-service", "VISION_SERVICE_URL", 8002, "rapidocr_onnxruntime"),
+    ]
+    for folder, url_env, port, check_mod in local_services:
+        svc_dir = os.path.join(services_root, folder)
+        if not os.getenv(url_env) and os.path.isdir(svc_dir) and importlib.util.find_spec(check_mod):
+            try:
+                env = os.environ.copy()
+                env.setdefault("INVENTORY_SERVICE_URL", f"http://127.0.0.1:{main_port}")
+                env.setdefault("INTERNAL_API_KEY", os.getenv("INTERNAL_API_KEY", "wh-internal-default-key-2026"))
+                proc = subprocess.Popen(
+                    [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port)],
+                    cwd=svc_dir,
+                    env=env,
+                )
+                child_procs.append(proc)
+                print(f"[Gateway] Started local {folder} microservice on 127.0.0.1:{port}", flush=True)
+            except Exception as e:
+                print(f"[Gateway] Note: could not auto-start local {folder}: {e}", flush=True)
     try:
         yield
     finally:
-        if picking_proc and picking_proc.poll() is None:
-            picking_proc.terminate()
+        for proc in child_procs:
+            if proc.poll() is None:
+                proc.terminate()
 
 
 app = FastAPI(
@@ -1854,15 +1864,137 @@ def internal_pick(
     }
 
 
+@app.get("/api/internal/catalog")
+def internal_catalog(
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_internal_service),
+):
+    """Export live inventory styles, colors, sizes, and pcs_per_box for training vision-llm-service."""
+    from collections import Counter
+    rows = db.query(
+        InventoryItem.style,
+        InventoryItem.brand,
+        InventoryItem.color,
+        InventoryItem.size,
+        InventoryItem.pcs_per_box,
+        InventoryItem.quantity,
+    ).all()
+
+    styles_map: dict = {}
+    colors_cnt: Counter = Counter()
+    sizes_cnt: Counter = Counter()
+    pcs_cnt: Counter = Counter()
+    qty_cnt: Counter = Counter()
+
+    for style, brand, color, size, pcs_per_box, qty in rows:
+        st = (style or "").strip().upper()
+        if not st:
+            continue
+        rec = styles_map.setdefault(st, {
+            "style": st,
+            "brand": (brand or "ALLBIRDS").upper(),
+            "colors": set(),
+            "sizes": set(),
+            "pcs_per_box": set(),
+        })
+        col = (color or "").strip().upper()
+        if col and col != "STANDARD":
+            rec["colors"].add(col)
+            colors_cnt[col] += 1
+        sz = (size or "").strip().upper()
+        if sz:
+            rec["sizes"].add(sz)
+            sizes_cnt[sz] += 1
+        if pcs_per_box and pcs_per_box > 0:
+            rec["pcs_per_box"].add(int(pcs_per_box))
+            pcs_cnt[int(pcs_per_box)] += 1
+        if qty and qty > 0:
+            qty_cnt[int(qty)] += 1
+
+    return {
+        "styles": [
+            {
+                "style": v["style"],
+                "brand": v["brand"],
+                "colors": sorted(v["colors"]),
+                "sizes": sorted(v["sizes"]),
+                "pcs_per_box": sorted(v["pcs_per_box"]),
+            }
+            for v in sorted(styles_map.values(), key=lambda x: x["style"])
+        ],
+        "colors": [k for k, _ in colors_cnt.most_common()],
+        "sizes": [k for k, _ in sizes_cnt.most_common()],
+        "common_pcs_per_box": [k for k, _ in pcs_cnt.most_common(30)],
+        "common_quantities": [k for k, _ in qty_cnt.most_common(40)],
+    }
+
+
+@app.get("/api/internal/styles/lookup")
+def internal_style_lookup(
+    style: str = Query(...),
+    color: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_internal_service),
+):
+    """Return live rack locations and quantities for a scanned style (used by vision-llm-service)."""
+    q = db.query(InventoryItem).filter(func.upper(InventoryItem.style) == style.strip().upper())
+    items = q.order_by(InventoryItem.quantity.desc(), InventoryItem.location.asc()).limit(40).all()
+    if color:
+        cu = color.strip().upper()
+        colored = [i for i in items if (i.color or "").upper() == cu]
+        if colored:
+            items = colored
+    return {
+        "style": style.strip().upper(),
+        "items": [
+            {
+                "id": i.id,
+                "style": i.style,
+                "brand": i.brand,
+                "color": i.color,
+                "size": i.size,
+                "quantity": i.quantity,
+                "location": i.location,
+            }
+            for i in items
+        ],
+    }
+
+
 # ======================================================================================
-# API GATEWAY: forward /pick/* to the picking-service microservice.
-# Keeps one public domain (shared login cookie) while the feature runs as its own service.
+# API GATEWAY: forward /pick/* -> picking-service and /scan/* -> vision-llm-service.
 # ======================================================================================
 import httpx
 
 PICKING_SERVICE_URL = os.getenv("PICKING_SERVICE_URL", "http://localhost:8001").rstrip("/")
+VISION_SERVICE_URL = os.getenv("VISION_SERVICE_URL", "http://localhost:8002").rstrip("/")
 _HOP_HEADERS = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te",
                 "trailers", "transfer-encoding", "upgrade", "host", "content-length", "content-encoding"}
+
+
+async def _proxy_to_service(request: Request, target_url: str, fallback_url: str, service_label: str):
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in _HOP_HEADERS}
+    headers["X-Forwarded-Host"] = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    headers["X-Forwarded-Proto"] = request.headers.get("x-forwarded-proto") or request.url.scheme
+    body = await request.body()
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            try:
+                upstream = await client.request(
+                    request.method, target_url, params=request.query_params,
+                    headers=headers, content=body,
+                )
+            except httpx.RequestError:
+                if target_url == fallback_url:
+                    raise
+                upstream = await client.request(
+                    request.method, fallback_url, params=request.query_params,
+                    headers=headers, content=body,
+                )
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail=f"{service_label} is unavailable. Please try again shortly.")
+    resp_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in _HOP_HEADERS}
+    return Response(content=upstream.content, status_code=upstream.status_code, headers=resp_headers)
 
 
 @app.api_route("/pick", methods=["GET", "POST"], include_in_schema=False)
@@ -1870,28 +2002,15 @@ _HOP_HEADERS = {"connection", "keep-alive", "proxy-authenticate", "proxy-authori
 async def gateway_picking_service(request: Request, path: str = ""):
     url = f"{PICKING_SERVICE_URL}/pick/{path}" if path else f"{PICKING_SERVICE_URL}/pick"
     fallback_url = f"http://127.0.0.1:8001/pick/{path}" if path else "http://127.0.0.1:8001/pick"
-    headers = {k: v for k, v in request.headers.items() if k.lower() not in _HOP_HEADERS}
-    headers["X-Forwarded-Host"] = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
-    headers["X-Forwarded-Proto"] = request.headers.get("x-forwarded-proto") or request.url.scheme
-    body = await request.body()
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            try:
-                upstream = await client.request(
-                    request.method, url, params=request.query_params,
-                    headers=headers, content=body,
-                )
-            except httpx.RequestError:
-                if url == fallback_url:
-                    raise
-                upstream = await client.request(
-                    request.method, fallback_url, params=request.query_params,
-                    headers=headers, content=body,
-                )
-    except httpx.RequestError:
-        raise HTTPException(status_code=502, detail="Picking service is unavailable. Please try again shortly.")
-    resp_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in _HOP_HEADERS}
-    return Response(content=upstream.content, status_code=upstream.status_code, headers=resp_headers)
+    return await _proxy_to_service(request, url, fallback_url, "Picking service")
+
+
+@app.api_route("/scan", methods=["GET", "POST"], include_in_schema=False)
+@app.api_route("/scan/{path:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False)
+async def gateway_vision_service(request: Request, path: str = ""):
+    url = f"{VISION_SERVICE_URL}/scan/{path}" if path else f"{VISION_SERVICE_URL}/scan"
+    fallback_url = f"http://127.0.0.1:8002/scan/{path}" if path else "http://127.0.0.1:8002/scan"
+    return await _proxy_to_service(request, url, fallback_url, "Vision SLM service")
 
 
 def _safe_next(next_url: Optional[str]) -> Optional[str]:

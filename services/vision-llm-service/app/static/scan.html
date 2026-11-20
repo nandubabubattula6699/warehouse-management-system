@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Vision SLM Photo Scanner • Alexander Warehouse OS</title>
+  <link rel="icon" href="/favicon.ico" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0b1120; color: #e2e8f0; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 16px; }
+    header { background: linear-gradient(135deg, #173456, #0f766e); border: 1px solid #38bdf8; border-radius: 18px; padding: 18px 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; box-shadow: 0 10px 28px rgba(0,0,0,.35); }
+    header .tag { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #7dd3fc; }
+    header h1 { margin: 4px 0 4px; font-size: 22px; font-weight: 900; color: #fff; }
+    header .sub { font-size: 13px; color: #cbd5e1; }
+    .hdr-btn { background: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 9px 14px; border-radius: 10px; font-size: 13px; font-weight: 800; text-decoration: none; }
+    .card { background: #131c31; border: 1px solid #26344d; border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+    .card h2 { margin: 0 0 10px; font-size: 15px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }
+    .btn-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    @media (max-width: 540px) { .btn-row { grid-template-columns: 1fr; } }
+    .big-btn { border: 0; border-radius: 14px; padding: 16px; font-size: 16px; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; transition: transform .1s; }
+    .big-btn:active { transform: scale(.98); }
+    .btn-cam { background: linear-gradient(135deg, #0284c7, #0369a1); box-shadow: 0 6px 18px rgba(2,132,199,.35); }
+    .btn-upl { background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 6px 18px rgba(5,150,105,.35); }
+    .btn-sec { background: #1e293b; border: 1px solid #475569; color: #e2e8f0; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 800; cursor: pointer; }
+    .btn-sec:hover { background: #334155; }
+    .preview-wrap { margin-top: 14px; display: none; text-align: center; }
+    .preview-wrap img { max-width: 100%; max-height: 280px; border-radius: 12px; border: 2px solid #334155; }
+    .status-bar { margin-top: 12px; padding: 12px 14px; border-radius: 12px; font-size: 14px; font-weight: 700; display: none; }
+    .status-bar.loading { display: block; background: #1e3a8a; border: 1px solid #38bdf8; color: #e0f2fe; }
+    .status-bar.ok { display: block; background: #14532d; border: 1px solid #22c55e; color: #dcfce7; }
+    .status-bar.err { display: block; background: #7f1d1d; border: 1px solid #ef4444; color: #fee2e2; }
+    .fields-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .f-box { background: #0b1120; border: 1.5px solid #334155; border-radius: 14px; padding: 14px; }
+    .f-box .lbl { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; }
+    .f-box .val { font-size: 22px; font-weight: 900; color: #fff; margin: 6px 0 4px; word-break: break-word; }
+    .f-box .meta { font-size: 11px; color: #7dd3fc; font-weight: 700; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; text-transform: uppercase; margin-right: 4px; }
+    .b-ok { background: #14532d; color: #86efac; border: 1px solid #22c55e; }
+    .b-brand { background: #1e3a8a; color: #93c5fd; border: 1px solid #3b82f6; }
+    .raw-box { background: #0b1120; border: 1px solid #334155; border-radius: 12px; padding: 12px; font-family: ui-monospace, monospace; font-size: 13px; white-space: pre-wrap; color: #cbd5e1; max-height: 220px; overflow-y: auto; }
+    .line-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+    .line-item { display: flex; justify-content: space-between; gap: 10px; background: #0b1120; border: 1px solid #1e293b; padding: 8px 12px; border-radius: 10px; font-size: 13px; }
+    .line-item .conf { font-family: ui-monospace, monospace; font-size: 11px; color: #38bdf8; font-weight: 800; white-space: nowrap; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #26344d; }
+    th { font-size: 11px; text-transform: uppercase; color: #94a3b8; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
+    .form-grid label { display: block; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
+    .form-grid input { width: 100%; background: #0b1120; border: 1.5px solid #475569; border-radius: 10px; padding: 9px 10px; color: #fff; font-size: 14px; font-weight: 700; text-transform: uppercase; }
+    textarea { width: 100%; background: #0b1120; border: 1.5px solid #475569; border-radius: 10px; padding: 10px; color: #fff; font-family: ui-monospace, monospace; font-size: 13px; }
+    .stat-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .pill { background: #0b1120; border: 1px solid #334155; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 700; }
+    .pill b { color: #38bdf8; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="tag">Self-Hosted Microservice • RapidOCR + Trained Warehouse SLM</div>
+      <h1>Warehouse Photo &amp; Label Reader</h1>
+      <div class="sub">Snap or upload any box label or sticker to read Style, Color, Qty/Pieces, Size &amp; all Text.</div>
+    </div>
+    <a href="/" class="hdr-btn">← Dashboard</a>
+  </header>
+
+  <div class="card">
+    <h2>1 · Scan or Upload Box / Label Image</h2>
+    <input type="file" id="camInput" accept="image/*" capture="environment" class="hidden" />
+    <input type="file" id="fileInput" accept="image/*" class="hidden" />
+    <div class="btn-row">
+      <button type="button" class="big-btn btn-cam" onclick="document.getElementById('camInput').click()">
+        📷 Take Photo (Camera)
+      </button>
+      <button type="button" class="big-btn btn-upl" onclick="document.getElementById('fileInput').click()">
+        📁 Upload Image File
+      </button>
+    </div>
+
+    <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+      <button type="button" class="btn-sec" onclick="toggleTextTester()">⌨️ Test Raw Label Text</button>
+      <button type="button" class="btn-sec" onclick="runSampleTest()">🧪 Try Sample Box Label</button>
+    </div>
+
+    <div id="textTester" class="hidden" style="margin-top:12px;">
+      <textarea id="rawTextInput" rows="4" placeholder="Paste box label text here...&#10;STYLE: A12501&#10;COLOR: NATURAL WHITE&#10;SIZE: 10.5&#10;QTY: 15 PCS"></textarea>
+      <button type="button" class="btn-sec" style="margin-top:8px; background:#0284c7; border-color:#38bdf8; color:#fff;" onclick="analyzeRawText()">Analyze Text with Warehouse SLM</button>
+    </div>
+
+    <div class="preview-wrap" id="previewWrap">
+      <img id="previewImg" alt="Uploaded label preview" />
+    </div>
+    <div id="statusBar" class="status-bar"></div>
+  </div>
+
+  <div id="resultsWrap" class="hidden">
+    <div class="card">
+      <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
+        <h2 style="margin:0;">2 · Extracted Product Details</h2>
+        <div id="resultMeta" style="font-size:12px; color:#94a3b8; font-weight:700;"></div>
+      </div>
+
+      <div class="fields-grid">
+        <div class="f-box">
+          <div class="lbl">Style / SKU</div>
+          <div class="val" id="outStyle">—</div>
+          <div class="meta" id="outStyleMeta"></div>
+        </div>
+        <div class="f-box">
+          <div class="lbl">Color</div>
+          <div class="val" id="outColor">—</div>
+          <div class="meta" id="outColorMeta"></div>
+        </div>
+        <div class="f-box">
+          <div class="lbl">Qty / Pieces</div>
+          <div class="val" id="outQty">—</div>
+          <div class="meta" id="outQtyMeta"></div>
+        </div>
+        <div class="f-box">
+          <div class="lbl">Size</div>
+          <div class="val" id="outSize">—</div>
+          <div class="meta" id="outBrandMeta"></div>
+        </div>
+      </div>
+
+      <div id="locationsBox" class="hidden" style="margin-top:10px;">
+        <h2>Live Warehouse Stock Locations for <span id="locStyleLbl"></span></h2>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Location</th><th>Color</th><th>Size</th><th>Qty</th></tr></thead>
+            <tbody id="locationsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h2 style="margin:0;">3 · Full Text Read from Image</h2>
+        <button type="button" class="btn-sec" onclick="copyRawText()">📋 Copy Text</button>
+      </div>
+      <div class="raw-box" id="outRawText"></div>
+      <div class="line-list" id="outLines"></div>
+    </div>
+
+    <div class="card">
+      <h2>4 · Teach / Correct Model (Active Learning)</h2>
+      <div style="font-size:13px; color:#94a3b8;">If any field needs correction, update it below and click Save to teach the Small LM from this real label.</div>
+      <div class="form-grid">
+        <div><label>Style</label><input id="fbStyle" type="text" /></div>
+        <div><label>Color</label><input id="fbColor" type="text" /></div>
+        <div><label>Qty / Pcs</label><input id="fbQty" type="number" /></div>
+        <div><label>Pcs / Box</label><input id="fbPcsBox" type="number" /></div>
+        <div><label>Size</label><input id="fbSize" type="text" /></div>
+      </div>
+      <div style="margin-top:12px;">
+        <button type="button" class="btn-sec" style="background:#16a34a; border-color:#22c55e; color:#fff;" onclick="submitFeedback()">💾 Save Correction &amp; Retrain Model</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px;">
+      <h2 style="margin:0;">Trained Small Language Model Status</h2>
+      <button type="button" id="retrainBtn" class="btn-sec" onclick="retrainModel()">🔄 Retrain on Live Warehouse Data</button>
+    </div>
+    <div id="modelStats" class="stat-pills">Loading model stats…</div>
+  </div>
+</div>
+
+<script>
+  let lastResult = null;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function setStatus(msg, cls) {
+    const el = $("statusBar");
+    el.className = "status-bar " + cls;
+    el.textContent = msg;
+  }
+
+  function toggleTextTester() {
+    $("textTester").classList.toggle("hidden");
+  }
+
+  async function handleFileSelect(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      $("previewImg").src = e.target.result;
+      $("previewWrap").style.display = "block";
+    };
+    reader.readAsDataURL(file);
+
+    setStatus("Reading image text with RapidOCR & Warehouse Small LM…", "loading");
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch("/scan/api/analyze", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to analyze image.");
+      renderResult(data);
+      setStatus(`✔ Read ${data.lines.length} text lines in ${data.latency_ms} ms (${data.ocr_pass})`, "ok");
+    } catch (err) {
+      setStatus("Error: " + err.message, "err");
+    } finally {
+      input.value = "";
+    }
+  }
+
+  $("camInput").addEventListener("change", (e) => handleFileSelect(e.target));
+  $("fileInput").addEventListener("change", (e) => handleFileSelect(e.target));
+
+  async function analyzeRawText() {
+    const raw_text = $("rawTextInput").value.trim();
+    if (!raw_text) return;
+    setStatus("Running trained Warehouse Small LM…", "loading");
+    try {
+      const res = await fetch("/scan/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raw_text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to analyze text.");
+      renderResult(data);
+      setStatus(`✔ Extracted fields in ${data.latency_ms} ms`, "ok");
+    } catch (err) {
+      setStatus("Error: " + err.message, "err");
+    }
+  }
+
+  function runSampleTest() {
+    $("textTester").classList.remove("hidden");
+    $("rawTextInput").value = "ALLBIRDS\nSTYLE: A12501\nCOLOR: NATURAL WHITE\nSIZE: US 10.5\nQTY: 15 PCS\nPCS/BOX: 15\nLINE 1  SEC 40  LVL 4";
+    analyzeRawText();
+  }
+
+  function renderResult(d) {
+    lastResult = d;
+    $("resultsWrap").classList.remove("hidden");
+    $("resultMeta").textContent = `${d.latency_ms} ms • OCR conf ${Math.round((d.avg_ocr_confidence || 0) * 100)}%`;
+
+    $("outStyle").textContent = d.style || "Not detected";
+    $("outStyleMeta").innerHTML =
+      `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">` +
+      (d.brand ? `<span class="badge b-brand">${esc(d.brand)}</span>` : "") +
+      (d.catalog_verified ? `<span class="badge b-ok">✓ Warehouse Match</span>` : "") +
+      `</div><div>Conf: ${Math.round((d.style_confidence || 0) * 100)}%</div>`;
+
+    $("outColor").textContent = d.color || "Not detected";
+    $("outColorMeta").textContent = d.color ? `Conf: ${Math.round((d.color_confidence || 0) * 100)}%` : "";
+
+    $("outQty").textContent = d.quantity != null ? `${d.quantity} pcs` : "Not detected";
+    $("outQtyMeta").textContent = [
+      d.pcs_per_box != null ? `Pcs/Box: ${d.pcs_per_box}` : null,
+      d.quantity != null ? `Conf: ${Math.round((d.quantity_confidence || 0) * 100)}%` : null,
+    ].filter(Boolean).join(" • ");
+
+    $("outSize").textContent = d.size || "—";
+    $("outBrandMeta").textContent = d.brand ? `Zone: ${d.brand === "ALLBIRDS" ? "Part 1 (Lines)" : "Part 2 (Rows)"}` : "";
+
+    $("outRawText").textContent = d.raw_text || "(No text detected in image)";
+    $("outLines").innerHTML = (d.lines || []).map((ln) =>
+      `<div class="line-item"><span>${esc(ln.text)}</span><span class="conf">${Math.round((ln.confidence || 0) * 100)}%</span></div>`
+    ).join("");
+
+    // Pre-fill feedback editor
+    $("fbStyle").value = d.style || "";
+    $("fbColor").value = d.color || "";
+    $("fbQty").value = d.quantity != null ? d.quantity : "";
+    $("fbPcsBox").value = d.pcs_per_box != null ? d.pcs_per_box : "";
+    $("fbSize").value = d.size || "";
+
+    // Warehouse locations
+    const locs = d.warehouse_locations || [];
+    $("locationsBox").classList.toggle("hidden", locs.length === 0);
+    $("locStyleLbl").textContent = d.style || "";
+    $("locationsBody").innerHTML = locs.map((loc) =>
+      `<tr><td><b>${esc(loc.location)}</b></td><td>${esc(loc.color)}</td><td>${esc(loc.size)}</td><td><b>${loc.quantity}</b> pcs</td></tr>`
+    ).join("");
+  }
+
+  function copyRawText() {
+    if (!lastResult || !lastResult.raw_text) return;
+    navigator.clipboard?.writeText(lastResult.raw_text);
+    setStatus("✔ Copied extracted text to clipboard.", "ok");
+  }
+
+  async function submitFeedback() {
+    if (!lastResult || !lastResult.raw_text) return;
+    setStatus("Saving correction and retraining Warehouse Small LM…", "loading");
+    const body = {
+      raw_text: lastResult.raw_text,
+      style: $("fbStyle").value.trim() || null,
+      color: $("fbColor").value.trim() || null,
+      quantity: $("fbQty").value ? parseInt($("fbQty").value, 10) : null,
+      pcs_per_box: $("fbPcsBox").value ? parseInt($("fbPcsBox").value, 10) : null,
+      size: $("fbSize").value.trim() || null,
+      retrain_now: true,
+    };
+    try {
+      const res = await fetch("/scan/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to save feedback.");
+      await loadModelInfo();
+      setStatus(`✔ Saved correction (${data.feedback_samples_saved} total) and retrained Small LM!`, "ok");
+    } catch (err) {
+      setStatus("Feedback error: " + err.message, "err");
+    }
+  }
+
+  async function retrainModel() {
+    const btn = $("retrainBtn");
+    btn.disabled = true;
+    btn.textContent = "⏳ Retraining…";
+    try {
+      const res = await fetch("/scan/api/train", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Retrain failed.");
+      await loadModelInfo();
+      setStatus(`✔ Model retrained on ${data.report.catalog_styles_count} styles in ${data.report.training_seconds}s!`, "ok");
+    } catch (err) {
+      setStatus("Retrain error: " + err.message, "err");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "🔄 Retrain on Live Warehouse Data";
+    }
+  }
+
+  async function loadModelInfo() {
+    try {
+      const res = await fetch("/scan/api/model-info");
+      const m = await res.json();
+      const acc = m.e2e_field_accuracy || {};
+      $("modelStats").innerHTML = `
+        <div class="pill">Styles Learned: <b>${m.catalog_styles_count || 0}</b></div>
+        <div class="pill">Colors Learned: <b>${m.catalog_colors_count || 0}</b></div>
+        <div class="pill">Sizes Learned: <b>${m.catalog_sizes_count || 0}</b></div>
+        <div class="pill">Train Docs: <b>${m.train_documents || 0}</b></div>
+        <div class="pill">Token Val Acc: <b>${Math.round((m.token_validation_accuracy || 0) * 1000) / 10}%</b></div>
+        <div class="pill">Style Acc: <b>${Math.round((acc.style || 0) * 100)}%</b></div>
+        <div class="pill">Color Acc: <b>${Math.round((acc.color || 0) * 100)}%</b></div>
+        <div class="pill">Qty Acc: <b>${Math.round((acc.quantity || 0) * 100)}%</b></div>
+        <div class="pill">Feedback Saved: <b>${m.feedback_samples_saved || 0}</b></div>
+      `;
+    } catch (_) {}
+  }
+
+  loadModelInfo();
+</script>
+</body>
+</html>
