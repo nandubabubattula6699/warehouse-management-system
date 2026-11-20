@@ -985,6 +985,16 @@ async function deleteLocationRecord(itemId) {
     if (!res.ok) {
       let detail = "Error deleting item";
       try { detail = (await res.json()).detail || detail; } catch (e) { /* non-JSON */ }
+      if (res.status === 409 && confirm(`${detail}\n\nDeactivate this row now instead?`)) {
+        const d = await fetch(`/api/items/${itemId}/deactivate`, { method: "POST" });
+        let dd = {};
+        try { dd = await d.json(); } catch (e) { /* non-JSON */ }
+        if (!d.ok) { showToast(dd.detail || "Deactivate failed", "error"); return; }
+        showToast("Row deactivated (hidden, history kept)", "success");
+        loadBatchStylesDetails(); autoSwitchToMobileLocations();
+        loadStats();
+        return;
+      }
       showToast(detail, "error");
       return;
     }
