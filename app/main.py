@@ -404,11 +404,38 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
 
     return new_item
 
+def _movement_counts(db: Session, item_ids: List[int]) -> dict:
+    """{item_id: number of stock_movements rows} for the given items (only items that have history)."""
+    if not item_ids:
+        return {}
+    db.flush()  # include movements added earlier in the same request (e.g. sheet IN then DELETE)
+    rows = (
+        db.query(StockMovement.item_id, func.count(StockMovement.id))
+        .filter(StockMovement.item_id.in_(item_ids))
+        .group_by(StockMovement.item_id)
+        .all()
+    )
+    return {item_id: int(n) for item_id, n in rows}
+
+
+def _history_block_message(label: str, n: int) -> str:
+    return (
+        f"{label} has {n} stock-movement history record(s) and cannot be deleted "
+        f"(deleting it would erase its audit history). Set its quantity to 0 instead."
+    )
+
+
 @app.delete("/api/items/{item_id}", dependencies=SUPERVISOR_ONLY)
 def delete_item(item_id: int, db: Session = Depends(get_db)):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+    history = _movement_counts(db, [item.id]).get(item.id, 0)
+    if history:
+        raise HTTPException(
+            status_code=409,
+            detail=_history_block_message(f"{item.style} at {item.location}", history),
+        )
     db.delete(item)
     db.commit()
     return {"message": f"Item {item.style} at location {item.location} deleted."}
@@ -545,6 +572,13 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                     raise HTTPException(
                         status_code=400,
                         detail=f"Row #{idx} ({style} at {loc_str}): Location not found to delete."
+                    )
+                history = _movement_counts(db, [target.id]).get(target.id, 0)
+                if history:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Row #{idx}: " + _history_block_message(f"{style} at {target.location}", history)
+                        + " Sheet not saved.",
                     )
                 db.delete(target)
                 deleted_count += 1
@@ -775,6 +809,24 @@ def bulk_delete_items(payload: BulkDeletePayload, db: Session = Depends(get_db))
     """Delete multiple selected location records at once."""
     if not payload.item_ids:
         raise HTTPException(status_code=400, detail="No item IDs selected.")
+    with_history = _movement_counts(db, payload.item_ids)
+    if with_history:
+        blocked = (
+            db.query(InventoryItem.id, InventoryItem.style, InventoryItem.location)
+            .filter(InventoryItem.id.in_(list(with_history.keys())))
+            .order_by(InventoryItem.style.asc())
+            .all()
+        )
+        examples = "; ".join(f"{s} at {loc}" for _, s, loc in blocked[:5])
+        more = f" and {len(blocked) - 5} more" if len(blocked) > 5 else ""
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Nothing was deleted: {len(blocked)} of the selected rows have stock-movement history "
+                f"({examples}{more}). Rows with history cannot be deleted — set their quantity to 0 instead, "
+                f"or unselect them."
+            ),
+        )
     deleted = db.query(InventoryItem).filter(InventoryItem.id.in_(payload.item_ids)).delete(synchronize_session=False)
     db.commit()
     return {"status": "ok", "deleted_count": deleted}

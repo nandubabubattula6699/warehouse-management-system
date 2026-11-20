@@ -517,7 +517,12 @@ async function deleteSingleExistingRow(itemId) {
   if (!confirm("Delete this location record from PostgreSQL?")) return;
   try {
     const res = await fetch(`/api/items/${itemId}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Failed");
+    if (!res.ok) {
+      let detail = "Delete failed";
+      try { detail = (await res.json()).detail || detail; } catch (e) { /* non-JSON */ }
+      showToast(detail, "error");
+      return;
+    }
     showToast("Location deleted", "success");
     searchExistingLocations();
   } catch (err) {

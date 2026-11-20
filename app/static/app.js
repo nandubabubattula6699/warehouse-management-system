@@ -982,7 +982,12 @@ async function deleteLocationRecord(itemId) {
 
   try {
     const res = await fetch(`/api/items/${itemId}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Delete failed");
+    if (!res.ok) {
+      let detail = "Error deleting item";
+      try { detail = (await res.json()).detail || detail; } catch (e) { /* non-JSON */ }
+      showToast(detail, "error");
+      return;
+    }
     showToast("Location record deleted", "success");
     loadBatchStylesDetails(); autoSwitchToMobileLocations();
     loadStats();
