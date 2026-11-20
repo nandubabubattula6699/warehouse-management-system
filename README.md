@@ -19,11 +19,14 @@ Copy `.env.example` to `.env` and set `DATABASE_URL` (the app refuses to start w
 DATABASE_URL=postgresql://postgres:your_actual_password_here@localhost:5432/warehouse_db
 ```
 
-Test your database connection:
+Create / update the tables with Alembic (the app itself never creates or alters tables, and refuses
+to start if the database is not at the latest migration):
 ```bash
+alembic upgrade head
 python scripts/test_db_connection.py
 ```
-*(The script creates the tables if they are missing. The app never loads or changes inventory on startup.)*
+*(An existing database created before Alembic must be checked and stamped once instead:
+see `docs/DEPLOY_1B.md`. The app never loads or changes inventory on startup.)*
 
 ### 3. Start the Warehouse Server
 ```bash
@@ -42,6 +45,24 @@ Open your browser at: http://localhost:8000
 python scripts/migrate_inventory.py --i-understand-this-deletes-all-inventory
 ```
 For day-to-day changes use the CSV upload on the `/manage` page instead.
+
+---
+
+## Development
+
+```bash
+pip install -r requirements-dev.txt
+ruff check .
+python -m pytest                                   # main app (local PostgreSQL, DB names *_test only)
+cd services/picking-service && python -m pytest    # picking-service
+```
+Schema changes: edit `app/models.py`, then `alembic revision --autogenerate -m "..."`, review the
+generated file (and write its `downgrade`), and run `alembic upgrade head`. CI (`.github/workflows/ci.yml`)
+runs ruff, a migration up/down round trip, `alembic check` and both test suites on every pull request.
+
+Inventory rows that have stock history are never deleted: bring them to 0 and **Deactivate** them
+(Manage page, or the prompt after a blocked delete). Deactivated rows are hidden from every stock view
+and can be found with "Show deactivated rows" and reactivated.
 
 ---
 
