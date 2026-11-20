@@ -11,6 +11,8 @@ def _headers() -> dict:
 
 def fetch_live_catalog_sync(timeout: float = 10.0) -> Optional[dict]:
     """Fetch live warehouse catalog (styles, colors, sizes, pcs_per_box) synchronously."""
+    if not INTERNAL_API_KEY:
+        return None
     try:
         with httpx.Client(timeout=timeout) as client:
             resp = client.get(f"{INVENTORY_SERVICE_URL}/api/internal/catalog", headers=_headers())
@@ -23,7 +25,7 @@ def fetch_live_catalog_sync(timeout: float = 10.0) -> Optional[dict]:
 
 async def lookup_style_locations(style: str, color: Optional[str] = None) -> List[dict]:
     """Look up live warehouse rack locations and stock for a scanned style."""
-    if not style:
+    if not style or not INTERNAL_API_KEY:
         return []
     params = {"style": style}
     if color:

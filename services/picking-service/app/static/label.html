@@ -64,7 +64,7 @@
   </div>
 <script>
   const code = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop());
-  fetch(`/pick/api/s/${encodeURIComponent(code)}`, { credentials: "same-origin" })
+  fetch(`/pick/api/stations/${encodeURIComponent(code)}`, { credentials: "same-origin" })
     .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
     .then(({ ok, d }) => {
       if (!ok) {

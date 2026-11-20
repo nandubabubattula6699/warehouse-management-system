@@ -10,7 +10,41 @@ load_dotenv()
 INVENTORY_SERVICE_URL = os.getenv("INVENTORY_SERVICE_URL", "http://localhost:8000").rstrip("/")
 
 # Shared secret for service-to-service calls (must match INTERNAL_API_KEY on the inventory service).
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "wh-internal-default-key-2026")
+# Required — there is deliberately no default value.
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "").strip()
+if not INTERNAL_API_KEY:
+    raise RuntimeError("INTERNAL_API_KEY is not set. It must match INTERNAL_API_KEY on the inventory service.")
+
+# Per-device tokens for QR picking phones/scanners.
+# Format: PICK_DEVICE_TOKENS="scanner-1:<long random token>,scanner-2:<long random token>"
+# Generate a token with:  python -c "import secrets; print(secrets.token_urlsafe(24))"
+MIN_DEVICE_TOKEN_LENGTH = 24
+
+
+def _parse_device_tokens(raw: str) -> "dict[str, str]":
+    """Return {token: device_name}. Raises RuntimeError on bad config (never echoes token values)."""
+    tokens: "dict[str, str]" = {}
+    for i, entry in enumerate([e.strip() for e in (raw or "").split(",") if e.strip()], start=1):
+        name, sep, token = entry.partition(":")
+        name, token = name.strip(), token.strip()
+        if not sep or not name or not token:
+            raise RuntimeError(f"PICK_DEVICE_TOKENS entry #{i} must look like 'device-name:token'.")
+        if len(token) < MIN_DEVICE_TOKEN_LENGTH:
+            raise RuntimeError(
+                f"PICK_DEVICE_TOKENS token for '{name}' is too short (min {MIN_DEVICE_TOKEN_LENGTH} characters)."
+            )
+        if token in tokens:
+            raise RuntimeError(f"PICK_DEVICE_TOKENS: device '{name}' reuses another device's token.")
+        tokens[token] = name[:40]
+    if not tokens:
+        raise RuntimeError(
+            "PICK_DEVICE_TOKENS is not set. QR picking requires at least one registered device "
+            "token, e.g. PICK_DEVICE_TOKENS='scanner-1:<random token>'."
+        )
+    return tokens
+
+
+PICK_DEVICE_TOKENS = _parse_device_tokens(os.getenv("PICK_DEVICE_TOKENS", ""))
 
 # Public URL encoded into QR codes. If empty, it is derived from the gateway's forwarded headers.
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")

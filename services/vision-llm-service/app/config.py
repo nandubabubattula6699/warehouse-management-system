@@ -15,5 +15,6 @@ REPORT_PATH = os.path.join(MODELS_DIR, "training_report.json")
 
 # Inventory service (main Warehouse OS app). Owns live Postgres inventory.
 INVENTORY_SERVICE_URL = os.getenv("INVENTORY_SERVICE_URL", "http://localhost:8000").rstrip("/")
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "wh-internal-default-key-2026")
+# No default. Without it, live catalog/location lookups are skipped (the bundled catalog is used).
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "").strip()
 MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(12 * 1024 * 1024)))

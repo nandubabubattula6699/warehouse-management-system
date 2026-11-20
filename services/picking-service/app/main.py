@@ -2,24 +2,30 @@
 Picking Service (microservice)
 ------------------------------
 QR-code based floor picking for all 14 Allbirds Lines and all 501 Sections.
-No login required: any floor staff can scan the 4x6 Zebra QR code pasted on a rack section,
-enter or tap the style, choose the level (1..4), and tap SAVE. The pick is sent to the
-Inventory service, which deducts stock and records an audit movement.
+No user login: floor staff scan the 4x6 Zebra QR code pasted on a rack section, enter or tap
+the style, choose the level (1..4), and tap SAVE. The phone/scanner must be a REGISTERED DEVICE:
+it sends its device token (X-Device-Token header, from PICK_DEVICE_TOKENS) with every stock
+lookup and pick. The pick is sent to the Inventory service, which deducts stock and records an
+audit movement that includes the device name.
+
+Label pages, QR images and label PDFs stay public (they contain no stock data).
 
 All routes live under /pick so the service works identically directly or behind the gateway.
 """
+import hmac
 import io
 import os
 from typing import Optional
 
 import segno
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response, JSONResponse
 from pydantic import BaseModel, Field
 
 from app import inventory_client
 from app.config import (
     PICK_STATIONS,
+    PICK_DEVICE_TOKENS,
     LINE_SECTION_COUNTS,
     PUBLIC_BASE_URL,
     MAX_PICK_QUANTITY,
@@ -58,13 +64,29 @@ def _scan_url(request: Request, code: str) -> str:
     return f"{_public_base(request)}/pick/s/{code}"
 
 
+DEVICE_TOKEN_HEADER = "X-Device-Token"
+
+
+def require_device(request: Request) -> str:
+    """Return the registered device name for the X-Device-Token header, or 401."""
+    supplied = (request.headers.get(DEVICE_TOKEN_HEADER) or "").strip()
+    if supplied:
+        for token, device_name in PICK_DEVICE_TOKENS.items():
+            if hmac.compare_digest(supplied.encode(), token.encode()):
+                return device_name
+    raise HTTPException(
+        status_code=401,
+        detail="This device is not registered for QR picking. Ask a supervisor for the device token.",
+    )
+
+
 # ----------------------------------------------------------------------------- health
 @app.get("/pick/health")
 async def health():
     return {
         "status": "ok",
         "service": "picking-service",
-        "auth_required": False,
+        "auth_required": "device_token",
         "total_lines": len(LINE_SECTION_COUNTS),
         "total_stations": len(PICK_STATIONS),
     }
@@ -178,8 +200,15 @@ async def list_all_stations(request: Request):
     }
 
 
+@app.get("/pick/api/stations/{code}")
+async def station_label_info(code: str, request: Request):
+    """Public station details for printable labels (no stock data)."""
+    station = _station(code)
+    return {"station": station, "scan_url": _scan_url(request, station["code"])}
+
+
 @app.get("/pick/api/s/{code}")
-async def station_info(code: str, request: Request):
+async def station_info(code: str, request: Request, device: str = Depends(require_device)):
     station = _station(code)
     try:
         items = await inventory_client.get_section_stock(
@@ -191,6 +220,7 @@ async def station_info(code: str, request: Request):
     return {
         "station": station,
         "scan_url": _scan_url(request, station["code"]),
+        "device": device,
         "items": items,
     }
 
@@ -204,7 +234,7 @@ class PickRequest(BaseModel):
 
 
 @app.post("/pick/api/s/{code}/picks")
-async def create_pick(code: str, body: PickRequest):
+async def create_pick(code: str, body: PickRequest, device: str = Depends(require_device)):
     station = _station(code)
 
     level = body.level.strip()
@@ -213,7 +243,9 @@ async def create_pick(code: str, body: PickRequest):
     if body.quantity > MAX_PICK_QUANTITY:
         raise HTTPException(status_code=400, detail=f"Quantity cannot exceed {MAX_PICK_QUANTITY}.")
 
-    staff = (body.staff_name or "").strip() or "Floor Staff (QR Scan)"
+    # Audit name always carries the registered device, e.g. "Floor Staff (QR Scan) [scanner-1]".
+    typed = (body.staff_name or "").strip()[:55] or "Floor Staff (QR Scan)"
+    staff = f"{typed} [{device}]"
 
     try:
         result = await inventory_client.pick({

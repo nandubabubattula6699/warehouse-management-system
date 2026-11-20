@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
             try:
                 env = os.environ.copy()
                 env.setdefault("INVENTORY_SERVICE_URL", f"http://127.0.0.1:{main_port}")
-                env.setdefault("INTERNAL_API_KEY", os.getenv("INTERNAL_API_KEY", "wh-internal-default-key-2026"))
+                # INTERNAL_API_KEY / PICK_DEVICE_TOKENS are inherited from this process's env; no defaults.
                 proc = subprocess.Popen(
                     [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port)],
                     cwd=svc_dir,
@@ -1735,7 +1735,10 @@ def delete_inbound_shipment(shipment_id: int, db: Session = Depends(get_db)):
 import hmac as _hmac
 from app.location_engine import _norm_coord
 
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "wh-internal-default-key-2026")
+# No default: if INTERNAL_API_KEY is unset, every /api/internal/* call is refused (503).
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "").strip()
+if not INTERNAL_API_KEY:
+    print("[Internal API] WARNING: INTERNAL_API_KEY is not set — QR picking and vision lookups are disabled.", flush=True)
 
 
 def require_internal_service(request: Request):

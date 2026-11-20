@@ -46,10 +46,18 @@
   <header>
     <div class="tag" id="stationCodeTag">QR Pick Station</div>
     <h1 id="stationLabel">Loading…</h1>
-    <div class="who">Instant Floor Scan • No Login Needed</div>
+    <div class="who" id="deviceLine">Instant Floor Scan • Registered devices only</div>
   </header>
 
   <div id="alert" class="alert"></div>
+
+  <form id="deviceForm" class="card hidden" autocomplete="off">
+    <label class="step" for="deviceToken">Register this device</label>
+    <div class="hint" style="margin:0 0 10px">This phone/scanner is not registered for QR picking yet. Enter the device token from your supervisor (only needed once per device).</div>
+    <input type="password" id="deviceToken" placeholder="Device token" required
+      style="width:100%;font-size:18px;padding:14px;border-radius:12px;border:2px solid #475569;background:#0f172a;color:#fff;margin-bottom:10px" />
+    <button type="submit" id="deviceSaveBtn" style="width:100%;padding:16px;font-size:18px;font-weight:900;border:0;border-radius:14px;background:#2563eb;color:#fff;cursor:pointer">SAVE DEVICE TOKEN</button>
+  </form>
 
   <form id="pickForm" autocomplete="off">
     <div class="card">
@@ -92,6 +100,44 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+  // ---- Registered-device token (stored on this phone only; sent as X-Device-Token) ----
+  const TOKEN_KEY = "wh_pick_device_token";
+  let memoryToken = "";
+  function getDeviceToken() {
+    try { return localStorage.getItem(TOKEN_KEY) || memoryToken; } catch (e) { return memoryToken; }
+  }
+  function setDeviceToken(t) {
+    memoryToken = t || "";
+    try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch (e) { /* private mode */ }
+  }
+  function deviceHeaders(extra) {
+    return Object.assign({ "X-Device-Token": getDeviceToken() }, extra || {});
+  }
+  // Optional one-time setup link: /pick/s/<code>#device_token=<token> (fragment is never sent to the server)
+  (function readTokenFromLink() {
+    const m = location.hash.match(/device_token=([^&]+)/);
+    if (m) {
+      setDeviceToken(decodeURIComponent(m[1]));
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+  })();
+  function showDeviceSetup(message) {
+    $("pickForm").classList.add("hidden");
+    $("deviceForm").classList.remove("hidden");
+    if (message) showAlert(esc(message), false);
+  }
+  $("deviceForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const t = $("deviceToken").value.trim();
+    if (!t) return;
+    setDeviceToken(t);
+    $("deviceToken").value = "";
+    $("deviceForm").classList.add("hidden");
+    $("pickForm").classList.remove("hidden");
+    clearAlert();
+    load();
+  });
+
   function showAlert(msg, ok) {
     const a = $("alert");
     a.className = "alert " + (ok ? "ok" : "err");
@@ -104,12 +150,15 @@
   const rowsFor = (style, level) => items.filter((i) => i.style.toUpperCase() === style && (level == null || String(i.level) === String(level)));
 
   async function load() {
-    const res = await fetch(api);
+    if (!getDeviceToken()) { showDeviceSetup(); return; }
+    const res = await fetch(api, { headers: deviceHeaders() });
     const data = await res.json();
+    if (res.status === 401) { setDeviceToken(""); showDeviceSetup(data.detail || "Device token not accepted."); return; }
     if (!res.ok) { showAlert(esc(data.detail || "Could not load station."), false); return; }
     station = data.station; items = data.items;
     $("stationCodeTag").textContent = `QR Pick Station • ${station.code}`;
     $("stationLabel").textContent = station.label;
+    $("deviceLine").textContent = `Instant Floor Scan • Device: ${data.device || "registered"}`;
     const styles = [...new Set(items.filter((i) => i.quantity > 0).map((i) => i.style.toUpperCase()))].sort();
     $("styleList").innerHTML = styles.map((s) => `<option value="${esc(s)}">`).join("");
     render();
@@ -199,9 +248,14 @@
     try {
       const res = await fetch(`${api}/picks`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        headers: deviceHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body),
       });
       const data = await res.json();
+      if (res.status === 401) {
+        setDeviceToken("");
+        showDeviceSetup(data.detail || "Device token not accepted. Nothing was saved.");
+        return;
+      }
       if (!res.ok) {
         const d = data.detail;
         showAlert(esc(typeof d === "object" && d ? d.message : d || "Save failed."), false);
