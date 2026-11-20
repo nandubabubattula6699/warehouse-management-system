@@ -67,7 +67,13 @@
   fetch(`/pick/api/s/${encodeURIComponent(code)}`, { credentials: "same-origin" })
     .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
     .then(({ ok, d }) => {
-      if (!ok) { document.body.innerHTML = `<p style="padding:24px;color:#fff">${d.detail || "Error"}</p>`; return; }
+      if (!ok) {
+        const p = document.createElement("p");
+        p.style.cssText = "padding:24px;color:#fff";
+        p.textContent = (typeof d.detail === "string" && d.detail) || "Error";
+        document.body.replaceChildren(p);
+        return;
+      }
       const s = d.station;
       document.getElementById("loc").textContent = `LINE ${s.line} • SEC ${s.section}`;
       document.getElementById("levels").textContent = `COVERS LEVELS ${s.levels.join(" • ")}  (PASTE ON LEVEL ${s.qr_mounted_on_level})`;

@@ -3,6 +3,19 @@
 // Compatible with both Main Dashboard (index.html) and Manager Section (manage.html)
 // =========================================================================
 
+// Safely pass a value as a JavaScript string argument inside an inline HTML event handler,
+// e.g. onclick="addStyleToSelection(${jsArg(style)})". JSON-encodes (JS string context), then
+// HTML-escapes (attribute context). escapeHtml() alone is NOT enough there because the browser
+// decodes &#039; back into a quote before running the handler. Loaded first on every page.
+function jsArg(value) {
+  return JSON.stringify(value === null || value === undefined ? "" : String(value))
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // Convert one AI-extracted line into a staging row WITHOUT inventing data.
 // Missing style/quantity/box values stay empty or 0, and the shelf location is left
 // unassigned so a person must choose it on the staging grid.
@@ -312,29 +325,29 @@ function renderStagingItemsTable() {
           class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-xs font-bold text-center uppercase text-slate-900" />
       </td>
       <td class="p-2 text-center">
-        <input type="number" min="1" value="${it.box_count || 1}" onchange="updateStagingItemBoxes(${idx}, this.value)"
+        <input type="number" min="0" value="${escapeHtml(String(it.box_count ?? ''))}" onchange="updateStagingItemBoxes(${idx}, this.value)"
           class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-xs text-center font-bold text-slate-700" />
       </td>
       <td class="p-2 text-center">
-        <input type="number" min="1" value="${it.pcs_per_box || 12}" onchange="updateStagingItemPcsBox(${idx}, this.value)"
+        <input type="number" min="1" value="${escapeHtml(String(it.pcs_per_box ?? ''))}" onchange="updateStagingItemPcsBox(${idx}, this.value)"
           class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-xs text-center text-slate-600" />
       </td>
       <td class="p-2 text-center">
-        <input type="number" min="1" value="${it.quantity || 0}" onchange="updateStagingItemField(${idx}, 'quantity', parseInt(this.value, 10))"
+        <input type="number" min="0" value="${escapeHtml(String(it.quantity ?? 0))}" onchange="updateStagingItemField(${idx}, 'quantity', parseInt(this.value, 10))"
           class="w-16 bg-white border border-slate-300 rounded px-1 py-1 text-xs font-black text-center text-[#0070ba]" />
       </td>
       <td class="p-2">
         <div class="flex items-center gap-1">
-          <input type="text" placeholder="Line/Row" value="${it.warehouse_part === 'PART_2' ? (it.row_pos || '') : (it.line || '')}"
+          <input type="text" placeholder="Line/Row" value="${escapeHtml(it.warehouse_part === 'PART_2' ? (it.row_pos || '') : (it.line || ''))}"
             onchange="updateStagingItemLocation(${idx}, '${it.warehouse_part === 'PART_2' ? 'row_pos' : 'line'}', this.value)"
             class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Line or Row" />
-          <input type="text" placeholder="Sec" value="${it.section || ''}"
+          <input type="text" placeholder="Sec" value="${escapeHtml(it.section || '')}"
             onchange="updateStagingItemLocation(${idx}, 'section', this.value)"
             class="w-12 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Section" />
-          <input type="text" placeholder="Lvl" value="${it.level || ''}"
+          <input type="text" placeholder="Lvl" value="${escapeHtml(it.level || '')}"
             onchange="updateStagingItemLocation(${idx}, 'level', this.value)"
             class="w-10 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Level" />
-          <input type="text" placeholder="Box" value="${it.box_num || ''}"
+          <input type="text" placeholder="Box" value="${escapeHtml(it.box_num || '')}"
             onchange="updateStagingItemLocation(${idx}, 'box_num', this.value)"
             class="w-12 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Box #" />
         </div>
@@ -551,7 +564,7 @@ async function loadAdminShipmentsList(status) {
         <div class="flex items-center justify-between">
           <span class="font-mono font-bold text-xs text-[#173456]">${escapeHtml(s.shipment_number)}</span>
           <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${s.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
-            ${s.status}
+            ${escapeHtml(s.status)}
           </span>
         </div>
         <div class="text-[11px] text-slate-600 flex items-center justify-between font-mono">
@@ -854,7 +867,7 @@ function handleReceivingStyleInput(val) {
   }
 
   dropdown.innerHTML = matches.map(s => `
-    <div onclick="selectReceivingStyle('${escapeHtml(s.style)}')"
+    <div onclick="selectReceivingStyle(${jsArg(s.style)})"
       class="p-2.5 hover:bg-[#f0f7ff] cursor-pointer flex items-center justify-between text-xs transition">
       <span class="font-mono font-bold text-[#173456]">${escapeHtml(s.style)}</span>
       <span class="text-slate-500 font-mono">${s.total_quantity.toLocaleString()} pcs • ${s.location_count} locs</span>

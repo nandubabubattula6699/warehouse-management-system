@@ -240,7 +240,7 @@ function renderSelectedStylesChips() {
   container.innerHTML = selectedStyles.map(st => `
     <span class="style-tag-badge inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold shadow-sm">
       <span>${escapeHtml(st)}</span>
-      <button onclick="removeSelectedStyle('${escapeHtml(st)}')" class="hover:text-red-400 p-0.5 rounded transition">
+      <button onclick="removeSelectedStyle(${jsArg(st)})" class="hover:text-red-400 p-0.5 rounded transition">
         ✕
       </button>
     </span>
@@ -300,9 +300,9 @@ async function loadStylesList() {
     if (chipsContainer) {
       chipsContainer.innerHTML = allStylesList.slice(0, 10).map(s => `
         <button 
-          onclick="addStyleToSelection('${s.style}')" 
+          onclick="addStyleToSelection(${jsArg(s.style)})"
           class="style-chip px-2.5 py-1 rounded-lg text-xs font-mono font-semibold ${selectedStyles.includes(s.style) ? 'active' : 'text-slate-300'}">
-          + ${s.style}
+          + ${escapeHtml(s.style)}
         </button>
       `).join("");
     }
@@ -347,7 +347,7 @@ function renderStyleDropdown(query) {
 
   const locHtml = locationSuggestions.map(loc => `
       <div 
-        onclick="addStyleToSelection('${loc.code}'); document.getElementById('styleDropdown').classList.add('hidden'); document.getElementById('styleSearchInput').value='';" 
+        onclick="addStyleToSelection(${jsArg(loc.code)}); document.getElementById('styleDropdown').classList.add('hidden'); document.getElementById('styleSearchInput').value='';" 
         class="p-2.5 bg-blue-50 hover:bg-blue-100 cursor-pointer flex justify-between items-center transition border-b border-slate-200">
         <span class="font-mono font-bold text-blue-800 text-xs">${escapeHtml(loc.label)}</span>
         <span class="text-[10px] text-amber-300 font-mono font-bold">+ Load Line/Row</span>
@@ -357,10 +357,10 @@ function renderStyleDropdown(query) {
     const isSelected = selectedStyles.includes(s.style);
     return `
       <div 
-        onclick="addStyleToSelection('${s.style}'); document.getElementById('styleDropdown').classList.add('hidden'); document.getElementById('styleSearchInput').value='';" 
+        onclick="addStyleToSelection(${jsArg(s.style)}); document.getElementById('styleDropdown').classList.add('hidden'); document.getElementById('styleSearchInput').value='';"
         class="p-2.5 hover:bg-slate-100 cursor-pointer flex justify-between items-center transition ${isSelected ? 'bg-slate-50' : ''}">
         <span class="font-mono font-bold text-[#173456] text-sm flex items-center gap-2">
-          ${s.style} ${isSelected ? '<span class="text-[10px] text-emerald-400 font-sans">(added)</span>' : ''}
+          ${escapeHtml(s.style)} ${isSelected ? '<span class="text-[10px] text-emerald-400 font-sans">(added)</span>' : ''}
         </span>
         <span class="text-xs text-slate-400 font-mono">${s.total_quantity.toLocaleString()} units • ${s.location_count} locs</span>
       </div>
@@ -382,7 +382,7 @@ async function loadBatchStylesDetails() {
     tbody.innerHTML = `
       <tr>
         <td colspan="8" class="text-center py-12 text-slate-400">
-          Loading locations for styles: ${selectedStyles.join(", ")}...
+          Loading locations for styles: ${escapeHtml(selectedStyles.join(", "))}...
         </td>
       </tr>
     `;
@@ -431,19 +431,19 @@ async function loadBatchStylesDetails() {
     const styleSelect = document.getElementById("filterStyleSelect");
     if (styleSelect) {
       styleSelect.innerHTML = '<option value="ALL">All Styles</option>' +
-        batchData.found_styles.map(s => `<option value="${s}">Style ${s}</option>`).join("");
+        batchData.found_styles.map(s => `<option value="${escapeHtml(s)}">Style ${escapeHtml(s)}</option>`).join("");
     }
 
     const colorSelect = document.getElementById("filterColorSelect");
     if (colorSelect) {
       colorSelect.innerHTML = '<option value="ALL">All Colors</option>' + 
-        allColors.map(c => `<option value="${c}">${c}</option>`).join("");
+        allColors.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
     }
 
     const sizeSelect = document.getElementById("filterSizeSelect");
     if (sizeSelect) {
       sizeSelect.innerHTML = '<option value="ALL">All Sizes</option>' + 
-        allSizes.map(s => `<option value="${s}">Size ${s}</option>`).join("");
+        allSizes.map(s => `<option value="${escapeHtml(s)}">Size ${escapeHtml(s)}</option>`).join("");
     }
 
     renderFilteredRows();
@@ -594,7 +594,7 @@ function renderFilteredRows() {
         <td class="admin-only-control py-2.5 px-3 text-center ${isAdmin ? '' : 'hidden'}">
           <div class="inline-flex items-center space-x-1 bg-slate-100 border border-slate-300 rounded-lg p-0.5">
             <button onclick="realtimeQuickAdjust(${item.id}, -1)" ${item.quantity <= 0 ? "disabled" : ""} class="w-6 h-6 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold text-xs">-</button>
-            <button onclick='openAdjustModal(${JSON.stringify(item)})' class="px-2 py-0.5 text-[11px] font-mono font-semibold text-slate-700 hover:text-blue-600">Adj</button>
+            <button onclick='openAdjustModal(${escapeHtml(JSON.stringify(item))})' class="px-2 py-0.5 text-[11px] font-mono font-semibold text-slate-700 hover:text-blue-600">Adj</button>
             <button onclick="realtimeQuickAdjust(${item.id}, 1)" class="w-6 h-6 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold text-xs">+</button>
           </div>
         </td>
@@ -666,7 +666,7 @@ function renderFilteredRows() {
               <div class="flex items-center justify-between pt-2 border-t border-[#e2eaf2]">
                 <div class="inline-flex items-center space-x-2 bg-[#f0f4f8] border border-[#cbd5e1] rounded-lg p-1">
                   <button onclick="realtimeQuickAdjust(${item.id}, -1)" ${item.quantity <= 0 ? 'disabled' : ''} class="w-9 h-9 rounded bg-white text-base font-bold text-[#173456] shadow-xs active:bg-slate-200 flex items-center justify-center">-</button>
-                  <button onclick='openAdjustModal(${JSON.stringify(item)})' class="px-3 py-1.5 text-xs font-mono font-bold text-[#173456]">Adj</button>
+                  <button onclick='openAdjustModal(${escapeHtml(JSON.stringify(item))})' class="px-3 py-1.5 text-xs font-mono font-bold text-[#173456]">Adj</button>
                   <button onclick="realtimeQuickAdjust(${item.id}, 1)" class="w-9 h-9 rounded bg-white text-base font-bold text-[#173456] shadow-xs active:bg-slate-200 flex items-center justify-center">+</button>
                 </div>
                 <button onclick="deleteLocationRecord(${item.id})" class="p-2 text-slate-400 hover:text-red-600 text-sm" title="Delete">🗑️</button>
@@ -1119,7 +1119,7 @@ function renderWarehouseMapOverview() {
     p1Grid.innerHTML = p1.lines.map(ln => {
       const isSelected = activeAisleData && activeAisleData.part === "PART_1" && activeAisleData.aisle === String(ln.line);
       return `
-        <button onclick="inspectWarehouseAisle('PART_1', '${ln.line}')"
+        <button onclick="inspectWarehouseAisle('PART_1', ${jsArg(ln.line)})"
           class="text-left p-2.5 rounded-lg border transition ${isSelected ? 'bg-[#e6f1fa] border-[#0070ba] ring-1 ring-[#0070ba]' : 'bg-[#f8fafc] border-[#cbd5e1] hover:border-[#0070ba] hover:bg-white'}">
           <div class="flex items-center justify-between">
             <span class="font-mono font-bold text-xs text-[#173456]">LINE ${escapeHtml(ln.line)}</span>
@@ -1139,7 +1139,7 @@ function renderWarehouseMapOverview() {
       const isSelected = activeAisleData && activeAisleData.part === "PART_2" && activeAisleData.aisle === String(rw.row);
       const label = isWall ? "WALL" : `ROW ${escapeHtml(rw.row)}`;
       return `
-        <button onclick="inspectWarehouseAisle('PART_2', '${rw.row}')"
+        <button onclick="inspectWarehouseAisle('PART_2', ${jsArg(rw.row)})"
           class="text-left p-2.5 rounded-lg border transition ${isSelected ? 'bg-[#e6f1fa] border-[#0070ba] ring-1 ring-[#0070ba]' : 'bg-[#f8fafc] border-[#cbd5e1] hover:border-[#0070ba] hover:bg-white'}">
           <div class="flex items-center justify-between">
             <span class="font-mono font-bold text-xs text-[#173456]">${label}</span>
@@ -1343,7 +1343,7 @@ function handleReceivingStyleInput(val) {
   }
 
   dropdown.innerHTML = matches.map(s => `
-    <div onclick="selectReceivingStyle('${escapeHtml(s.style)}')"
+    <div onclick="selectReceivingStyle(${jsArg(s.style)})"
       class="p-2.5 hover:bg-[#f0f7ff] cursor-pointer flex items-center justify-between text-xs transition">
       <span class="font-mono font-bold text-[#173456]">${escapeHtml(s.style)}</span>
       <span class="text-slate-500 font-mono">${s.total_quantity.toLocaleString()} pcs • ${s.location_count} locs</span>
@@ -1682,29 +1682,29 @@ function renderStagingItemsTable() {
           class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-xs font-bold text-center uppercase text-slate-900" />
       </td>
       <td class="p-2 text-center">
-        <input type="number" min="1" value="${it.box_count || 1}" onchange="updateStagingItemBoxes(${idx}, this.value)"
+        <input type="number" min="0" value="${escapeHtml(String(it.box_count ?? ''))}" onchange="updateStagingItemBoxes(${idx}, this.value)"
           class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-xs text-center font-bold text-slate-700" />
       </td>
       <td class="p-2 text-center">
-        <input type="number" min="1" value="${it.pcs_per_box || 12}" onchange="updateStagingItemPcsBox(${idx}, this.value)"
+        <input type="number" min="1" value="${escapeHtml(String(it.pcs_per_box ?? ''))}" onchange="updateStagingItemPcsBox(${idx}, this.value)"
           class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-xs text-center text-slate-600" />
       </td>
       <td class="p-2 text-center">
-        <input type="number" min="1" value="${it.quantity || 0}" onchange="updateStagingItemField(${idx}, 'quantity', parseInt(this.value, 10))"
+        <input type="number" min="0" value="${escapeHtml(String(it.quantity ?? 0))}" onchange="updateStagingItemField(${idx}, 'quantity', parseInt(this.value, 10))"
           class="w-16 bg-white border border-slate-300 rounded px-1 py-1 text-xs font-black text-center text-[#0070ba]" />
       </td>
       <td class="p-2">
         <div class="flex items-center gap-1">
-          <input type="text" placeholder="Line/Row" value="${it.warehouse_part === 'PART_2' ? (it.row_pos || '') : (it.line || '')}"
+          <input type="text" placeholder="Line/Row" value="${escapeHtml(it.warehouse_part === 'PART_2' ? (it.row_pos || '') : (it.line || ''))}"
             onchange="updateStagingItemLocation(${idx}, '${it.warehouse_part === 'PART_2' ? 'row_pos' : 'line'}', this.value)"
             class="w-14 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Line or Row" />
-          <input type="text" placeholder="Sec" value="${it.section || ''}"
+          <input type="text" placeholder="Sec" value="${escapeHtml(it.section || '')}"
             onchange="updateStagingItemLocation(${idx}, 'section', this.value)"
             class="w-12 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Section" />
-          <input type="text" placeholder="Lvl" value="${it.level || ''}"
+          <input type="text" placeholder="Lvl" value="${escapeHtml(it.level || '')}"
             onchange="updateStagingItemLocation(${idx}, 'level', this.value)"
             class="w-10 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Level" />
-          <input type="text" placeholder="Box" value="${it.box_num || ''}"
+          <input type="text" placeholder="Box" value="${escapeHtml(it.box_num || '')}"
             onchange="updateStagingItemLocation(${idx}, 'box_num', this.value)"
             class="w-12 bg-white border border-slate-300 rounded px-1 py-1 text-[11px] text-center font-mono" title="Box #" />
         </div>
@@ -1919,7 +1919,7 @@ async function loadAdminShipmentsList(status) {
         <div class="flex items-center justify-between">
           <span class="font-mono font-bold text-xs text-[#173456]">${escapeHtml(s.shipment_number)}</span>
           <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${s.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
-            ${s.status}
+            ${escapeHtml(s.status)}
           </span>
         </div>
         <div class="text-[11px] text-slate-600 flex items-center justify-between font-mono">
