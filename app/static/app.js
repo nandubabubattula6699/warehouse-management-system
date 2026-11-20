@@ -1610,36 +1610,9 @@ async function runAiDocumentExtraction() {
     const randHex = Math.random().toString(16).substring(2, 6).toUpperCase();
     currentInboundDraft.shipment_number = `SHP-${dateStr}-${randHex}`;
 
-    // Map extracted items with initial staged locations
-    currentInboundDraft.items = (data.items || []).map((it, idx) => {
-      const isPart2 = (it.warehouse_part === "PART_2") || (it.style && (it.style.startsWith("VD") || it.style.startsWith("VO")));
-      const defaultLine = isPart2 ? "" : String((idx % 14) + 1);
-      const defaultRow = isPart2 ? String((idx % 14) + 1) : "";
-      const defaultSec = String((idx * 3 % 32) + 1);
-      const defaultLvl = String((idx % 4) + 1);
-      const defaultBox = String((idx % 8) + 1);
-
-      const locStr = isPart2
-        ? `Row ${defaultRow} • Sec ${defaultSec} • Lvl ${defaultLvl} • Box ${defaultBox}`
-        : `Line ${defaultLine} • Sec ${defaultSec} • Lvl ${defaultLvl} • Box ${defaultBox}`;
-
-      return {
-        style: it.style || "A12501",
-        brand: it.brand || (isPart2 ? "VON DUTCH" : "ALLBIRDS"),
-        warehouse_part: isPart2 ? "PART_2" : "PART_1",
-        color: it.color || "STANDARD",
-        size: it.size || "OS",
-        box_count: it.box_count || 10,
-        pcs_per_box: it.pcs_per_box || 12,
-        quantity: it.quantity || ((it.box_count || 10) * (it.pcs_per_box || 12)),
-        line: defaultLine,
-        row_pos: defaultRow,
-        section: defaultSec,
-        level: defaultLvl,
-        box_num: defaultBox,
-        location: locStr
-      };
-    });
+    // Map extracted items exactly as read. Never invent styles, quantities or shelf locations:
+    // missing values stay empty and staff fill them in on the staging grid.
+    currentInboundDraft.items = (data.items || []).map(mapExtractedInboundItem);
 
     closeModal("documentIngestModal");
     showToast(`✨ AI extracted ${currentInboundDraft.items.length} product lines from documents!`, "success");

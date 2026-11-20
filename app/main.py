@@ -12,7 +12,7 @@ from sqlalchemy import func, or_, distinct
 
 from app.database import get_db, init_db, SessionLocal
 from app.models import WarehouseLocation, InventoryItem, StockMovement, WarehouseUser, InboundShipment, InboundShipmentItem
-from app.llm_parser import parse_inbound_documents
+from app.llm_parser import parse_inbound_documents, DocumentParserError
 from app.auth import (
     SESSION_COOKIE_NAME, hash_password, verify_password,
     get_optional_user, require_user, require_supervisor, require_admin
@@ -1417,9 +1417,10 @@ def api_parse_inbound_documents(payload: InboundParseRequest):
             commercial_invoice_filename=payload.commercial_invoice_filename,
             raw_text=payload.raw_text
         )
-        return {"status": "success", "data": extracted}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Document parsing error: {str(e)}")
+    except DocumentParserError as e:
+        print(f"[Inbound AI] {e.status_code}: {e.message}", flush=True)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    return {"status": "success", "data": extracted}
 
 
 @app.post("/api/inbound/shipments", response_model=InboundShipmentResponse, dependencies=LOGIN_REQUIRED)
@@ -1430,6 +1431,12 @@ def create_inbound_shipment(payload: InboundShipmentCreate, db: Session = Depend
     """
     from datetime import datetime
     import os
+
+    for n, it in enumerate(payload.items, start=1):
+        if not (it.style or "").strip():
+            raise HTTPException(status_code=400, detail=f"Line #{n}: style is required.")
+        if (it.quantity or 0) < 0:
+            raise HTTPException(status_code=400, detail=f"Line #{n} ({it.style}): quantity cannot be negative.")
 
     shipment_num = payload.shipment_number
     if not shipment_num or not shipment_num.strip():

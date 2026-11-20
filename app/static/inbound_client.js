@@ -3,6 +3,32 @@
 // Compatible with both Main Dashboard (index.html) and Manager Section (manage.html)
 // =========================================================================
 
+// Convert one AI-extracted line into a staging row WITHOUT inventing data.
+// Missing style/quantity/box values stay empty or 0, and the shelf location is left
+// unassigned so a person must choose it on the staging grid.
+function mapExtractedInboundItem(it) {
+  const toInt = (v) => (Number.isFinite(Number(v)) && v !== null && v !== "" ? Math.trunc(Number(v)) : null);
+  const style = (it.style || "").toString().trim().toUpperCase();
+  const isPart2 = it.warehouse_part === "PART_2" || style.startsWith("VD") || style.startsWith("VO");
+  return {
+    style: style,
+    brand: it.brand || "",
+    warehouse_part: isPart2 ? "PART_2" : "PART_1",
+    color: it.color || "STANDARD",
+    size: it.size || "OS",
+    box_count: toInt(it.box_count) || 0,
+    pcs_per_box: toInt(it.pcs_per_box),
+    quantity: toInt(it.quantity) || 0,
+    expected_quantity: toInt(it.quantity),
+    line: "",
+    row_pos: "",
+    section: "",
+    level: "",
+    box_num: "",
+    location: "Unassigned"
+  };
+}
+
 // Global Helper Functions (safe fallback if not present)
 if (typeof window.openModal !== "function") {
   window.openModal = function(id) {
@@ -207,36 +233,9 @@ async function runAiDocumentExtraction() {
     const randHex = Math.random().toString(16).substring(2, 6).toUpperCase();
     window.currentInboundDraft.shipment_number = `SHP-${dateStr}-${randHex}`;
 
-    // Map extracted items with initial staged locations
-    window.currentInboundDraft.items = (data.items || []).map((it, idx) => {
-      const isPart2 = (it.warehouse_part === "PART_2") || (it.style && (it.style.startsWith("VD") || it.style.startsWith("VO")));
-      const defaultLine = isPart2 ? "" : String((idx % 14) + 1);
-      const defaultRow = isPart2 ? String((idx % 14) + 1) : "";
-      const defaultSec = String((idx * 3 % 32) + 1);
-      const defaultLvl = String((idx % 4) + 1);
-      const defaultBox = String((idx % 8) + 1);
-
-      const locStr = isPart2
-        ? `Row ${defaultRow} • Sec ${defaultSec} • Lvl ${defaultLvl} • Box ${defaultBox}`
-        : `Line ${defaultLine} • Sec ${defaultSec} • Lvl ${defaultLvl} • Box ${defaultBox}`;
-
-      return {
-        style: it.style || "A12501",
-        brand: it.brand || (isPart2 ? "VON DUTCH" : "ALLBIRDS"),
-        warehouse_part: isPart2 ? "PART_2" : "PART_1",
-        color: it.color || "STANDARD",
-        size: it.size || "OS",
-        box_count: it.box_count || 10,
-        pcs_per_box: it.pcs_per_box || 12,
-        quantity: it.quantity || ((it.box_count || 10) * (it.pcs_per_box || 12)),
-        line: defaultLine,
-        row_pos: defaultRow,
-        section: defaultSec,
-        level: defaultLvl,
-        box_num: defaultBox,
-        location: locStr
-      };
-    });
+    // Map extracted items exactly as read. Never invent styles, quantities or shelf locations:
+    // missing values stay empty and staff fill them in on the staging grid.
+    window.currentInboundDraft.items = (data.items || []).map(mapExtractedInboundItem);
 
     closeModal("documentIngestModal");
     showToast(`✨ AI extracted ${window.currentInboundDraft.items.length} product lines from documents!`, "success");
