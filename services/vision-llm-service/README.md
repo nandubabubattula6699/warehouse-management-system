@@ -13,6 +13,10 @@ Uses **RapidOCR (ONNX PP-OCRv4)** + **WarehouseLabelSLM** (a contextual sequence
 - `GET /scan` — Mobile-first Camera & Photo Upload Scanner UI
 - `POST /scan/api/analyze` — Extract Style, Color, Qty, Size, and Text from image or raw text
 - `GET /scan/api/model-info` — Training dataset & validation accuracy report
-- `POST /scan/api/train` — Retrain model on live Postgres catalog + saved corrections
-- `POST /scan/api/feedback` — Save verified correction & retrain
+- `POST /scan/api/train` — Retrain model on live Postgres catalog + saved corrections (**requires `X-Internal-Key`**)
+- `POST /scan/api/feedback` — Save verified correction & retrain (**requires `X-Internal-Key`**)
+
+Train/feedback require `INTERNAL_API_KEY` (same value as the main app). Browsers never hold the key:
+the main app's `/scan/*` gateway adds it only for a logged-in Admin or Manager, and strips any
+`X-Internal-Key` a client sends.
 - `GET /scan/health` — Service health check

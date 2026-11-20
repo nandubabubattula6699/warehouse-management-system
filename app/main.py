@@ -2070,10 +2070,19 @@ PICKING_SERVICE_URL = os.getenv("PICKING_SERVICE_URL", "http://localhost:8001").
 VISION_SERVICE_URL = os.getenv("VISION_SERVICE_URL", "http://localhost:8002").rstrip("/")
 _HOP_HEADERS = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te",
                 "trailers", "transfer-encoding", "upgrade", "host", "content-length", "content-encoding"}
+# Never forward a client-supplied service key; the gateway adds it itself when allowed.
+_STRIP_FROM_CLIENT = {"x-internal-key"}
+
+# Vision endpoints that change the model: gateway adds X-Internal-Key only for logged-in Admin/Manager.
+_VISION_PROTECTED_PATHS = {"api/train", "api/feedback"}
 
 
-async def _proxy_to_service(request: Request, target_url: str, fallback_url: str, service_label: str):
-    headers = {k: v for k, v in request.headers.items() if k.lower() not in _HOP_HEADERS}
+async def _proxy_to_service(request: Request, target_url: str, fallback_url: str, service_label: str,
+                            extra_headers: Optional[dict] = None):
+    headers = {k: v for k, v in request.headers.items()
+               if k.lower() not in _HOP_HEADERS and k.lower() not in _STRIP_FROM_CLIENT}
+    if extra_headers:
+        headers.update(extra_headers)
     headers["X-Forwarded-Host"] = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
     headers["X-Forwarded-Proto"] = request.headers.get("x-forwarded-proto") or request.url.scheme
     body = await request.body()
@@ -2110,7 +2119,19 @@ async def gateway_picking_service(request: Request, path: str = ""):
 async def gateway_vision_service(request: Request, path: str = ""):
     url = f"{VISION_SERVICE_URL}/scan/{path}" if path else f"{VISION_SERVICE_URL}/scan"
     fallback_url = f"http://127.0.0.1:8002/scan/{path}" if path else "http://127.0.0.1:8002/scan"
-    return await _proxy_to_service(request, url, fallback_url, "Vision SLM service")
+    extra = None
+    if path.strip("/") in _VISION_PROTECTED_PATHS:
+        db = SessionLocal()
+        try:
+            user = get_optional_user(request, db)
+        finally:
+            db.close()
+        if not user or (user.role or "").upper() not in ("ADMIN", "MANAGER"):
+            raise HTTPException(status_code=403, detail="Admin or Manager login required to train the model.")
+        if not INTERNAL_API_KEY:
+            raise HTTPException(status_code=503, detail="Model training is disabled: INTERNAL_API_KEY is not set.")
+        extra = {"X-Internal-Key": INTERNAL_API_KEY}
+    return await _proxy_to_service(request, url, fallback_url, "Vision SLM service", extra_headers=extra)
 
 
 def _safe_next(next_url: Optional[str]) -> Optional[str]:

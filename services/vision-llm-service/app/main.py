@@ -8,18 +8,19 @@ live catalog of styles, colors, sizes, and quantities).
 All routes live under /scan so the service works identically directly or behind the gateway.
 """
 import base64
+import hmac
 import json
 import os
 import threading
 import time
 from typing import Optional
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from app import catalog_client
-from app.config import FEEDBACK_PATH, MAX_IMAGE_BYTES, MODEL_PATH, REPORT_PATH, STATIC_DIR
+from app.config import FEEDBACK_PATH, INTERNAL_API_KEY, MAX_IMAGE_BYTES, MODEL_PATH, REPORT_PATH, STATIC_DIR
 from app.ocr_engine import extract_text_from_image, get_ocr_engine
 from app.slm_model import WarehouseLabelSLM
 from app.trainer import train_warehouse_slm
@@ -45,6 +46,16 @@ def _get_model() -> WarehouseLabelSLM:
                 train_warehouse_slm()
                 _SLM = WarehouseLabelSLM.load(MODEL_PATH)
         return _SLM
+
+
+def require_internal_key(request: Request) -> None:
+    """Training and feedback change the model: only callers holding INTERNAL_API_KEY may use them.
+    Browsers reach these through the main app's gateway, which adds the key for logged-in Admin/Manager users."""
+    if not INTERNAL_API_KEY:
+        raise HTTPException(status_code=503, detail="Model training is disabled: INTERNAL_API_KEY is not set.")
+    supplied = request.headers.get("X-Internal-Key", "")
+    if not hmac.compare_digest(supplied.encode(), INTERNAL_API_KEY.encode()):
+        raise HTTPException(status_code=403, detail="Admin or Manager login required to train the model.")
 
 
 def _feedback_count() -> int:
@@ -92,7 +103,7 @@ async def model_info():
     return report
 
 
-@app.post("/scan/api/train")
+@app.post("/scan/api/train", dependencies=[Depends(require_internal_key)])
 async def retrain_model():
     """Retrain the Warehouse Small Language Model on live Postgres catalog + worker feedback."""
     global _SLM
@@ -117,7 +128,7 @@ class FeedbackPayload(BaseModel):
     retrain_now: bool = True
 
 
-@app.post("/scan/api/feedback")
+@app.post("/scan/api/feedback", dependencies=[Depends(require_internal_key)])
 async def save_feedback(payload: FeedbackPayload):
     """Save verified text-to-field correction so the Small LM learns from real photos."""
     global _SLM
