@@ -300,11 +300,17 @@ def get_style_detail(style_code: str, db: Session = Depends(get_db)):
         "items": [ItemResponse.model_validate(i) for i in items]
     }
 
-@app.post("/api/items/{item_id}/adjust", response_model=ItemResponse, dependencies=SUPERVISOR_ONLY)
+def _actor_name(user: WarehouseUser) -> str:
+    """Name written to stock_movements.staff_name: the LOGGED-IN user, never a client-typed name."""
+    return ((user.full_name or "").strip() or user.username)[:100]
+
+
+@app.post("/api/items/{item_id}/adjust", response_model=ItemResponse)
 def adjust_quantity(
     item_id: int,
     payload: StockAdjustPayload,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: WarehouseUser = Depends(require_supervisor),
 ):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).with_for_update().first()
     if not item:
@@ -323,18 +329,19 @@ def adjust_quantity(
         quantity_after=new_qty,
         movement_type=payload.movement_type or ("STOCK_IN" if payload.change_amount > 0 else "STOCK_OUT"),
         reason=payload.reason or ("Quick Add" if payload.change_amount > 0 else "Quick Deduct"),
-        staff_name=payload.staff_name or "Manager"
+        staff_name=_actor_name(user),
     )
     db.add(m)
     db.commit()
     db.refresh(item)
     return item
 
-@app.post("/api/items/{item_id}/set-quantity", response_model=ItemResponse, dependencies=SUPERVISOR_ONLY)
+@app.post("/api/items/{item_id}/set-quantity", response_model=ItemResponse)
 def set_quantity(
     item_id: int,
     payload: SetQuantityPayload,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: WarehouseUser = Depends(require_supervisor),
 ):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).with_for_update().first()
     if not item:
@@ -353,7 +360,7 @@ def set_quantity(
         quantity_after=payload.new_quantity,
         movement_type="SET_EXACT",
         reason=payload.reason or "Direct Quantity Update",
-        staff_name=payload.staff_name or "Manager"
+        staff_name=_actor_name(user),
     )
     db.add(m)
     db.commit()
@@ -421,7 +428,9 @@ def _movement_counts(db: Session, item_ids: List[int]) -> dict:
 def _history_block_message(label: str, n: int) -> str:
     return (
         f"{label} has {n} stock-movement history record(s) and cannot be deleted "
-        f"(deleting it would erase its audit history). Set its quantity to 0 instead."
+        f"(deleting it would erase its audit history). To empty it instead, bring its quantity to 0 "
+        f"with an action that records a movement under your login: 'Adj' on the dashboard "
+        f"(deduct the remaining pieces), or edit the row on the Manage page and Save with quantity 0."
     )
 
 
@@ -760,8 +769,13 @@ def search_locations(
     return [ItemResponse.model_validate(i) for i in items]
 
 
-@app.put("/api/items/{item_id}", response_model=ItemResponse, dependencies=SUPERVISOR_ONLY)
-def update_item_full(item_id: int, payload: ItemUpdatePayload, db: Session = Depends(get_db)):
+@app.put("/api/items/{item_id}", response_model=ItemResponse)
+def update_item_full(
+    item_id: int,
+    payload: ItemUpdatePayload,
+    db: Session = Depends(get_db),
+    user: WarehouseUser = Depends(require_supervisor),
+):
     """Edit any field of an inventory row (style, color, size, line, section, level, row, box/cartons, quantity)."""
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).with_for_update().first()
     if not item:
@@ -797,7 +811,7 @@ def update_item_full(item_id: int, payload: ItemUpdatePayload, db: Session = Dep
         quantity_after=item.quantity,
         movement_type="ROW_EDIT",
         reason=f"Edited row ({old_style} @ {old_loc} -> {item.style} @ {item.location})",
-        staff_name=payload.staff_name or "Nandu",
+        staff_name=_actor_name(user),
     ))
     db.commit()
     db.refresh(item)
@@ -823,8 +837,8 @@ def bulk_delete_items(payload: BulkDeletePayload, db: Session = Depends(get_db))
             status_code=409,
             detail=(
                 f"Nothing was deleted: {len(blocked)} of the selected rows have stock-movement history "
-                f"({examples}{more}). Rows with history cannot be deleted — set their quantity to 0 instead, "
-                f"or unselect them."
+                f"({examples}{more}). Rows with history cannot be deleted — unselect them, or bring their "
+                f"quantity to 0 by editing each row and pressing Save (this records a movement under your login)."
             ),
         )
     deleted = db.query(InventoryItem).filter(InventoryItem.id.in_(payload.item_ids)).delete(synchronize_session=False)
