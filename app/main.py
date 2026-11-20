@@ -105,13 +105,32 @@ app = FastAPI(
     version="2.1.0"
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def _allowed_origins() -> List[str]:
+    """
+    Cross-origin browser access is allowed ONLY for origins listed in ALLOWED_ORIGINS
+    (comma-separated, e.g. "https://alexander-warehouse.up.railway.app"). Wildcards are rejected.
+    Empty/unset = no cross-origin access at all (the app's own pages are same-origin and unaffected).
+    """
+    origins = []
+    for raw in (os.getenv("ALLOWED_ORIGINS") or "").split(","):
+        o = raw.strip().rstrip("/")
+        if not o:
+            continue
+        if o == "*" or not o.startswith(("https://", "http://")):
+            raise RuntimeError(f"ALLOWED_ORIGINS entry '{o}' is invalid: use full origins like https://example.com, no '*'.")
+        origins.append(o)
+    return origins
+
+
+ALLOWED_ORIGINS = _allowed_origins()
+if ALLOWED_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Content-Type", "Authorization", "X-Device-Token"],
+    )
 
 
 @app.get("/api/health")
