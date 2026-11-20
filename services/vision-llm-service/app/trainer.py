@@ -14,7 +14,7 @@ import os
 import random
 import re
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.linear_model import SGDClassifier

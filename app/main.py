@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, distinct
 
 from app.database import get_db, init_db, SessionLocal
-from app.models import WarehouseLocation, InventoryItem, StockMovement, WarehouseUser, InboundShipment, InboundShipmentItem
+from app.models import InventoryItem, StockMovement, WarehouseUser, InboundShipment, InboundShipmentItem
 from app.llm_parser import parse_inbound_documents, DocumentParserError
 from app.auth import (
     SESSION_COOKIE_NAME, hash_password, verify_password,
@@ -24,11 +24,10 @@ SUPERVISOR_ONLY = [Depends(require_supervisor)]  # ADMIN or MANAGER
 ADMIN_ONLY = [Depends(require_admin)]
 from app.location_engine import build_location_info, ensure_schema_and_locations_seeded
 from app.schemas import (
-    ItemCreate, ItemUpdatePayload, ItemResponse, StyleSummary,
-    StockAdjustPayload, SetQuantityPayload, WarehouseStats,
-    SheetRowItem, SheetSubmitPayload, BulkDeletePayload, StyleRenamePayload,
+    ItemCreate, ItemUpdatePayload, ItemResponse, StockAdjustPayload, SetQuantityPayload, WarehouseStats,
+    SheetSubmitPayload, BulkDeletePayload, StyleRenamePayload,
     ReceivingPayload,
-    InboundItemPayload, InboundItemResponse, InboundShipmentCreate,
+    InboundShipmentCreate,
     InboundShipmentResponse, InboundParseRequest, InboundApprovePayload, InboundRejectPayload
 )
 
@@ -1136,7 +1135,7 @@ def get_warehouse_aisle_detail(
     return {
         "part": p,
         "aisle": a,
-        "aisle_label": f"Line {a} (Allbirds)" if p == "PART_1" else (f"WALL Zone" if a == "WALL" else f"Row {a} (Von Dutch / Valentino)"),
+        "aisle_label": f"Line {a} (Allbirds)" if p == "PART_1" else ("WALL Zone" if a == "WALL" else f"Row {a} (Von Dutch / Valentino)"),
         "total_sections_occupied": len(sorted_sections),
         "total_units": sum(s["total_units"] for s in sorted_sections),
         "total_records": sum(s["total_records"] for s in sorted_sections),
@@ -1789,7 +1788,6 @@ def reject_inbound_shipment(
     db: Session = Depends(get_db)
 ):
     """Admin rejects shipment with revision instructions."""
-    from datetime import datetime
 
     shipment = db.query(InboundShipment).filter(InboundShipment.id == shipment_id).first()
     if not shipment:

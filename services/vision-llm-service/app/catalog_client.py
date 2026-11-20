@@ -1,5 +1,5 @@
 """HTTP client for fetching live warehouse catalog and stock locations from the Inventory service."""
-from typing import Dict, List, Optional
+from typing import List, Optional
 import httpx
 
 from app.config import INVENTORY_SERVICE_URL, INTERNAL_API_KEY
