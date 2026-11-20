@@ -91,16 +91,9 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Role</label>
-            <select id="signupRole" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
-              <option value="STAFF">Warehouse Floor Staff</option>
-              <option value="PART_1_LEAD">Part 1 Lead (Allbirds E-Com)</option>
-              <option value="PART_2_LEAD">Part 2 Lead (VD &amp; Valentino Wholesale)</option>
-              <option value="MANAGER">Warehouse Manager</option>
-            </select>
-          </div>
+        <p class="text-[11px] text-slate-400">New accounts start as Warehouse Floor Staff and need Admin approval before you can log in.</p>
+
+        <div class="grid grid-cols-1 gap-3">
           <div>
             <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Warehouse Zone</label>
             <select id="signupZone" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
@@ -195,7 +188,6 @@
       const full_name = document.getElementById("signupFullName").value.trim();
       const username = document.getElementById("signupUsername").value.trim();
       const email = document.getElementById("signupEmail").value.trim() || null;
-      const role = document.getElementById("signupRole").value;
       const assigned_zone = document.getElementById("signupZone").value;
       const password = document.getElementById("signupPassword").value;
 
@@ -207,7 +199,7 @@
         const res = await fetch("/api/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ full_name, username, email, role, assigned_zone, password })
+          body: JSON.stringify({ full_name, username, email, assigned_zone, password })
         });
         const data = await res.json();
         if (!res.ok) {

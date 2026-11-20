@@ -1132,12 +1132,16 @@ class LoginPayload(BaseModel):
     password: str
 
 
+SIGNUP_ROLE = "STAFF"  # lowest role; only an admin can grant more (create the user from the admin panel)
+SIGNUP_ZONES = ("ALL_ZONES", "PART_1_ALLBIRDS", "PART_2_VD_VALENTINO")
+
+
 class SignupPayload(BaseModel):
     full_name: str
     username: str
     email: Optional[str] = None
     password: str
-    role: Optional[str] = "STAFF"
+    role: Optional[str] = None  # IGNORED — kept only so older clients don't get a 422
     assigned_zone: Optional[str] = "ALL_ZONES"
 
 
@@ -1221,14 +1225,15 @@ def signup_user(payload: SignupPayload, db: Session = Depends(get_db)):
         if ex_email:
             raise HTTPException(status_code=400, detail=f"Email '{email_clean}' is already registered.")
 
+    zone = (payload.assigned_zone or "ALL_ZONES").strip().upper()
     new_u = WarehouseUser(
         username=uname,
         email=email_clean,
         full_name=payload.full_name.strip(),
         password_hash=hash_password(payload.password),
-        role=(payload.role or "STAFF").upper(),
-        assigned_zone=(payload.assigned_zone or "ALL_ZONES").upper(),
-        is_approved=0,  # Requires Admin (Nandu) approval
+        role=SIGNUP_ROLE,  # never taken from the request
+        assigned_zone=zone if zone in SIGNUP_ZONES else "ALL_ZONES",
+        is_approved=0,  # pending: login is refused until an admin approves
         created_at=datetime.utcnow(),
     )
     db.add(new_u)
