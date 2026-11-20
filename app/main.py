@@ -8,8 +8,9 @@ from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi import Request, Response
-from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, distinct
 
@@ -20,6 +21,7 @@ from app.auth import (
     SESSION_COOKIE_NAME, hash_password, verify_password,
     get_optional_user, require_user, require_supervisor, require_admin
 )
+from app.inventory_slots import ACTIVE_SLOT_CONFLICT_MESSAGE, ACTIVE_SLOT_INDEX
 from app.location_engine import _norm_coord, build_location_info, seed_locations_if_empty
 from app.schemas import (
     ItemCreate, ItemUpdatePayload, ItemResponse, StockAdjustPayload, SetQuantityPayload, WarehouseStats,
@@ -37,6 +39,13 @@ ADMIN_ONLY = [Depends(require_admin)]
 # Deactivated inventory rows (is_active = false) keep their stock history but are hidden from every
 # stock view, lookup, map, export and the picking service. They are never matched for new stock.
 ACTIVE_ITEM = InventoryItem.is_active.is_(True)
+
+
+def _integrity_message(exc: IntegrityError) -> str:
+    """User-facing text for a database constraint violation (nothing was saved)."""
+    if ACTIVE_SLOT_INDEX in str(getattr(exc, "orig", exc)):
+        return ACTIVE_SLOT_CONFLICT_MESSAGE
+    return "The change conflicts with existing data (database constraint) and was not saved."
 
 def seed_if_empty():
     """
@@ -112,6 +121,13 @@ app = FastAPI(
     description="Multi-style tracking, location mapping, and live stock adjustments in PostgreSQL.",
     version="2.1.0"
 )
+
+
+@app.exception_handler(IntegrityError)
+async def _integrity_error_to_409(request: Request, exc: IntegrityError):
+    # e.g. a second active row for the same slot (create, edit, reactivate, rename, receiving).
+    # The request's session is rolled back and closed by get_db; nothing was saved.
+    return JSONResponse(status_code=409, content={"detail": _integrity_message(exc)})
 
 def _allowed_origins() -> List[str]:
     """
@@ -772,6 +788,7 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                     staff_name=staff,
                 ))
                 db.add(new_item)
+                db.flush()  # later rows of this same sheet must find (and add to) this new row
                 inserted_count += 1
                 total_pieces_in += qty
 
@@ -779,6 +796,9 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
     except HTTPException:
         db.rollback()
         raise
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=_integrity_message(e) + " Sheet not saved.")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Sheet failed and rolled back safely: {e}")
@@ -946,27 +966,39 @@ def rename_style(payload: StyleRenamePayload, db: Session = Depends(get_db)):
     return {"status": "ok", "old_style": old_s, "new_style": new_s, "updated_records": len(items)}
 
 
-@app.get("/api/export-csv", dependencies=SUPERVISOR_ONLY)
-def export_inventory_csv(db: Session = Depends(get_db)):
-    """Export all inventory rows as a CSV file."""
+@app.get("/api/export-csv")
+def export_inventory_csv(
+    include_inactive: bool = Query(False, description="ADMIN only: also export deactivated rows (audits)"),
+    db: Session = Depends(get_db),
+    user: WarehouseUser = Depends(require_supervisor),
+):
+    """Export active inventory rows as CSV. Admins can add deactivated rows (extra ACTIVE column)."""
     import csv
     import io
-    items = db.query(InventoryItem).filter(ACTIVE_ITEM).order_by(InventoryItem.style.asc(), InventoryItem.line.asc(), InventoryItem.section.asc()).all()
+    if include_inactive and (user.role or "").upper() != "ADMIN":
+        raise HTTPException(status_code=403, detail="Only admins can export deactivated rows.")
+    q = db.query(InventoryItem)
+    if not include_inactive:
+        q = q.filter(ACTIVE_ITEM)
+    items = q.order_by(InventoryItem.style.asc(), InventoryItem.line.asc(), InventoryItem.section.asc()).all()
     out = io.StringIO()
     writer = csv.writer(out)
-    writer.writerow(["SKU", "COLOR", "ROW", "LINE", "SECTION", "LEVEL", "SIZE", "PCS/BOX", "QTY", "BOX #"])
+    header = ["SKU", "COLOR", "ROW", "LINE", "SECTION", "LEVEL", "SIZE", "PCS/BOX", "QTY", "BOX #"]
+    writer.writerow(header + (["ACTIVE"] if include_inactive else []))
     for i in items:
-        writer.writerow([
+        row = [
             i.style, i.color or "", i.row_pos or "", i.line or "",
             i.section or "", i.level or "", i.size or "",
             i.pcs_per_box if i.pcs_per_box is not None else "",
             i.quantity, i.box_num or ""
-        ])
+        ]
+        writer.writerow(row + (["YES" if i.is_active else "NO"] if include_inactive else []))
     out.seek(0)
+    filename = "warehouse_inventory_export_incl_deactivated.csv" if include_inactive else "warehouse_inventory_export.csv"
     return StreamingResponse(
         iter([out.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=warehouse_inventory_export.csv"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 

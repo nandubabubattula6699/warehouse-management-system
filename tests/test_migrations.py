@@ -15,6 +15,7 @@ from sqlalchemy import create_engine, inspect, text
 
 from app import database
 from app.database import Base, engine
+from app.inventory_slots import ACTIVE_SLOT_INDEX
 from app.main import seed_if_empty
 from tests.conftest import ROOT, TEST_DB_URL, _ensure_database_exists
 
@@ -31,7 +32,7 @@ def test_models_match_migrated_schema():
 
 def test_database_is_at_head():
     current, head = database.schema_revisions()
-    assert current == head == "0002"
+    assert current == head == "0003"
 
 
 def test_app_refuses_to_start_on_outdated_schema(monkeypatch):
@@ -119,7 +120,65 @@ def test_stamp_then_upgrade_existing_database(migr_engine):
     _alembic("stamp", "0001")
     _alembic("upgrade", "head")
     r = _alembic("current")
-    assert "0002 (head)" in r.stdout
+    assert "0003 (head)" in r.stdout
+
+
+def _insert(conn, style, qty, active=True, box=None):
+    conn.execute(text(
+        "INSERT INTO inventory_items (style, color, size, line, section, level, box_num, location, quantity, is_active) "
+        "VALUES (:s, 'STANDARD', '9', '2', '1', '4', :b, 'Line 2 • Sec 1 • Lvl 4', :q, :a)"
+    ), {"s": style, "q": qty, "a": active, "b": box})
+
+
+def test_0003_refuses_duplicates_and_changes_nothing(migr_engine):
+    _alembic("upgrade", "0002")
+    with migr_engine.begin() as conn:
+        _insert(conn, "TB1WJBK", 20)
+        _insert(conn, "tb1wjbk", 20)          # same slot (case-insensitive)
+        _insert(conn, "TB1WJBK", 20, active=False)  # deactivated: never counts
+        _insert(conn, "TB1WJBK", 20, box="7")  # other box = other slot
+        before = conn.execute(text("SELECT id, style, quantity, is_active FROM inventory_items ORDER BY id")).fetchall()
+
+    r = _alembic("upgrade", "head", ok=False)
+    assert r.returncode != 0
+    assert "Migration 0003 NOT applied" in r.stderr and "1 style/color/size/location slot(s)" in r.stderr
+    assert "TB1WJBK" in r.stderr
+    assert "0002" in _alembic("current").stdout
+    assert ACTIVE_SLOT_INDEX not in {i["name"] for i in inspect(migr_engine).get_indexes("inventory_items")}
+    with migr_engine.connect() as conn:
+        after = conn.execute(text("SELECT id, style, quantity, is_active FROM inventory_items ORDER BY id")).fetchall()
+    assert after == before
+
+    # the read-only report lists exactly that group
+    env = {k: v for k, v in os.environ.items() if k not in ("DATABASE_PUBLIC_URL", "POSTGRES_URL")}
+    env["DATABASE_URL"] = MIGR_DB_URL
+    rep = subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "report_duplicate_active_rows.py")],
+                         cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
+    assert rep.returncode == 1, rep.stderr
+    assert "1 slot(s) with more than one active row, 2 rows involved." in rep.stdout
+
+
+def test_failed_upgrade_rolls_back_all_steps(migr_engine):
+    """0001 -> head in one go: 0003 fails on duplicates, so 0002 must not stay applied either."""
+    _alembic("upgrade", "0001")
+    with migr_engine.begin() as conn:
+        for _ in range(2):
+            conn.execute(text("INSERT INTO inventory_items (style, location, quantity) VALUES ('D1', 'x', 1)"))
+    assert _alembic("upgrade", "head", ok=False).returncode != 0
+    assert "0001" in _alembic("current").stdout
+    assert "is_active" not in {c["name"] for c in inspect(migr_engine).get_columns("inventory_items")}
+
+
+def test_0003_applies_when_clean_and_downgrades(migr_engine):
+    _alembic("upgrade", "0002")
+    with migr_engine.begin() as conn:
+        _insert(conn, "A1", 5)
+        _insert(conn, "A1", 5, active=False)
+        _insert(conn, "A1", 5, box="1")
+    _alembic("upgrade", "head")
+    assert ACTIVE_SLOT_INDEX in {i["name"] for i in inspect(migr_engine).get_indexes("inventory_items")}
+    _alembic("downgrade", "0002")
+    assert ACTIVE_SLOT_INDEX not in {i["name"] for i in inspect(migr_engine).get_indexes("inventory_items")}
 
 
 def test_baseline_downgrade_needs_explicit_flag(migr_engine):

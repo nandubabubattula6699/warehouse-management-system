@@ -32,7 +32,9 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
-            transaction_per_migration=True,
+            # One transaction for the whole `upgrade` (PostgreSQL has transactional DDL): if any
+            # migration fails (e.g. 0003 finds duplicates), the earlier ones are rolled back too.
+            transaction_per_migration=False,
         )
         with context.begin_transaction():
             context.run_migrations()
