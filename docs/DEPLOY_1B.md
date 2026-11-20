@@ -11,9 +11,9 @@ Deploy 1a first (`DEPLOY_1A.md`); 1b builds on it.
 | `railway.json` `preDeployCommand: alembic upgrade head` | Railway runs the migrations before each deploy. If they fail, the deploy is aborted and the old version keeps running. |
 | Migration `0001` (baseline) | Creates nothing on an existing DB. If the tables already exist without a stamp, it **refuses to run**. |
 | Migration `0002` | `stock_movements.item_id` changes to `ON DELETE RESTRICT`, so the DB itself refuses to delete history. Adds `inventory_items.is_active BOOLEAN NOT NULL DEFAULT true` with an index. All existing rows stay active. |
-| Migration `0003` | Partial unique index: only **one active row per style + color + size + location (incl. box #)**. Deactivated rows don't count. If duplicates already exist, it **refuses and changes nothing** (see "Blocker" below). |
+| Migration `0003` | **Part 2 (VD & VO, Rows) only.** Partial unique index: **one active row per location (row/section/level) + style + color + size + pack size**. Deactivated rows don't count. **Allbirds (Part 1, Lines) is not covered and no data is changed anywhere**: Lines keep one row per carton. If Part 2 already has duplicates, it **refuses and changes nothing** (see "Blocker" below). |
 | `upgrade head` is all-or-nothing | All pending migrations run in one transaction. If 0003 fails, 0002 is rolled back too, and production stays at 0001. |
-| Duplicate-slot writes → 409 | Creating, editing, reactivating or renaming into an occupied slot returns a clear 409 instead of a 500. Two sheet rows for the same new slot are merged into one row. |
+| Duplicate-slot writes → 409 (Part 2) | Creating, editing, reactivating or renaming into an occupied Part 2 slot returns a clear 409 instead of a 500. Two sheet rows for the same new Part 2 slot are merged into one row. Lines behave exactly as before. |
 | CSV export | Excludes deactivated rows. Admins get an extra "Export incl. Deactivated (Audit)" button that adds an ACTIVE column. Managers get 403 for that option. |
 | Deactivate / reactivate | `POST /api/items/{id}/deactivate` and `/reactivate`, supervisor only. Deactivating requires quantity 0. Each change is recorded as a 0-pc `DEACTIVATE`/`REACTIVATE` movement under the logged-in user. |
 
@@ -38,12 +38,24 @@ Deploy 1a first (`DEPLOY_1A.md`); 1b builds on it.
 
    **Expected difference:** if production ever ran the old startup `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, then `brand`, `warehouse_part`, `placement_type` and `location_code` may carry server defaults (`DEFAULT 'ALLBIRDS'` and so on) that the baseline doesn't have. Other drift is possible on a database built by `create_all` over time, such as missing indexes or different nullability.
 
-## BLOCKER: duplicate active rows (migration 0003)
+## BLOCKER: Part 2 duplicate active rows (migration 0003)
 
-The inventory CSV import stores **one row per carton**. For example, 19 identical rows show TB1WJBK size 7 at Line 2 • Sec 1 • Lvl 4, each with 20 pcs and no box #. The new rule forbids that. On `warehouse_dev`, which holds the same CSV data, 0003 finds **258 slots with 608 active rows** and refuses. Production very likely has the same, plus any changes made since.
+Allbirds (Part 1, Lines) is out of scope: one row per carton is normal there and is never reported or changed.
+
+On `warehouse_dev`, 0003 finds **5 Part 2 slots with 11 active rows** and refuses (nothing changed):
+
+| Brand | Style / color / pcs per box | Location | Rows |
+|---|---|---|---|
+| Von Dutch | VDBP-039 / CAMO / 8 | Row 4 • Sec 21 • Lvl 1 | 3 |
+| Von Dutch | VDSB-2116 / LIGHT DENIM / 48 | Row 11 • Ground BACK • Lvl 1 | 2 |
+| Valentino | VOSB-030 / BLACK / 10 | Row 12 • Ground BACK • Lvl 2 | 2 |
+| Ed Hardy | EHBG-002 / BLACK / 16 | Row 14 • Ground FRONT • Lvl 1 | 2 |
+| Ed Hardy | EHSPE-001 / PINK / 24 | Row 15 • Ground FRONT • Lvl 1 | 2 |
+
+Production may differ.
 
 Consequences:
-- Until the duplicates are resolved, `alembic upgrade head` fails and **1b cannot deploy**. It fails safely: nothing is changed and the old version keeps running.
+- Until Part 2 is clean, `alembic upgrade head` fails and **1b cannot deploy**. It fails safely: nothing is changed and the old version keeps running.
 - For the same reason, warehouse_dev stays at 0002, and the 1b app refuses to start on it.
 
 Listing the duplicates needs **data**, not just the schema:
@@ -52,10 +64,12 @@ python scripts/report_duplicate_active_rows.py duplicates.csv    # READ ONLY, DA
 ```
 Running this against production reads production data, so it needs your explicit OK first.
 
-How to resolve the duplicates is a business decision. Each option would be its own reviewed migration or script:
-- **(a) Merge each group into one row.** Sum the quantities, keep one row, and deactivate the others with a 0-pc movement. History is kept.
-- **(b) Number the cartons.** Give each carton row a box # so the rows become different slots.
-- **(c) Change the rule.** Allow several rows per slot and drop 0003.
+**Plan (decided):** VD & VO get new locations (format `R<row>-S<section>-<level>`, e.g. `R3-S5-2`) and a fresh initial count. Their old rows are replaced, not merged. That replacement is a separate, reviewed step. 0003 can only be applied once Part 2 has no duplicate active rows.
+
+Verified on a throw-away copy of warehouse_dev:
+- **Duplicates present:** 0003 refuses and the DB stays at 0002.
+- **Duplicates cleared (on the copy only):** 0003 applies.
+- **Both cases:** all 14 Lines are identical before and after: 8,610 rows, 209,162 pcs, 14,632 boxes, every row and its history.
 
 ## Step 2: back up production
 
@@ -109,4 +123,4 @@ Do this only after the blocker above is resolved. Merge the 1b PR, then deploy. 
 
 Afterwards all 9,789 rows are active, total units are unchanged, and the history is intact.
 
-Migration 0003 was then **refused** on warehouse_dev (258 duplicate slots, nothing changed), so the database is at 0002.
+Migration 0003 was then **refused** on warehouse_dev (5 Part 2 duplicate slots, nothing changed), so the database is at 0002.

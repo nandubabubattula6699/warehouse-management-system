@@ -788,7 +788,10 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                     staff_name=staff,
                 ))
                 db.add(new_item)
-                db.flush()  # later rows of this same sheet must find (and add to) this new row
+                if new_item.warehouse_part == "PART_2":
+                    # Part 2 has one active row per slot: later rows of this same sheet must find (and
+                    # add to) this new row. Part 1 (Lines) is left exactly as before: one row per carton.
+                    db.flush()
                 inserted_count += 1
                 total_pieces_in += qty
 

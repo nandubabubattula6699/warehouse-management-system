@@ -23,12 +23,12 @@
   - Dashboard and Manage page offer "Deactivate instead?" after a blocked delete.
   - Manage page has "Show deactivated rows" and a Reactivate button.
   - Cache-buster v34.
-- **One active row per slot (0003)**
-  - Partial unique index on style + color + size + line/row/section/level + box #, WHERE is_active. The definition is in `app/inventory_slots.py`.
-  - The migration refuses, changing nothing, if duplicates exist.
-  - `scripts/report_duplicate_active_rows.py` (read-only) lists them.
-  - warehouse_dev has 258 duplicate slots (608 rows: one row per carton), so 0003 is blocked there. See DEPLOY_1B.
-  - Constraint violations return 409 with a clear message. Sheet rows for the same new slot merge.
+- **One active row per slot (0003): Part 2 (VD & VO, Rows) only**
+  - Partial unique index on row/section/level + style + color + size + pack size (pcs per box), WHERE `is_active AND warehouse_part = 'PART_2'`. Box # is not part of the slot. The definition is in `app/inventory_slots.py`.
+  - **Allbirds (Part 1, Lines) is not covered and not changed.** It keeps one row per carton, exactly as before. No migration changes any data (a test checks per-Line row count, total pcs, boxes, every row and its history).
+  - The migration refuses, changing nothing, if Part 2 has duplicates. `scripts/report_duplicate_active_rows.py` (read-only) lists them.
+  - warehouse_dev has 5 Part 2 duplicate groups (11 rows), so 0003 is blocked there. See DEPLOY_1B.
+  - Part 2 constraint violations return 409 with a clear message. Sheet rows for the same new Part 2 slot merge into one row; on Lines they still create one row per carton.
   - `alembic upgrade` now runs all pending migrations in a single transaction.
 - **Audit export:** `GET /api/export-csv?include_inactive=true` (ADMIN only) adds deactivated rows and an ACTIVE column. Manage page has an admin-only button for it. Cache-buster v35.
 - **Tooling**
@@ -39,7 +39,8 @@
   - The schema is built by `alembic upgrade head` (no `create_all`).
   - New `tests/test_migrations.py`: model/DB drift, round trip with data, unstamped guard, stamp path, downgrade guard, startup refusal.
   - New `tests/test_deactivate.py`.
-  - 49 main-app tests and 9 picking-service tests pass.
+  - New `tests/test_active_slots.py`.
+  - 65 main-app tests and 9 picking-service tests pass.
 - **Docs**
   - `docs/DEPLOY_1B.md` (production baseline check, backup, stamp, deploy, rollback).
   - `docs/schema_baseline_0001.sql`.

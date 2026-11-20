@@ -1,6 +1,7 @@
 """
-READ-ONLY report: active inventory rows that share the same style + color + size + location (incl. box #).
-These block migration 0003 (one active row per slot). Nothing is changed.
+READ-ONLY report: Part 2 (VD & VO, Rows) active inventory rows that share the same
+location (row/section/level) + style + color + size + pack size. These block migration 0003.
+Part 1 (Allbirds, Lines) is never reported: one row per carton is normal there. Nothing is changed.
 
     python scripts/report_duplicate_active_rows.py              # summary + every group
     python scripts/report_duplicate_active_rows.py out.csv      # also write one line per group to a CSV
@@ -36,19 +37,19 @@ def main() -> int:
         dups = find_duplicate_active_slots(conn)
         conn.rollback()
 
-    print(f"{groups} slot(s) with more than one active row, {rows} rows involved.")
+    print(f"Part 2: {groups} slot(s) with more than one active row, {rows} rows involved.")
     for d in dups:
-        print(f"{d['rows']:>3} rows  {d['style']} / {d['color']} / size {d['size']} @ {d['location']}"
-              f"  ids={d['ids']}  qty={d['quantities']}")
+        print(f"{d['rows']:>3} rows  {d['style']} / {d['color']} / size {d['size']} / {d['pcs_per_box']} pcs/box"
+              f" @ {d['location']}  [{d['brands']}]  ids={d['ids']}  qty={d['quantities']}")
 
     if len(sys.argv) > 1:
         with open(sys.argv[1], "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow(["style", "color", "size", "line", "row", "section", "level", "box", "location",
+            w.writerow(["brand", "style", "color", "size", "pcs_per_box", "row", "section", "level", "location",
                         "active_rows", "total_qty", "item_ids", "quantities"])
             for d in dups:
-                w.writerow([d["style"], d["color"], d["size"], d["line"], d["row_pos"], d["section"], d["level"],
-                            d["box_num"], d["location"], d["rows"], sum(d["quantities"]),
+                w.writerow([d["brands"], d["style"], d["color"], d["size"], d["pcs_per_box"], d["row_pos"],
+                            d["section"], d["level"], d["location"], d["rows"], sum(d["quantities"]),
                             " ".join(map(str, d["ids"])), " ".join(map(str, d["quantities"]))])
         print(f"Written: {sys.argv[1]}")
     return 1 if groups else 0

@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, Index, Text, text, true
 from sqlalchemy.orm import relationship
 from .database import Base
-from .inventory_slots import ACTIVE_SLOT_EXPRESSIONS, ACTIVE_SLOT_INDEX
+from .inventory_slots import ACTIVE_SLOT_EXPRESSIONS, ACTIVE_SLOT_INDEX, ACTIVE_SLOT_WHERE
 
 
 class WarehouseLocation(Base):
@@ -55,13 +55,13 @@ class InventoryItem(Base):
         Index("idx_item_style_loc", "style", "location"),
         Index("idx_item_style_size_color", "style", "size", "color"),
         Index("idx_item_part_line_sec", "warehouse_part", "line", "row_pos", "section", "level"),
-        # One ACTIVE row per style + color + size + location (incl. box #). Migration 0003;
-        # definition shared with app/inventory_slots.py.
+        # Part 2 only: one ACTIVE row per location + style + color + size + pack size. Migration 0003;
+        # definition shared with app/inventory_slots.py. Part 1 (Lines) keeps one row per carton.
         Index(
             ACTIVE_SLOT_INDEX,
             *[text(expr) for expr in ACTIVE_SLOT_EXPRESSIONS],
             unique=True,
-            postgresql_where=text("is_active"),
+            postgresql_where=text(ACTIVE_SLOT_WHERE),
         ),
     )
 
