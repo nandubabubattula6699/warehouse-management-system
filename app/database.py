@@ -45,7 +45,29 @@ def get_db():
     finally:
         db.close()
 
-def init_db():
-    from app import models  # noqa: F401
-    Base.metadata.create_all(bind=engine)
-    print("[Database] Schema ready!")
+ALEMBIC_INI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "alembic.ini")
+
+
+def schema_revisions():
+    """(revision the database is at, latest revision in migrations/). The app never changes the schema:
+    `alembic upgrade head` does (Railway preDeployCommand / by hand)."""
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    head = ScriptDirectory.from_config(Config(ALEMBIC_INI)).get_current_head()
+    with engine.connect() as conn:
+        current = MigrationContext.configure(conn).get_current_revision()
+    return current, head
+
+
+def require_current_schema():
+    """Refuse to run against a database whose schema is not at the latest migration."""
+    current, head = schema_revisions()
+    if current != head:
+        raise RuntimeError(
+            f"Database schema is at revision {current or 'NONE (not managed by Alembic)'}, "
+            f"the code needs {head}. Run 'alembic upgrade head' first "
+            "(an existing pre-Alembic database must be checked and stamped: see docs/DEPLOY_1B.md)."
+        )
+    return current

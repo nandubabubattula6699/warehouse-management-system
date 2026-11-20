@@ -21,7 +21,7 @@ load_dotenv()
 from sqlalchemy import func  # noqa: E402
 
 from app.auth import hash_password  # noqa: E402
-from app.database import SessionLocal, init_db  # noqa: E402
+from app.database import SessionLocal, require_current_schema  # noqa: E402
 from app.models import WarehouseUser  # noqa: E402
 
 MIN_PASSWORD_LENGTH = 12
@@ -43,7 +43,7 @@ def main() -> int:
         print(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
         return 1
 
-    init_db()
+    require_current_schema()
     db = SessionLocal()
     try:
         user = db.query(WarehouseUser).filter(func.lower(WarehouseUser.username) == username).first()

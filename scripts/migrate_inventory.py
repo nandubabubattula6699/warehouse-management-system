@@ -9,7 +9,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, PROJECT_ROOT)
 load_dotenv()
 
-from app.database import init_db, SessionLocal
+from app.database import require_current_schema, SessionLocal
 from app.models import InventoryItem
 
 def clean_val(val):
@@ -24,11 +24,16 @@ def clean_val(val):
 
 def format_loc(line, section, level, row, box):
     parts = []
-    if line: parts.append(f"Line {line}")
-    if section: parts.append(f"Sec {section}")
-    if level: parts.append(f"Lvl {level}")
-    if row: parts.append(f"Row {row}")
-    if box: parts.append(f"Box {box}")
+    if line:
+        parts.append(f"Line {line}")
+    if section:
+        parts.append(f"Sec {section}")
+    if level:
+        parts.append(f"Lvl {level}")
+    if row:
+        parts.append(f"Row {row}")
+    if box:
+        parts.append(f"Box {box}")
     return " • ".join(parts) if parts else "Unassigned"
 
 def load_csv_records(csv_path):
@@ -110,7 +115,7 @@ def migrate(target_session_factory=None):
     print(f"Loaded {len(records):,} valid inventory rows from CSV.")
 
     if target_session_factory is None:
-        init_db()
+        require_current_schema()
         db = SessionLocal()
     else:
         db = target_session_factory()
@@ -135,6 +140,7 @@ def migrate(target_session_factory=None):
 if __name__ == "__main__":
     if CONFIRM_FLAG not in sys.argv[1:]:
         print("This script DELETES ALL inventory rows and reloads them from data/alexander_inventory.csv.")
+        print("Since migration 0002 it fails (and changes nothing) if any row has stock-movement history.")
         print(f"To run it anyway: python scripts/migrate_inventory.py {CONFIRM_FLAG}")
         sys.exit(2)
     migrate()

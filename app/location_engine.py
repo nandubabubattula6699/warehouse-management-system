@@ -1,7 +1,5 @@
 from typing import Optional, Tuple, Dict, Any
-from sqlalchemy import text
 from sqlalchemy.orm import Session
-from app.database import engine
 from app.models import WarehouseLocation
 
 
@@ -141,30 +139,14 @@ def build_location_info(
     }
 
 
-def ensure_schema_and_locations_seeded(db: Session):
+def seed_locations_if_empty(db: Session):
     """
-    1. Safely add new columns (brand, warehouse_part, placement_type, location_code) to inventory_items if missing.
-    2. Seed the master warehouse_locations table for Part 1 (14 Lines x 35 Sections x 4 Levels)
-       and Part 2 (14 Rows x 36 Sections + FRONT/BACK/WALL x 4 Levels) if empty.
+    Seed the master warehouse_locations table for Part 1 (14 Lines x 35 Sections x 4 Levels)
+    and Part 2 (14 Rows x 36 Sections + FRONT/BACK/WALL x 4 Levels) if it is empty.
 
-    This runs at startup and must NEVER insert, delete, or modify inventory_items rows.
+    Reference data only. Schema changes live in Alembic migrations, never here, and this must
+    NEVER insert, delete, or modify inventory_items rows.
     """
-    for col_name, col_def in [
-        ("brand", "VARCHAR(60) DEFAULT 'ALLBIRDS'"),
-        ("warehouse_part", "VARCHAR(30) DEFAULT 'PART_1'"),
-        ("placement_type", "VARCHAR(30) DEFAULT 'RACK'"),
-        ("location_code", "VARCHAR(120)"),
-    ]:
-        try:
-            with engine.begin() as conn:
-                conn.execute(text(f"ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS {col_name} {col_def}"))
-        except Exception:
-            try:
-                with engine.begin() as conn:
-                    conn.execute(text(f"ALTER TABLE inventory_items ADD COLUMN {col_name} {col_def}"))
-            except Exception:
-                pass
-
     loc_count = db.query(WarehouseLocation).count()
     if loc_count == 0:
         print("[Warehouse Map] Seeding 50,000 sq ft physical warehouse map (Part 1: 14 Lines, Part 2: 14 Rows + Front/Back/Wall)...", flush=True)

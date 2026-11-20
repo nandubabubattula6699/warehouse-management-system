@@ -37,6 +37,7 @@ class ItemUpdatePayload(BaseModel):
 
 class ItemResponse(ItemBase):
     id: int
+    is_active: bool = True
     created_at: datetime
     updated_at: Optional[datetime] = None
 

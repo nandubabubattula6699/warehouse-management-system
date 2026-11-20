@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index, Text
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, Index, Text, true
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -45,6 +45,8 @@ class InventoryItem(Base):
     location = Column(String(200), index=True, nullable=False, default="Unassigned")
     pcs_per_box = Column(Integer, nullable=True)
     quantity = Column(Integer, default=0, nullable=False, index=True)
+    # False = deactivated: hidden from lookups/maps/picking, kept for its stock history (never deleted).
+    is_active = Column(Boolean, nullable=False, default=True, server_default=true(), index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -54,10 +56,13 @@ class InventoryItem(Base):
         Index("idx_item_part_line_sec", "warehouse_part", "line", "row_pos", "section", "level"),
     )
 
+    # History is never deleted with its item: the DB foreign key is ON DELETE RESTRICT and
+    # passive_deletes="all" stops the ORM from touching movements when an item is deleted.
     movements = relationship(
         "StockMovement",
         back_populates="item",
-        cascade="all, delete-orphan",
+        cascade="save-update, merge",
+        passive_deletes="all",
         order_by="desc(StockMovement.created_at)"
     )
 
@@ -66,7 +71,7 @@ class StockMovement(Base):
     __tablename__ = "stock_movements"
 
     id = Column(Integer, primary_key=True, index=True)
-    item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False, index=True)
+    item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="RESTRICT"), nullable=False, index=True)
     style = Column(String(100), index=True, nullable=False)
     change_amount = Column(Integer, nullable=False)
     quantity_after = Column(Integer, nullable=False)
