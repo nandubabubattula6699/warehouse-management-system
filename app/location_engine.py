@@ -2,7 +2,7 @@ from typing import Optional, Tuple, Dict, Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.database import engine
-from app.models import WarehouseLocation, InventoryItem
+from app.models import WarehouseLocation
 
 
 def _norm_coord(val: Optional[str], prefixes: tuple) -> Optional[str]:
@@ -144,9 +144,10 @@ def build_location_info(
 def ensure_schema_and_locations_seeded(db: Session):
     """
     1. Safely add new columns (brand, warehouse_part, placement_type, location_code) to inventory_items if missing.
-    2. Backfill any rows in inventory_items that haven't been classified yet.
-    3. Seed the master warehouse_locations table for Part 1 (14 Lines x 35 Sections x 4 Levels)
+    2. Seed the master warehouse_locations table for Part 1 (14 Lines x 35 Sections x 4 Levels)
        and Part 2 (14 Rows x 36 Sections + FRONT/BACK/WALL x 4 Levels) if empty.
+
+    This runs at startup and must NEVER insert, delete, or modify inventory_items rows.
     """
     for col_name, col_def in [
         ("brand", "VARCHAR(60) DEFAULT 'ALLBIRDS'"),
@@ -163,32 +164,6 @@ def ensure_schema_and_locations_seeded(db: Session):
                     conn.execute(text(f"ALTER TABLE inventory_items ADD COLUMN {col_name} {col_def}"))
             except Exception:
                 pass
-
-    needs_backfill = db.query(InventoryItem).filter(
-        (InventoryItem.location_code.is_(None))
-        | (InventoryItem.brand.is_(None))
-        | (InventoryItem.location.like("%• Row %"))
-    ).count()
-
-    if needs_backfill > 0:
-        print(f"[Warehouse Map] Backfilling 2-Zone location metadata on {needs_backfill:,} inventory rows...", flush=True)
-        items = db.query(InventoryItem).all()
-        for item in items:
-            info = build_location_info(
-                style=item.style,
-                line=item.line,
-                section=item.section,
-                level=item.level,
-                row_pos=item.row_pos,
-                box_num=item.box_num,
-            )
-            item.warehouse_part = info["warehouse_part"]
-            item.brand = info["brand"]
-            item.placement_type = info["placement_type"]
-            item.location_code = info["location_code"]
-            item.location = info["location"]
-        db.commit()
-        print("[Warehouse Map] Backfill complete!", flush=True)
 
     loc_count = db.query(WarehouseLocation).count()
     if loc_count == 0:
@@ -274,19 +249,3 @@ def ensure_schema_and_locations_seeded(db: Session):
             db.bulk_insert_mappings(WarehouseLocation, master_locs[i:i + BATCH])
             db.commit()
         print(f"[Warehouse Map] Seeded {len(master_locs):,} physical warehouse locations!", flush=True)
-
-
-    # 4. Ensure Line 14 records from data/alexander_inventory.csv are seeded if Line 14 is currently empty
-    line14_count = db.query(InventoryItem).filter(InventoryItem.line == "14").count()
-    if line14_count == 0:
-        import os as _os
-        from scripts.migrate_inventory import load_csv_records
-        csv_p = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "..", "data", "alexander_inventory.csv"))
-        if _os.path.exists(csv_p):
-            all_recs = load_csv_records(csv_p)
-            l14_recs = [r for r in all_recs if str(r.get("line") or "") == "14"]
-            if l14_recs:
-                print(f"[Warehouse Map] Seeding {len(l14_recs):,} Line 14 records into PostgreSQL...", flush=True)
-                db.bulk_insert_mappings(InventoryItem, l14_recs)
-                db.commit()
-                print(f"[Warehouse Map] Seeded {len(l14_recs):,} Line 14 records!", flush=True)

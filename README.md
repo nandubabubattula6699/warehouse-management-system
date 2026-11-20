@@ -23,7 +23,7 @@ Test your database connection:
 ```bash
 python scripts/test_db_connection.py
 ```
-*(The script will automatically create warehouse_db and tables for you!)*
+*(The script creates the tables if they are missing. The app never loads or changes inventory on startup.)*
 
 ### 3. Start the Warehouse Server
 ```bash
@@ -36,12 +36,12 @@ Open your browser at: http://localhost:8000
 ## Migrating 20,000+ Rows from Google Sheets
 
 1. In Google Sheets, download your sheet: File -> Download -> Comma Separated Values (.csv)
-2. Save the file into `data/my_sheet.csv`
-3. Run the high-speed migration script:
+2. Save the file as `data/alexander_inventory.csv`
+3. **DESTRUCTIVE — deletes ALL existing inventory rows first.** Only for an empty/dev database:
 ```bash
-python scripts/migrate_sheets.py data/my_sheet.csv
+python scripts/migrate_inventory.py --i-understand-this-deletes-all-inventory
 ```
-*(To test with sample data right away, run `python scripts/migrate_sheets.py data/sample_inventory.csv`)*
+For day-to-day changes use the CSV upload on the `/manage` page instead.
 
 ---
 

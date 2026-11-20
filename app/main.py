@@ -28,7 +28,11 @@ from app.schemas import (
 )
 
 def seed_if_empty():
-    """Create tables, upgrade 2-Part Warehouse schema/locations, and auto-seed from CSV if empty."""
+    """
+    Create missing tables/columns and seed the location master list.
+    NEVER inserts, deletes, or modifies inventory rows. Loading inventory from CSV is a
+    manual, explicit operation (scripts/migrate_inventory.py).
+    """
     try:
         init_db()
         db_map = SessionLocal()
@@ -44,14 +48,8 @@ def seed_if_empty():
         finally:
             db.close()
         if count == 0:
-            print("[Database] Empty database detected. Auto-seeding records from CSV...", flush=True)
-            from scripts.migrate_inventory import migrate
-            migrate()
-            db_map2 = SessionLocal()
-            try:
-                ensure_schema_and_locations_seeded(db_map2)
-            finally:
-                db_map2.close()
+            print("[Database] WARNING: inventory_items is EMPTY. Not auto-seeding. "
+                  "Check DATABASE_URL points at the right database.", flush=True)
         else:
             print(f"[Database] {count:,} inventory records present.", flush=True)
     except Exception as e:

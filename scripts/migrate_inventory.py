@@ -93,10 +93,12 @@ def load_csv_records(csv_path):
             })
     return records
 
+CONFIRM_FLAG = "--i-understand-this-deletes-all-inventory"
+
+
 def migrate(target_session_factory=None):
+    """DESTRUCTIVE: deletes ALL inventory_items rows, then imports data/alexander_inventory.csv."""
     csv_path = os.path.join(PROJECT_ROOT, "data", "alexander_inventory.csv")
-    if not os.path.exists(csv_path):
-        csv_path = r"C:\Users\b7580\Downloads\ALEXANDER INVENTORY(NANDU) - ALL LOCATIONS LINE1-LINE13.csv"
 
     print(f"Reading CSV: {csv_path}")
     if not os.path.exists(csv_path):
@@ -131,4 +133,8 @@ def migrate(target_session_factory=None):
         db.close()
 
 if __name__ == "__main__":
+    if CONFIRM_FLAG not in sys.argv[1:]:
+        print("This script DELETES ALL inventory rows and reloads them from data/alexander_inventory.csv.")
+        print(f"To run it anyway: python scripts/migrate_inventory.py {CONFIRM_FLAG}")
+        sys.exit(2)
     migrate()
