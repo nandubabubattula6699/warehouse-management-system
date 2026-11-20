@@ -23,6 +23,14 @@
   - Dashboard and Manage page offer "Deactivate instead?" after a blocked delete.
   - Manage page has "Show deactivated rows" and a Reactivate button.
   - Cache-buster v34.
+- **One active row per slot (0003)**
+  - Partial unique index on style + color + size + line/row/section/level + box #, WHERE is_active. The definition is in `app/inventory_slots.py`.
+  - The migration refuses, changing nothing, if duplicates exist.
+  - `scripts/report_duplicate_active_rows.py` (read-only) lists them.
+  - warehouse_dev has 258 duplicate slots (608 rows: one row per carton), so 0003 is blocked there. See DEPLOY_1B.
+  - Constraint violations return 409 with a clear message. Sheet rows for the same new slot merge.
+  - `alembic upgrade` now runs all pending migrations in a single transaction.
+- **Audit export:** `GET /api/export-csv?include_inactive=true` (ADMIN only) adds deactivated rows and an ACTIVE column. Manage page has an admin-only button for it. Cache-buster v35.
 - **Tooling**
   - `ruff.toml` with correctness rules (E4, E7, E9, F); the code now passes it.
   - `requirements-dev.txt`; `alembic` added to `requirements.txt`.
