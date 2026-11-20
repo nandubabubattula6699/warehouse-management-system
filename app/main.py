@@ -15,7 +15,7 @@ from app.models import WarehouseLocation, InventoryItem, StockMovement, Warehous
 from app.llm_parser import parse_inbound_documents
 from app.auth import (
     SESSION_COOKIE_NAME, hash_password, verify_password,
-    ensure_default_admin, get_optional_user, require_user, require_admin
+    get_optional_user, require_user, require_admin
 )
 from app.location_engine import build_location_info, ensure_schema_and_locations_seeded
 from app.schemas import (
@@ -38,7 +38,6 @@ def seed_if_empty():
         db_map = SessionLocal()
         try:
             ensure_schema_and_locations_seeded(db_map)
-            ensure_default_admin(db_map)
         finally:
             db_map.close()
 
@@ -1088,7 +1087,6 @@ class AdminUpdateStatusPayload(BaseModel):
 def login_user(payload: LoginPayload, response: Response, db: Session = Depends(get_db)):
     from datetime import datetime
     import secrets
-    ensure_default_admin(db)
     ident = payload.username.strip().lower()
     user = db.query(WarehouseUser).filter(
         or_(
@@ -1138,7 +1136,6 @@ def login_user(payload: LoginPayload, response: Response, db: Session = Depends(
 @app.post("/api/auth/signup")
 def signup_user(payload: SignupPayload, db: Session = Depends(get_db)):
     from datetime import datetime
-    ensure_default_admin(db)
     uname = payload.username.strip().lower()
     if not uname or len(uname) < 2:
         raise HTTPException(status_code=400, detail="Username must be at least 2 characters.")
