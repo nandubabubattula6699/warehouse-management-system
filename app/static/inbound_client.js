@@ -42,6 +42,29 @@ function mapExtractedInboundItem(it) {
   };
 }
 
+// A blank staging line for "+ Add Item Line": every field empty, nothing pre-filled.
+// (warehouse_part only selects whether the Line or Row box is shown; the server derives the real part.
+// Empty color/size are stored as the system defaults STANDARD / OS by the server.)
+function newEmptyStagingItem() {
+  return {
+    style: "",
+    brand: "",
+    warehouse_part: "PART_1",
+    color: "",
+    size: "",
+    box_count: null,
+    pcs_per_box: null,
+    quantity: null,
+    expected_quantity: null,
+    line: "",
+    row_pos: "",
+    section: "",
+    level: "",
+    box_num: "",
+    location: "Unassigned"
+  };
+}
+
 // Global Helper Functions (safe fallback if not present)
 if (typeof window.openModal !== "function") {
   window.openModal = function(id) {
@@ -410,22 +433,7 @@ function updateStagingItemLocation(idx, field, val) {
 }
 
 function addEmptyStagingRow() {
-  window.currentInboundDraft.items.push({
-    style: "A12501",
-    brand: "ALLBIRDS",
-    warehouse_part: "PART_1",
-    color: "STANDARD",
-    size: "OS",
-    box_count: 5,
-    pcs_per_box: 12,
-    quantity: 60,
-    line: "1",
-    row_pos: "",
-    section: "1",
-    level: "1",
-    box_num: "1",
-    location: "Line 1 • Sec 1 • Lvl 1 • Box 1"
-  });
+  window.currentInboundDraft.items.push(newEmptyStagingItem());
   renderStagingItemsTable();
 }
 

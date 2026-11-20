@@ -124,9 +124,9 @@ class InboundItemPayload(BaseModel):
     section: Optional[str] = None
     level: Optional[str] = None
     box_num: Optional[str] = None
-    box_count: int = 1
+    box_count: Optional[int] = 1      # None allowed (blank line); stored as 1 like before
     pcs_per_box: Optional[int] = None
-    quantity: int = 0
+    quantity: Optional[int] = 0       # None allowed (blank line); stored as 0, skipped at approval
     expected_quantity: Optional[int] = None
     location: Optional[str] = None
     notes: Optional[str] = None

@@ -1772,22 +1772,7 @@ function updateStagingItemLocation(idx, field, val) {
 }
 
 function addEmptyStagingRow() {
-  currentInboundDraft.items.push({
-    style: "A12501",
-    brand: "ALLBIRDS",
-    warehouse_part: "PART_1",
-    color: "STANDARD",
-    size: "OS",
-    box_count: 5,
-    pcs_per_box: 12,
-    quantity: 60,
-    line: "1",
-    row_pos: "",
-    section: "1",
-    level: "1",
-    box_num: "1",
-    location: "Line 1 • Sec 1 • Lvl 1 • Box 1"
-  });
+  currentInboundDraft.items.push(newEmptyStagingItem());
   renderStagingItemsTable();
 }
 
