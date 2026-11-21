@@ -48,6 +48,10 @@
      - whether Part 1/Part 2 leads are workers or supervisors;
      - async vs. sync DB driver.
    - Nothing was built. The only receiving-check files are the earlier Antigravity attempt in `C:\Users\Nancy Arroyo\receiving-check-backup` on the old PC. That folder is not a git repo, was never pushed, and contains a `.env` (secrets).
+5. **Possible stray v2 tables in production.**
+   - Check whether production already has the tables `brands`, `products`, `skus`, `sku_barcodes`, `zones`, `bins`, `lpns`, `inventory_balances`, `inventory_txns` (possible `create_all` from the home PC on Nov 19).
+   - Verify this during the production schema check, before the 1b baseline is stamped.
+   - The draft model is saved on branch `draft/wms-models-v2` (NOT for merge; input for Phase 3 design).
 
 ## 3. Things you must do in Railway
 
