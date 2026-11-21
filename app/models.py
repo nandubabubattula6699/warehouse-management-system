@@ -165,3 +165,10 @@ class InboundShipmentItem(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     shipment = relationship("InboundShipment", back_populates="items")
+
+
+# Register industrial WMS v2 tables (brands, products, skus, sku_barcodes, zones, bins, lpns,
+# inventory_balances, inventory_txns) so Base.metadata.create_all() creates them.
+from .wms_models import (  # noqa: E402,F401
+    Brand, Product, Sku, SkuBarcode, Zone, Bin, Lpn, InventoryBalance, InventoryTxn,
+)
