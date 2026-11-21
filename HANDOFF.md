@@ -16,7 +16,7 @@
 
 **Local dev database (old PC only):**
 - `warehouse_dev` is at migration **0002**.
-- Migration 0003 refuses to run there because Part 2 has 5 duplicate groups (11 rows). This is intended: see decision 3.
+- Migration 0003 refuses to run there because Part 2 has duplicates: 11 rows in 5 groups. This is intended: see decision 3.
 - The 1b app refuses to start until the DB is at the newest migration (0003).
 
 ## 2. Open decisions (waiting for you)
@@ -25,7 +25,8 @@
    - Part 2 (Rows 1-14) holds Von Dutch (VD), Valentino Orlandi (VO) and Ed Hardy (ED). Brand codes: **VD / VO / ED**.
    - **Ed Hardy is treated exactly like VD & VO:** Part 2, one-active-row rule, relocation and fresh count.
    - 0003 already covers it: the index filters on `warehouse_part = 'PART_2'`, and `app/location_engine.py` assigns ED HARDY to Part 2. No code change needed.
-   - 94 Ed Hardy rows are in Part 2. Two of the 5 Part 2 duplicate groups are Ed Hardy (EHBG-002, EHSPE-001); they are fixed together with the VD/VO ones.
+   - 94 Ed Hardy rows are in Part 2. Of the Part 2 duplicates (11 rows in 5 groups), two groups are Ed Hardy (EHBG-002, EHSPE-001); they are fixed together with the VD/VO ones.
+   - **Do NOT rename the stored value `PART_2_VD_VALENTINO`.** It is saved on user records (`assigned_zone`), so renaming it needs a data migration. Later we may change only the display text.
 2. **VD/VO/ED relocation step (not built yet; go-ahead given 2026-11-21: build it AFTER 1a + 1b are deployed).**
    - **Planned:** VD, VO & ED get new locations (`R<row>-S<section>-<level>`, e.g. `R3-S5-2`) and a fresh initial count. Their old rows are replaced, not merged.
    - **Needed from you:** the go-ahead and the details:
@@ -36,7 +37,8 @@
    - **Allbirds (Part 1, Lines) is untouched.** It keeps one row per carton, and no migration changes any data.
    - The unique rule covers only Part 2 (VD, VO & ED, Rows): location + style + color + size + pack size. Scope agreed 2026-11-21.
    - 0003 refuses to run while Part 2 has duplicates.
-   - **The 11 duplicate rows are fixed only through the app** (adjustment / deactivate, recorded as movements), never by direct SQL. List them first and show them to the owner.
+   - **The duplicates (11 rows in 5 groups, counted on the old PC's warehouse_dev copy) are fixed only through the app** (adjustment / deactivate, recorded as movements), never by direct SQL. List them first and show them to the owner.
+   - **Duplicate list (decided 2026-11-21):** use the normal Export CSV from the live WMS, but NOT now. Pull it right before fixing the duplicates during 1b, so the list is current.
    - **Still to confirm:**
      - "pack size" = pieces per box (10 rows have none and count as 0);
      - box # is not part of the location.
