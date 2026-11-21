@@ -21,27 +21,27 @@
 
 ## 2. Open decisions (waiting for you)
 
-1. **Ed Hardy.**
-   - 94 Ed Hardy rows are stored as Part 2 (Rows), together with VD & VO.
-   - Two of the 5 Part 2 duplicate groups are Ed Hardy (EHBG-002, EHSPE-001).
-   - Decide:
-     - Is Ed Hardy covered by the Part 2 one-row-per-slot rule?
-     - Is it included in the VD/VO relocation and fresh count?
-2. **VD/VO relocation step (not built yet).**
-   - **Planned:** VD & VO get new locations (`R<row>-S<section>-<level>`, e.g. `R3-S5-2`) and a fresh initial count. Their old rows are replaced, not merged.
+1. **Ed Hardy (decided 2026-11-21).**
+   - Part 2 (Rows 1-14) holds Von Dutch (VD), Valentino Orlandi (VO) and Ed Hardy (ED). Brand codes: **VD / VO / ED**.
+   - **Ed Hardy is treated exactly like VD & VO:** Part 2, one-active-row rule, relocation and fresh count.
+   - 0003 already covers it: the index filters on `warehouse_part = 'PART_2'`, and `app/location_engine.py` assigns ED HARDY to Part 2. No code change needed.
+   - 94 Ed Hardy rows are in Part 2. Two of the 5 Part 2 duplicate groups are Ed Hardy (EHBG-002, EHSPE-001); they are fixed together with the VD/VO ones.
+2. **VD/VO/ED relocation step (not built yet; go-ahead given 2026-11-21: build it AFTER 1a + 1b are deployed).**
+   - **Planned:** VD, VO & ED get new locations (`R<row>-S<section>-<level>`, e.g. `R3-S5-2`) and a fresh initial count. Their old rows are replaced, not merged.
    - **Needed from you:** the go-ahead and the details:
      - the new location list;
      - how the count is entered;
      - what happens to the old rows (deactivate, keeping their history).
 3. **0003 duplicates scope (decided, recorded here).**
    - **Allbirds (Part 1, Lines) is untouched.** It keeps one row per carton, and no migration changes any data.
-   - The unique rule covers only Part 2 (VD & VO, Rows): location + style + color + size + pack size.
+   - The unique rule covers only Part 2 (VD, VO & ED, Rows): location + style + color + size + pack size. Scope agreed 2026-11-21.
    - 0003 refuses to run while Part 2 has duplicates.
+   - **The 11 duplicate rows are fixed only through the app** (adjustment / deactivate, recorded as movements), never by direct SQL. List them first and show them to the owner.
    - **Still to confirm:**
      - "pack size" = pieces per box (10 rows have none and count as 0);
      - box # is not part of the location.
    - Details: `docs/DEPLOY_1B.md`, section "BLOCKER".
-4. **Receiving-check plan: ON HOLD.** Decide whether to build it inside the WMS (as `modules/inbound`) or separately.
+4. **Receiving-check plan: ON HOLD.** Decided 2026-11-21: build it inside the WMS (as `modules/inbound`), not separately. Still on hold.
    - The revised plan was: same Postgres in its own schema `receiving_check`, WMS logins and roles read-only, Postgres 18 everywhere.
    - Still open within that plan:
      - the login model (shared accounts with its own session, vs. the same session);
