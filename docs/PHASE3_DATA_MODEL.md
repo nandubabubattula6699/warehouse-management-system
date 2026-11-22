@@ -250,7 +250,7 @@ managers issuing at the same time get different ranges.
 **`lpns`**: one row per printed label, created when the batch is issued.
 | Column | Notes |
 |---|---|
-| `code` | UQ forever, e.g. `L00012345` + check digit. The format cannot be confused with a location (`R3-S5-2`) or a UPC (12 digits). |
+| `code` | UQ forever, e.g. `L00012345` + check digit. The format cannot be confused with a location (`R3-S5-L2`) or a UPC (12 digits). |
 | `batch_id` | FK. |
 | `status` | CK `IN ('ISSUED','RECEIVED','STORED','HOLD','EMPTY','VOID')`. |
 | `current_location_id` | FK locations, null while ISSUED. |
@@ -267,26 +267,33 @@ managers issuing at the same time get different ranges.
 | `code` | UQ. See the code scheme below. |
 | `zone_id` | FK. |
 | `location_type` | CK `IN ('STORAGE','RECEIVING','STAGING','DAMAGE')`. |
-| `area` | STORAGE only. CK `IN ('ROW','WALL')`. |
-| `row_no`, `section_no`, `level_no` | Integers for storage locations. `level_no` 0 = floor, 1–4 = shelf levels. `row_no` is null for WALL. |
-| Code check | CK: ROW ⇒ `code = 'R'||row_no||'-S'||section_no||'-'||level_no`; WALL ⇒ `row_no IS NULL AND code = 'W-S'||section_no||'-'||level_no`; non-storage types ⇒ all coordinates null. So the code can never disagree with its coordinates. |
+| `area` | STORAGE only. CK `IN ('SHELF','GROUND_FRONT','GROUND_BACK','WALL')`. |
+| `row_no`, `section_no`, `level_no` | Integers for storage locations. **Every storage location has a level** (`level_no` NOT NULL, ≥ 1; no level 0). `row_no` is null for WALL; `section_no` is null for GROUND_FRONT / GROUND_BACK (ground spots belong to the row, not a section). |
+| Code check | CK: SHELF ⇒ `code = 'R'||row_no||'-S'||section_no||'-L'||level_no`; GROUND_FRONT ⇒ `section_no IS NULL AND code = 'R'||row_no||'-GF-L'||level_no`; GROUND_BACK ⇒ same with `-GB-`; WALL ⇒ `row_no IS NULL AND code = 'W-S'||section_no||'-L'||level_no`; non-storage types ⇒ all coordinates null. So the code can never disagree with its coordinates. |
 | `putaway_sequence` | Walking order, used for "nearest first" (§3.8). |
 | `max_cartons` | Optional, **not used for now** (capacity is unknown). Kept so a capacity check can be added later without a schema change. |
 | `is_active` | Deactivated, never deleted. |
 
-Proposed code scheme (final names are set when the Part 2 layout is collected):
+**Part 2 code scheme (decided 2026-11-21; replaces the earlier "level = number, floor = level 0" proposal).
+Every location always has a level.**
 
-| Spot | Code | Coordinates |
-|---|---|---|
-| Shelf in a row | `R3-S5-2` | row 3, section 5, level 2 |
-| Floor at a section (old GROUND_FRONT / GROUND_BACK) | `R3-S5-0` | level 0 = floor |
-| Wall | `W-S12-1` (floor at the wall: `W-S12-0`) | no row, section 12, level 1 |
-| Receiving / staging / damage | `R-RECV`, `R-STAGE`, `R-DAMAGE` | none |
+| Spot | Format | Example | Coordinates |
+|---|---|---|---|
+| Shelf in a row | `R<row>-S<section>-L<level>` | `R3-S5-L2` | row 3, section 5, level 2 |
+| Ground front of a row (old GROUND_FRONT) | `R<row>-GF-L<level>` | `R3-GF-L1` | row 3, no section, level 1 |
+| Ground back of a row (old GROUND_BACK) | `R<row>-GB-L<level>` | `R3-GB-L2` | row 3, no section, level 2 |
+| Wall | `W-S<section>-L<level>` | `W-S12-L1` | no row, section 12, level 1 |
+| Receiving / staging / damage | `R-RECV`, `R-STAGE`, `R-DAMAGE` | | none |
 
-If a section really has two separate floor spots (front and back), they need two codes. That is decided when the
-layout is collected (§6, still open).
+The list of actual Part 2 spots is collected from a draft (§6, still open): `C:\WMS-backups\part2_layout_draft.xlsx`
+(outside the repo), built 2026-11-21 from a local restore of that morning's production backup. Every spot there
+must be confirmed on the floor before any location is created.
 
 Part 1 (Lines) locations are **not** created in Phase 3 (Part 1 stays on the old tables).
+
+**Allbirds (Part 1): PLANNED, NOT NOW.** Future format `LN<line>-S<section>-L<level>` (e.g. `LN1-S1-L1`). This needs a
+separate approved project: reprint the 501 QR labels, update the picking-service, test on staging. Allbirds data
+stays unchanged until then (CLAUDE.md rule 7).
 
 ### 3.7 Inventory (ledger and balances)
 
@@ -360,7 +367,7 @@ Partial UQ `(lpn_id) WHERE released_at IS NULL`: one open hold per LPN.
 No capacity check for now. **Overriding is quick:** the worker simply scans a different location instead of the
 suggested one. The reason is optional, one tap from the short list.
 
-Confirming a task = worker scans LPN, then location. One transaction: task → DONE, ledger `MOVE` (−R-RECV, +R3-S5-2,
+Confirming a task = worker scans LPN, then location. One transaction: task → DONE, ledger `MOVE` (−R-RECV, +R3-S5-L2,
 same LPN, same `txn_group_id`), `lpns.current_location_id` and status updated.
 
 ### 3.9 Cycle counts (later, Phase 4+)
@@ -473,7 +480,7 @@ Finish. Wrong scans before Finish are voided in `receipt_cartons` (still recorde
   reading distinct values from `inventory_items` (Part 2 only). Old rows are not modified. Near-duplicates are listed for
   you, not merged automatically.
 - **Part 2 relocation = opening balance:**
-  1. `locations` are created for the new `R<row>-S<section>-<level>` list (+ R-RECV, R-STAGE, R-DAMAGE).
+  1. `locations` are created for the confirmed Part 2 list in the §3.6 format (+ R-RECV, R-STAGE, R-DAMAGE).
   2. The fresh count is entered as `OPENING` ledger rows (with who/when, and `legacy_item_id` where it matches an old row).
   3. Each old Part 2 row is brought to 0 and deactivated **in the app** (recorded movement, history kept), as decided for
      the duplicates. No direct SQL.
@@ -482,7 +489,7 @@ Finish. Wrong scans before Finish are voided in `receipt_cartons` (still recorde
   (one read-only view that combines both).
 - **Draft branch `draft/wms-models-v2`:** kept as input. Taken over: brand → style → SKU → barcode, zone → location,
   LPN, balance + ledger idea, partial unique for loose vs. LPN stock. Changed: `timestamptz`, `created_by` FKs, append-only
-  enforced in the DB, balances written only by the ledger, no cascades, location format `R3-S5-2` instead of
+  enforced in the DB, balances written only by the ledger, no cascades, location format `R3-S5-L2` instead of
   `P2-R05-S12-3`, explicit document FKs instead of `ref_type/ref_id` text, `user_name` text → user FK.
 - **Possible stray tables:** if production already has tables named `brands`, `skus`, `lpns`, `inventory_balances`,
   … (HANDOFF item 5), the first Phase 3 migration checks them. Empty stray tables are dropped (decided). If any of them
@@ -504,7 +511,7 @@ Finish. Wrong scans before Finish are voided in `receipt_cartons` (still recorde
 | 8 | Missing invoice number | Receiving allowed; required before closing (DB check). |
 | 9 | Put-away suggestions | No fixed rows per brand, no capacity check. Same SKU first, else nearest empty location. Override = scan another location; reason optional from a short list. `max_cartons` kept optional. |
 | 10 | Stock per LPN after put-away | Yes, kept per LPN. |
-| 11 | Floor and wall names | Proposed: floor = level 0 (`R3-S5-0`), wall = `W-S<section>-<level>` (§3.6). Final names when the Part 2 layout is collected. |
+| 11 | Location names (Part 2) | Decided 2026-11-21: `R<row>-S<section>-L<level>`, `R<row>-GF-L<level>`, `R<row>-GB-L<level>`, `W-S<section>-L<level>`, `R-RECV` / `R-STAGE` / `R-DAMAGE`. Every location has a level (§3.6). Allbirds `LN<line>-S<section>-L<level>` is planned, not now. |
 | 12 | Sizes | Profile supports no size column (default OS), a size column, and a size grid. Prepacks: per-carton size breakdown in `inbound_order_line_sizes`. |
 | 13 | Allbirds receiving | Stays exactly as it is. New receiving is Part 2 only. |
 | 14 | Over-receipt | Always a variance for a supervisor. |
@@ -513,9 +520,12 @@ Finish. Wrong scans before Finish are voided in `receipt_cartons` (still recorde
 | — | Prepacks as master data | Not now. The per-line size breakdown from the packing list (`inbound_order_line_sizes`) is enough. |
 
 **Still open (does not block writing the Phase 3 migrations):**
-1. **Part 2 layout:** the list of rows, sections and levels, the wall sections, and whether any section has two separate
-   floor spots (front and back). Also the walking order from the dock (`putaway_sequence`, used for "nearest first").
-   Stays open until the relocation step.
+1. **Part 2 layout:** the list of rows, sections and levels and the wall sections. Also the walking order from the dock
+   (`putaway_sequence`, used for "nearest first"). Stays open until the relocation step. Draft for floor confirmation:
+   `C:\WMS-backups\part2_layout_draft.xlsx` (§3.6). Found in the backup, to be checked on the floor:
+   - stock in **row 15** (146 rows, sections 1–29 + ground), which is not in the app's Rows 1–14 location map;
+   - **wall** stock has no section number (stored as BACK, levels 1–2);
+   - one row with section `Q` (row 15) and one with level `14` (row 7, section 8).
 
 ---
 

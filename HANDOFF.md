@@ -1,18 +1,24 @@
-# Handoff: WMS restructure (state on 2026-11-20)
+# Handoff: WMS restructure (state on 2026-11-21)
 
-**Nothing has been deployed.** Railway and production are unchanged. Do not deploy until the open decisions below are made and the deploy docs have been followed.
+**Phase 1a is deployed to production (2026-11-21).** Nothing else is deployed. The next deploy is 1b: do not deploy it until the open decisions below are made and `docs/DEPLOY_1B.md` has been followed.
 
 ## 1. Phase status
 
 | Phase | Branch | Done | Tested | Pushed | Deployed |
 |---|---|---|---|---|---|
 | 0: audit and target architecture | `phase-0-audit` | yes | n/a (docs) | yes | n/a |
-| 1a: emergency fixes (auth on every route, secrets, CORS, XSS, data safety) | `phase-1a-emergency-fixes` | yes | yes, automated tests + browser checks | yes | **NOT deployed** |
+| 1a: emergency fixes (auth on every route, secrets, CORS, XSS, data safety) | `phase-1a-emergency-fixes` | yes | yes, automated tests + browser checks, then a Railway staging environment | yes | **DEPLOYED 2026-11-21** (`main` = `a8b3af8`) |
 | 1b: foundation (Alembic, protected history, deactivate, 0003, ruff, CI) | `phase-1b-foundation` (built on 1a) | yes, except the open decisions below | yes: 65 main-app + 9 picking-service tests, ruff clean, migration up/down on a fresh DB | yes | **NOT deployed** |
 
-**Pull requests:** none are open yet (no `gh` CLI here). Open them on GitHub:
-- **1a:** `phase-1a-emergency-fixes` → `main`
-- **1b:** `phase-1b-foundation` → `phase-1a-emergency-fixes`. Retarget it to `main` after 1a is merged.
+**1a deploy (2026-11-21):**
+- `main` was fast-forwarded to `phase-1a-emergency-fixes` (`a8b3af8`), after testing on a Railway staging environment.
+- Picking uses per-device tokens. 5 devices are registered: `phone-1`, `phone-2`, `phone-3`, `scanner-1`, `scanner-2`.
+- **Lesson for future staging:** after duplicating an environment, check every URL variable. In staging,
+  `INVENTORY_SERVICE_URL` still pointed to production.
+
+**Pull requests:**
+- **1a:** done (merged into `main` by fast-forward).
+- **1b:** `phase-1b-foundation` → `main` (the PR now targets `main`). This is the next deploy.
 
 **Local dev database (old PC only):**
 - `warehouse_dev` is at migration **0002**.
@@ -28,7 +34,17 @@
    - 94 Ed Hardy rows are in Part 2. Of the Part 2 duplicates (11 rows in 5 groups), two groups are Ed Hardy (EHBG-002, EHSPE-001); they are fixed together with the VD/VO ones.
    - **Do NOT rename the stored value `PART_2_VD_VALENTINO`.** It is saved on user records (`assigned_zone`), so renaming it needs a data migration. Later we may change only the display text.
 2. **VD/VO/ED relocation step (not built yet; go-ahead given 2026-11-21: build it AFTER 1a + 1b are deployed).**
-   - **Planned:** VD, VO & ED get new locations (`R<row>-S<section>-<level>`, e.g. `R3-S5-2`) and a fresh initial count. Their old rows are replaced, not merged.
+   - **Planned:** VD, VO & ED get new locations and a fresh initial count. Their old rows are replaced, not merged.
+   - **Part 2 location names (decided 2026-11-21; replaces the old "level = number" rule). Every location always has a level:**
+     - shelf `R<row>-S<section>-L<level>` (e.g. `R3-S5-L2`);
+     - ground front `R<row>-GF-L<level>`; ground back `R<row>-GB-L<level>`;
+     - wall `W-S<section>-L<level>`;
+     - special `R-RECV`, `R-STAGE`, `R-DAMAGE`.
+   - **Draft layout (2026-11-21):** `C:\WMS-backups\part2_layout_draft.xlsx` (outside the repo, from a local restore of that morning's backup). Every spot must be confirmed on the floor. Found, to check on the floor:
+     - stock in row 15 (146 rows), which is not in the app's Rows 1-14 location map;
+     - wall stock has no section number;
+     - one row with section `Q`, one with level `14`.
+   - **Allbirds (Part 1): PLANNED, NOT NOW.** Future format `LN<line>-S<section>-L<level>` (e.g. `LN1-S1-L1`). Needs a separate approved project: reprint the 501 QR labels, update the picking-service, test on staging. Allbirds data stays unchanged until then.
    - **Needed from you:** the go-ahead and the details:
      - the new location list;
      - how the count is entered;
@@ -57,17 +73,19 @@
 
 ## 3. Things you must do in Railway
 
-- [ ] **Remove public access to the production Postgres** (`DATABASE_PUBLIC_URL` / TCP proxy), unless something still needs it. Do this after taking the 1b schema dump below.
-- [ ] **Change the production DB password.** Then update `DATABASE_URL` on every service that uses it.
-- [ ] **Delete the `receiving-check-dev` service**, later, once the receiving-check decision is made.
+- [x] **Remove public access to the production Postgres** (TCP proxy removed, reported 2026-11-21).
+- [x] **Change the production DB password** (regenerated, reported 2026-11-21).
+- [ ] **Delete the `receiving-check-dev` service and the staging environment** when they are no longer needed.
+- [ ] **Rotate the production `INTERNAL_API_KEY` and the picking device tokens.** They appeared in screenshots.
+- [ ] **Retire the old `nandu` / `manager` accounts.** Create the new personal admin account first.
 - [ ] **Take the production schema dump for 1b.**
   - Run `pg_dump --schema-only` (no data) and compare it with `docs/schema_baseline_0001.sql`. Steps: `docs/DEPLOY_1B.md`, step 1.
   - Keep the dump outside the repo.
 
 ## 4. Deploy order (when you decide to deploy, not before)
 
-1. **1a via staging:** follow `DEPLOY_1A.md` (staging environment → checklist §5 → production).
-2. **Then 1b:** follow `docs/DEPLOY_1B.md`:
+1. **1a via staging:** done 2026-11-21.
+2. **Next: 1b:** follow `docs/DEPLOY_1B.md`:
    - schema dump and compare;
    - resolve the Part 2 duplicates;
    - back up production;
@@ -119,7 +137,7 @@
 Open Claude Code in the repo folder and paste:
 
 > Read HANDOFF.md, WMS_Restructure_Prompt.md, docs/CHANGELOG.md and docs/DEPLOY_1B.md. We are on branch
-> phase-1b-foundation. Nothing is deployed. Do not deploy, do not push to main, and never run anything
+> phase-1b-foundation. Only 1a is deployed (main = a8b3af8). Do not deploy, do not push to main, and never run anything
 > against the production database unless I explicitly say so in that message. First verify my new PC
 > setup (section 5): .venv, .env pointing at a LOCAL database, warehouse_dev and warehouse_test exist,
 > `alembic upgrade head`, ruff and both test suites pass. Report the results. Then wait for my
