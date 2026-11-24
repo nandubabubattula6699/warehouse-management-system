@@ -1,6 +1,6 @@
 # Handoff: WMS restructure (state on 2026-11-24)
 
-**Phase 1a is deployed to production (2026-11-21).** No other code is deployed. **Production data:** on 2026-11-24 all Part 2 stock was replaced with the owner's full count through the /manage uploads (decision 7). Allbirds was not touched. The next deploy is 1b: do not deploy it until the open decisions below are made and `docs/DEPLOY_1B.md` has been followed.
+**Phase 1a is deployed to production (2026-11-21).** No other code is deployed. **Production data:** on 2026-11-24 all Part 2 stock was replaced through the /manage uploads (decision 7). The final state is the v2 "original" count: 54,878 pcs. Allbirds was not touched. The next deploy is 1b: do not deploy it until the open decisions below are made and `docs/DEPLOY_1B.md` has been followed.
 
 ## 1. Phase status
 
@@ -60,15 +60,23 @@
      - "pack size" = pieces per box (10 rows have none and count as 0);
      - box # is not part of the location.
    - Details: `docs/DEPLOY_1B.md`, section "BLOCKER".
-   - **Update 2026-11-24 (after the Part 2 replacement, decision 7):**
-     - the duplicate groups in the live data are now all at qty 0 but still **active**:
-       - EHBG-002 BLACK, Row 14 FRONT L1 (2 rows);
-       - VDBP-039 CAMO, Row 4 S21 L1 (3 rows);
-       - VDSB-2116 LIGHT DENIM, Row 11 BACK L1 (2 rows);
-       - VOSB-030 BLACK, Row 12 BACK L2 (2 rows);
-     - in the first two groups, one row now holds the new stock and the others are 0;
-     - 0003 will still refuse to run until the extra rows are deactivated (1b feature) or otherwise resolved through the app;
-     - pull a fresh Export CSV first: the old 11-rows/5-groups list is out of date.
+   - **Update 2026-11-24 (after the v2 Part 2 replacement, decision 7):** 4 duplicate groups (9 rows) are still **active**.
+     Checked with 0003's exact key (row/section/level + style + color + size + pcs/box) on `export_after_part2_v2.csv`:
+
+     | Style / color / size | Pcs/box | Location | Qty per row | Rows to deactivate |
+     |---|---|---|---|---|
+     | VDBP-039 CAMO OS | 8 | Row 4 S21 L1 | 24, 0, 0 | the two 0 rows |
+     | EHBG-002 BLACK OS | 16 | Row 14 FRONT L1 | 32, 0 | the 0 row |
+     | VDSB-2116 LIGHT DENIM OS | 48 | Row 11 BACK L1 | 0, 0 | one, or both (not in the count) |
+     | VOSB-030 BLACK OS | 10 | Row 12 BACK L2 | 0, 0 | one, or both (not in the count) |
+
+     - EHSPE-001 is no longer a duplicate. The old 11-rows/5-groups list is out of date.
+     - All rows to deactivate are at qty 0, as 1b's Deactivate requires.
+     - **0003 will refuse to run until they are deactivated.**
+     - Proposed (planning 2026-11-24, not yet approved), deploy 1b in two steps:
+       1. 1b without 0003; then deactivate the 5 rows in the app;
+       2. then 0003.
+     - Pull a fresh Export CSV right before, in case Part 2 changed.
 4. **Receiving-check plan: ON HOLD.** Decided 2026-11-21: build it inside the WMS (as `modules/inbound`), not separately. Still on hold.
    - The revised plan was: same Postgres in its own schema `receiving_check`, WMS logins and roles read-only, Postgres 18 everywhere.
    - Still open within that plan:
@@ -102,32 +110,45 @@
      - Where is the receiving door?
      - Wall: which sections and levels?
      - Are Rows 1-3, 10 and 14 still ground-only?
-7. **Part 2 full replacement in PRODUCTION (done 2026-11-24, owner's explicit OK, uploads done by the owner).**
-   - **Source:** `C:\WMS-backups\ALEXANDER INVENTORY(NANDU) - SORTED_INVENTORY.csv` (work PC; outside the repo).
-     - Cleaned with owner-approved rules:
-       - 1 entry = 1 box; a numeric BOX # = number of boxes; qty = boxes x PCS/BOX;
-       - style fixes: spaces around "-" removed, V- -> VD-, V0 -> VO, VDAW-35/50/54 -> 035/050/054, size in brackets moved to size;
-       - any other style text kept as written;
-       - color typos fixed: MONGRAM, METALIC, a stray apostrophe.
-     - Result: **1,503 entries, 1,533 boxes, 52,041 pcs.** That is 1,529 boxes / 52,009 pcs, plus the 2 QTY corrections (VDP-033, VDBP-025 = 3 boxes each).
-   - **Files** (all in `C:\WMS-backups` on the work PC):
-     - `export_before_part2.csv` (10:35), `export_mid_part2.csv`, `export_after_part2.csv`;
-     - `part2_old_SET0.csv`, `part2_old_MANUAL.csv`, `part2_new_IN.csv`;
-     - `part2_new_REPORT.txt` (the full cleaning report).
-   - **Steps and numbers:**
-     1. **Before:** Allbirds 8,610 rows / 209,206 pcs; old Part 2 1,266 rows / 42,222 pcs.
-     2. **SET0 upload** (mode SET): 1,242 rows set to 0 (OUT -42,050).
-        - The 9 duplicate rows (172 pcs) were zeroed by hand with **Adj** (STOCK_OUT).
+7. **Part 2 full replacement in PRODUCTION (2026-11-24, owner's explicit OK, uploads done by the owner).**
+   - **Current state = v2 (the "original" full count, 12:10-12:21).** It replaced the morning run (v1).
+   - **Cleaning rules** (owner-approved, same for v1 and v2):
+     - 1 entry = 1 box; a numeric BOX # = number of boxes; qty = boxes x PCS/BOX;
+     - style fixes: spaces around "-" removed, V- -> VD-, V0 -> VO, VDAW-35/50/54 -> 035/050/054, size in brackets moved to size;
+     - any other style text kept as written;
+     - color typos fixed: MONGRAM, METALIC, a stray apostrophe;
+     - safe defaults for v2 (owner): no PCS/BOX -> qty 0 "to be counted"; unclear style -> kept as written;
+       no row -> not loaded; unclear size -> MIX.
+   - **v2 source:** `C:\WMS-backups\part2_original_v2.csv` (work PC; outside the repo).
+     - **1,624 entries, 1,654 boxes, 54,878 pcs.** That is 1,650 boxes / 54,846 pcs, plus the 2 QTY corrections (VDP-033, VDBP-025 = 3 boxes each).
+     - Compared with v1, only Rows 12 and 13 differ. Row 12: 135 entries / 3,401 pcs. Row 13: 128 / 3,412.
+   - **v2 files** (all in `C:\WMS-backups` on the work PC):
+     - `part2_original_v2.csv`;
+     - `export_before_part2_v2.csv` (12:11), `export_mid_part2_v2.csv` (12:16), `export_after_part2_v2.csv` (12:21);
+     - `part2_v2_SET0.csv`, `part2_v2_MANUAL.csv`, `part2_v2_IN.csv`;
+     - `part2_v2_REPORT.txt` (the full cleaning report).
+   - **v2 steps and numbers:**
+     1. **Before** (= the v1 result): Allbirds 8,610 rows / 209,206 pcs; Part 2 1,737 rows / 52,041 pcs.
+     2. **SET0 upload** (mode SET): 1,427 rows set to 0 (OUT -51,985).
+        - 2 duplicate rows were zeroed by hand with **Adj**: EHBG-002 -32, VDBP-039 -24.
         - Middle check: every Part 2 row at 0, Allbirds identical row by row.
-     3. **IN upload** (mode IN): 1,443 lines; New 471, Updated 972, IN +52,041.
+     3. **IN upload** (mode IN): 1,564 lines, IN +54,878.
+        - The export shows exactly 144 new rows, so the banner was New 144 / Updated 1,420.
+        - The owner's message did not fill in these two numbers.
      4. **Final check passed:**
-        - Allbirds identical row by row;
-        - Part 2 = 52,041 pcs, 0 locations differ from the new count;
-        - Part 2 rows: 1,737 = 1,429 with stock + 308 at 0.
-        - The 308 rows at 0 are: 291 old locations not in the new count; 14 entries to count; 3 extra rows of the duplicate groups (EHBG-002, VDBP-039).
+        - Allbirds identical row by row (8,610 / 209,206);
+        - Part 2 = 54,878 pcs, 0 locations differ from the v2 count;
+        - Part 2 rows: 1,881 = 1,550 with stock + 331 at 0.
+        - The 331 rows at 0 are: 314 old locations not in the count; 14 entries to count; 3 extra rows of the duplicate groups (EHBG-002, VDBP-039).
         - Nothing was deleted, and all history is kept.
+   - **v1 (morning, now superseded):**
+     - Source: `ALEXANDER INVENTORY(NANDU) - SORTED_INVENTORY.csv`. 1,503 entries / 1,533 boxes / 52,041 pcs.
+     - Steps: SET0 1,242 rows (OUT -42,050), 9 manual zeros, then IN 1,443 lines (New 471, Updated 972).
+     - Before v1: Part 2 was 1,266 rows / 42,222 pcs. Allbirds 8,610 / 209,206, unchanged throughout.
+     - **The v1 files are missing from `C:\WMS-backups`** (found gone around 12:00 on 2026-11-24): the source, the three exports and the upload files.
+       - Check the Recycle Bin. The numbers above are the only record.
    - **Open items:**
-     - **14 entries loaded as qty 0, to be counted:**
+     - **14 entries loaded as qty 0, to be counted** (the same in v1 and v2):
        - VDAW-118 CHEETAH R4 S5 L1 (PCS/BOX 243);
        - VDAW-120 BLACK R16 S2 L1;
        - VDBP-050 DENIM R12 S10 L2 ("10/,8");
@@ -140,15 +161,17 @@
        - VOSB-028 LAVENDER R2 BACK L2 (".");
        - VOSB-029 ANIMAL PRINT R8 S25 L3;
        - VOSB-2119BLK BLACK R8 S27 L1 and L2.
-     - **VOSB-037LAV LAVENDER SUEDE, Sec 13 Lvl 4, 20 pcs: NOT loaded** (no row in the count). Find its row.
-       - Its other entry, R16 S11 L3 (120 pcs), was loaded.
-     - **5 sizes guessed (not in the approved list) and loaded; confirm or fix in the app:**
-       - VDAW-048 BLACK R12 S29 L3 "Sizes" -> MIX;
-       - VDAW-048 BLUE R4 S2 L3 "MULTIPLE" -> MIX;
-       - VDSB-2115 DARK DENIM R12 S22 L2 "XL & Mix" -> MIX;
-       - VDTB-003 PINK FUR R12 S18 L2 "Large Medium" -> M/L;
-       - VDSB-2114 DENIM R12 S23 L2 "2 diff styles" -> OS. Two styles are in one box; find out which.
-     - **88 style codes are new to the WMS** (not in the old data, Part 1 or 2).
+     - **VOSB-037LAV:** v2 has only R16 S11 L3 (120 pcs), which was loaded.
+       - v1's extra entry without a row (Sec 13 Lvl 4, 20 pcs) is not in v2.
+     - **Unclear sizes in v2 (safe defaults applied); confirm or fix in the app:**
+       - VDAW-048 BLUE R4 S2 L3: "MULTIPLE" -> MIX;
+       - VDZU-031 PURPLE R13 S18 L2: "Sizes" -> MIX;
+       - `VDAW-139 & 129` HOT PINK - YELLOW R13 S12 L1: "2 diff styles" -> MIX. Style kept as written: one box holds two styles.
+       - VDAW-128 BLACK R13 S7 L1: the style says (M), but BOX # says "Large Medium" -> M (the bracket wins);
+       - VDAW-129 YELLOW R13 S11 L1: the style says (XL), but BOX # says "XL & Mix" -> XL (the bracket wins).
+     - **96 style codes are new to the WMS** (not in the data before 2026-11-24, Part 1 or 2): v1's 88 below (all still in v2) plus 8 new in v2.
+       - **The 8 new in v2:** `EHPVC-001 1KS` (probably `EHPVC-001LKS`), VDAW-129, `VDAW-139 & 129`, VDLBB-019,
+         `VDSB-2060 PNK`, `VDSB-2073 GRN`, `VDSB-2105 BLK`, VDZU-031.
        - Most are genuine new styles (e.g. the Row 16 VDAW codes) or new because of the V- -> VD- rule.
        - **Check these "kept as written" ones; they may be variants of existing codes:**
          - `VDLBB-018 HP` (vs `VDLBB-018HP`);
@@ -168,8 +191,8 @@
          VDSB-2119 TEAL, VDSB-2128, VDSB-2231, VDSB-2322, VDSB-2323, VOSB-014, VOSB-015, VOSB-037CRM, VOSB-037DBN,
          VOSB-037DPK, VOSB-037LAV, VOSB-055, VOSB-064, VOSB-079, VOSB-080.
      - **Size runs now use one format, `XS/S/M/L/XL`.** About 15 old rows stored them with commas (`XS,S,M,L,XL`); those old rows are at 0.
-     - **Box counts are not stored** (BOX # left empty on purpose: see the traps below). They are in `part2_new_REPORT.txt`.
-     - **1b / 0003:** the zeroed duplicate groups are still active rows. See decision 3, "Update 2026-11-24".
+     - **Box counts are not stored** (BOX # left empty on purpose: see the traps below). They are in `part2_v2_REPORT.txt`.
+     - **1b / 0003:** 4 duplicate groups are still active (checked on `export_after_part2_v2.csv`). See decision 3, "Update 2026-11-24".
    - **Upload-page traps (`app/static/manage.js`, `/api/sheet-submit`), all found 2026-11-23/24:**
      - **The CSV upload saves the moment the file is picked.** There is no preview. Set the mode (IN/SET), staff and note first.
      - **QTY is the total when it is > 0.** With QTY 0 or empty, the page computes PCS/BOX x BOX # (or PCS/BOX).
