@@ -1,6 +1,6 @@
-# Handoff: WMS restructure (state on 2026-11-21)
+# Handoff: WMS restructure (state on 2026-11-23)
 
-**Phase 1a is deployed to production (2026-11-21).** Nothing else is deployed. The next deploy is 1b: do not deploy it until the open decisions below are made and `docs/DEPLOY_1B.md` has been followed.
+**Phase 1a is deployed to production (2026-11-21).** Nothing else is deployed. No production data was changed on 2026-11-23. The next deploy is 1b: do not deploy it until the open decisions below are made and `docs/DEPLOY_1B.md` has been followed.
 
 ## 1. Phase status
 
@@ -28,7 +28,7 @@
 ## 2. Open decisions (waiting for you)
 
 1. **Ed Hardy (decided 2026-11-21).**
-   - Part 2 (Rows 1-14) holds Von Dutch (VD), Valentino Orlandi (VO) and Ed Hardy (ED). Brand codes: **VD / VO / ED**.
+   - Part 2 (Rows 1-16 since 2026-11-23, see decision 6) holds Von Dutch (VD), Valentino Orlandi (VO) and Ed Hardy (ED). Brand codes: **VD / VO / ED**.
    - **Ed Hardy is treated exactly like VD & VO:** Part 2, one-active-row rule, relocation and fresh count.
    - 0003 already covers it: the index filters on `warehouse_part = 'PART_2'`, and `app/location_engine.py` assigns ED HARDY to Part 2. No code change needed.
    - 94 Ed Hardy rows are in Part 2. Of the Part 2 duplicates (11 rows in 5 groups), two groups are Ed Hardy (EHBG-002, EHSPE-001); they are fixed together with the VD/VO ones.
@@ -41,9 +41,10 @@
      - wall `W-S<section>-L<level>`;
      - special `R-RECV`, `R-STAGE`, `R-DAMAGE`.
    - **Draft layout (2026-11-21):** `C:\WMS-backups\part2_layout_draft.xlsx` (outside the repo, from a local restore of that morning's backup). Every spot must be confirmed on the floor. Found, to check on the floor:
-     - stock in row 15 (146 rows), which is not in the app's Rows 1-14 location map;
+     - stock in row 15 (146 rows), which is not in the app's Rows 1-14 location map (Part 2 is Rows 1-16: decision 6);
      - wall stock has no section number;
-     - one row with section `Q`, one with level `14`.
+     - one row with section `Q`;
+     - ~~one with level `14`~~ resolved 2026-11-23: Row 7 Section 8 "Level 14" is a typo, the real level is **4** (owner).
    - **Allbirds (Part 1): PLANNED, NOT NOW.** Future format `LN<line>-S<section>-L<level>` (e.g. `LN1-S1-L1`). Needs a separate approved project: reprint the 501 QR labels, update the picking-service, test on staging. Allbirds data stays unchanged until then.
    - **Needed from you:** the go-ahead and the details:
      - the new location list;
@@ -70,6 +71,33 @@
    - Check whether production already has the tables `brands`, `products`, `skus`, `sku_barcodes`, `zones`, `bins`, `lpns`, `inventory_balances`, `inventory_txns` (possible `create_all` from the home PC on Nov 19).
    - Verify this during the production schema check, before the 1b baseline is stamped.
    - The draft model is saved on branch `draft/wms-models-v2` (NOT for merge; input for Phase 3 design).
+6. **Part 2 layout and re-sectioned rows (owner's floor walk, 2026-11-23).**
+   - **Physical layout, left to right:** Row 16 (single), 15/14, 13/12, 11/10, 9/8, 7/6, 5/4, 3/2 (double, back-to-back), Row 1 (single).
+     - Wall along the back of all rows. Staging area in front of all rows.
+     - **Part 2 = Rows 1-16** (not 1-14). The app's location map still says Rows 1-14.
+   - **Rows 11, 12, 13 and 15 have been re-sectioned.** Their old WMS data is wrong and will be replaced.
+   - **Row 15/16 new data:** `row_15-16_data.csv` (home PC, `C:\WMS-backups`): **154 lines / 8,620 pcs**. Decisions:
+     - 1 line = 1 box, qty = PCS/BOX;
+     - VDSB-2015 DENIM is gone from the warehouse;
+     - `V-4013HUN` -> `VD-4013HUN`;
+     - `VDAW-35` / `VDAW-50` / `VDAW-54` -> `VDAW-035` / `VDAW-050` / `VDAW-054`;
+     - a size run (S/M/L/XL) = one mixed-size box;
+     - VDAW-120 BLACK, Row 16 Sec 2 Lvl 1 = qty 0, to be counted.
+   - **Rows 11-13 new data:** coming from the owner.
+   - **Plan: one combined update, done from the home PC:**
+     1. zero the old Rows 11, 12, 13, 15 (recorded movements, history kept, nothing deleted);
+     2. load the new Rows 11, 12, 13, 15, 16.
+   - **Status: the Row 15/16 upload into production is NOT confirmed.** Check with a fresh Export CSV before the combined update.
+   - **Stopped 2026-11-23 (work PC):** a separate "set Rows 11-13 to 0" upload was prepared but **not** built or run.
+     It is replaced by the combined update. Lessons from reading the upload code (`app/static/manage.js`, `/api/sheet-submit`):
+     - the CSV upload saves as soon as the file is picked: set mode, staff and note first;
+     - with QTY 0, a PCS/BOX value turns into PCS/BOX x BOX #: leave PCS/BOX out of a zeroing file;
+     - duplicate rows (same style/color/size/location/box) can only be reached once by the upload: zero those by hand.
+   - **Open layout questions:**
+     - Ground Front = staging side, and Ground Back = wall side?
+     - Where is the receiving door?
+     - Wall: which sections and levels?
+     - Are Rows 1-3, 10 and 14 still ground-only?
 
 ## 3. Things you must do in Railway
 
