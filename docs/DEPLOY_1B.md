@@ -1,30 +1,74 @@
 # Deploying Phase 1b (Alembic, protected history, deactivate)
 
-**Status: NOT deployable yet.** Production must first be compared with the baseline (step 1).
+**1b ships in two steps:**
+- **1b-a** (branch `phase-1b-a`, this document): Alembic, migrations 0001 and 0002, protected history, deactivate. Head = **0002**.
+- **1b-b** (branch `phase-1b-foundation`): migration 0003 (one active Part 2 row per slot). Deploy it only after the Part 2 duplicates are deactivated in the app (see "Migration 0003 comes later").
+
+**Status:** ready to deploy once steps 1–3 pass, on staging first, then production.
 Deploy 1a first (`DEPLOY_1A.md`); 1b builds on it.
+
+## Railway setup: read this first
+
+- **No service reads `railway.json`.** The production main service has no Config-as-code path (checked 2026-11-26; staging is the same). The `preDeployCommand` and `startCommand` in `railway.json` **do not run**.
+- **How the app starts:**
+  - The dashboard Start command is empty, so Railway's builder uses the **`Procfile`**: `web: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`.
+  - 1b-a leaves the `Procfile` unchanged, so it starts exactly like 1a.
+  - Confirm once in the dashboard: the latest deployment's details show this start command.
+- **The migrations run from the dashboard:** Service → Settings → Deploy → **Pre-deploy step = `alembic upgrade head`**. Set it by hand, at the moment given in the deploy order below.
+- **The 1b-a app refuses to start** unless the DB is at 0002. If it is deployed without the Pre-deploy step, it crash-loops and can replace the running 1a version. So the Pre-deploy step must be saved **before** the 1b-a deploy starts.
+- **1a has no `alembic` installed.** Any 1a deployment that runs while the Pre-deploy step is set fails with "alembic: not found". Railway then aborts that deploy and keeps the running version. This is safe, but you must clear the field before rolling back to 1a.
 
 ## What changes for production
 
 | Change | Effect |
 |---|---|
-| Alembic manages the schema | The app no longer runs `create_all` or `ALTER TABLE` at startup. It **refuses to start** if the DB is not at the latest migration. |
-| `railway.json` `preDeployCommand: alembic upgrade head` | Railway runs the migrations before each deploy. If they fail, the deploy is aborted and the old version keeps running. |
+| Alembic manages the schema | The app no longer runs `create_all` or `ALTER TABLE` at startup. It **refuses to start** if the DB is not at the latest migration (0002). |
+| Dashboard Pre-deploy step `alembic upgrade head` | Railway runs the migrations before each deploy. If they fail, the deploy is aborted and the old version keeps running. |
 | Migration `0001` (baseline) | Creates nothing on an existing DB. If the tables already exist without a stamp, it **refuses to run**. |
-| Migration `0002` | `stock_movements.item_id` changes to `ON DELETE RESTRICT`, so the DB itself refuses to delete history. Adds `inventory_items.is_active BOOLEAN NOT NULL DEFAULT true` with an index. All existing rows stay active. |
-| Migration `0003` | **Part 2 (VD & VO, Rows) only.** Partial unique index: **one active row per location (row/section/level) + style + color + size + pack size**. Deactivated rows don't count. **Allbirds (Part 1, Lines) is not covered and no data is changed anywhere**: Lines keep one row per carton. If Part 2 already has duplicates, it **refuses and changes nothing** (see "Blocker" below). |
-| `upgrade head` is all-or-nothing | All pending migrations run in one transaction. If 0003 fails, 0002 is rolled back too, and production stays at 0001. |
-| Duplicate-slot writes → 409 (Part 2) | Creating, editing, reactivating or renaming into an occupied Part 2 slot returns a clear 409 instead of a 500. Two sheet rows for the same new Part 2 slot are merged into one row. Lines behave exactly as before. |
+| Migration `0002` | `stock_movements.item_id` changes to `ON DELETE RESTRICT`, so the DB itself refuses to delete history. Adds `inventory_items.is_active BOOLEAN NOT NULL DEFAULT true` with an index. All existing rows stay active. No data is changed. |
+| `upgrade head` is all-or-nothing | All pending migrations run in one transaction. If anything fails, production stays at 0001. |
 | CSV export | Excludes deactivated rows. Admins get an extra "Export incl. Deactivated (Audit)" button that adds an ACTIVE column. Managers get 403 for that option. |
 | Deactivate / reactivate | `POST /api/items/{id}/deactivate` and `/reactivate`, supervisor only. Deactivating requires quantity 0. Each change is recorded as a 0-pc `DEACTIVATE`/`REACTIVATE` movement under the logged-in user. |
 
-**Until step 3 is done, a 1b deploy fails safely.** The pre-deploy step stops at the 0001 guard, so nothing is deployed.
+## Migration 0003 comes later (1b-b)
 
-## Step 1: check the production schema against the baseline (read-only)
+0003 adds a **Part 2 only** partial unique index: one active row per location (row/section/level) + style + color + size + pack size.
+- Deactivated rows don't count.
+- Allbirds (Part 1, Lines) is not covered, and no data is changed anywhere.
+- If Part 2 has duplicate active rows, 0003 refuses and changes nothing.
 
-1. Make the schema-only dump. This is the one read-only production command you approved. No data is exported.
+Production still has **4 Part 2 duplicate groups (5 extra rows, all at qty 0)**. This was checked on `export_after_part2_v2.csv` after the Part 2 replacement on 2026-11-24.
+
+The sequence is:
+1. Deploy 1b-a (this document). It contains no 0003, so the duplicates don't block it.
+2. Deactivate the 5 extra rows **in the app**. Each one is recorded as a `DEACTIVATE` movement. Never use direct SQL.
+3. Deploy 1b-b. The Pre-deploy step stays set, and `alembic upgrade head` applies 0003.
+
+Run the duplicate check (`scripts/report_duplicate_active_rows.py`) again just before 1b-b. Against production it reads data, so it needs your explicit OK first.
+
+Tested locally:
+- An unstamped DB with Part 2 duplicates goes through `stamp 0001` → `upgrade head` = 0002, with no row or history changed.
+- The full sequence 1b-a → deactivate → 1b-b → rollback passed.
+
+## The database access window (steps 1–3)
+
+Production Postgres has had no public access since 2026-11-21. Steps 1–3 run from your PC, so they need a short, planned access window. Do the same for staging.
+
+1. **Open the window:** Railway → Postgres service → Settings → Networking → add a **TCP proxy**. Use its public URL for steps 1–3, only in one PowerShell window. Never write it to `.env` or the repo.
+2. **Do steps 1, 2 and 3 in one sitting.**
+3. **Close the window:**
+   1. Remove the TCP proxy.
+   2. **Regenerate the DB password** (Postgres service → Variables).
+   3. Redeploy the **1a** main app so it connects with the new password. The Pre-deploy step must **not** be set yet.
+   4. Check that the app works (dashboard loads, same totals).
+4. **Order matters:** regenerate the password **before** setting the Pre-deploy step in step 4. Otherwise the redeploy needed for the new password runs 1a with the Pre-deploy step and is aborted ("alembic: not found").
+
+## Step 1: check the schema against the baseline (read-only)
+
+1. Make the schema-only dump. This is a read-only command; no data is exported.
    ```powershell
    & "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" --schema-only --no-owner --no-privileges `
-       -f prod_schema.sql "<PROD_SCHEMA_DUMP_URL from .env>"
+       -f prod_schema.sql "<TCP proxy URL>"
    ```
    - Keep `prod_schema.sql` **outside the repo**, or delete it afterwards. Never commit it.
    - Use pg_dump 18. It can dump older servers.
@@ -34,68 +78,70 @@ Deploy 1a first (`DEPLOY_1A.md`); 1b builds on it.
    ```
 3. Read the result:
    - **`IDENTICAL`:** go to step 2.
-   - **Differences:** do **not** stamp. Send me the diff (it is DDL only, with no data or passwords). I'll adjust the baseline, or add a migration `0001a` that brings production into line, and re-run the checks.
+   - **Differences:** do **not** stamp. Close the access window (see above) and send me the diff. It is DDL only, with no data or passwords. I'll adjust the baseline, or add a migration `0001a` that brings production into line, and re-run the checks.
 
-   **Expected difference:** if production ever ran the old startup `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, then `brand`, `warehouse_part`, `placement_type` and `location_code` may carry server defaults (`DEFAULT 'ALLBIRDS'` and so on) that the baseline doesn't have. Other drift is possible on a database built by `create_all` over time, such as missing indexes or different nullability.
+**Expected differences:**
+- If production ever ran the old startup `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, then `brand`, `warehouse_part`, `placement_type` and `location_code` may carry server defaults (`DEFAULT 'ALLBIRDS'` and so on) that the baseline doesn't have.
+- Other drift is possible on a database built by `create_all` over time, such as missing indexes or different nullability.
+- Also look for stray v2 tables (`brands`, `products`, `skus`, ...). See HANDOFF.
 
-## BLOCKER: Part 2 duplicate active rows (migration 0003)
-
-Allbirds (Part 1, Lines) is out of scope: one row per carton is normal there and is never reported or changed.
-
-On `warehouse_dev`, 0003 finds **5 Part 2 slots with 11 active rows** and refuses (nothing changed):
-
-| Brand | Style / color / pcs per box | Location | Rows |
-|---|---|---|---|
-| Von Dutch | VDBP-039 / CAMO / 8 | Row 4 • Sec 21 • Lvl 1 | 3 |
-| Von Dutch | VDSB-2116 / LIGHT DENIM / 48 | Row 11 • Ground BACK • Lvl 1 | 2 |
-| Valentino | VOSB-030 / BLACK / 10 | Row 12 • Ground BACK • Lvl 2 | 2 |
-| Ed Hardy | EHBG-002 / BLACK / 16 | Row 14 • Ground FRONT • Lvl 1 | 2 |
-| Ed Hardy | EHSPE-001 / PINK / 24 | Row 15 • Ground FRONT • Lvl 1 | 2 |
-
-Production may differ.
-
-Consequences:
-- Until Part 2 is clean, `alembic upgrade head` fails and **1b cannot deploy**. It fails safely: nothing is changed and the old version keeps running.
-- For the same reason, warehouse_dev stays at 0002, and the 1b app refuses to start on it.
-
-Listing the duplicates needs **data**, not just the schema:
-```powershell
-python scripts/report_duplicate_active_rows.py duplicates.csv    # READ ONLY, DATABASE_URL = target DB
-```
-Running this against production reads production data, so it needs your explicit OK first.
-
-**Plan (decided):** VD & VO get new locations (format `R<row>-S<section>-<level>`, e.g. `R3-S5-2`) and a fresh initial count. Their old rows are replaced, not merged. That replacement is a separate, reviewed step. 0003 can only be applied once Part 2 has no duplicate active rows.
-
-Verified on a throw-away copy of warehouse_dev:
-- **Duplicates present:** 0003 refuses and the DB stays at 0002.
-- **Duplicates cleared (on the copy only):** 0003 applies.
-- **Both cases:** all 14 Lines are identical before and after: 8,610 rows, 209,162 pcs, 14,632 boxes, every row and its history.
-
-## Step 2: back up production
-
-Do this immediately before migrating, from a machine with pg_dump 18:
+## Step 2: back up (production)
 
 ```powershell
-& "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" -Fc -f "wms_prod_before_1b_<date>.dump" "<prod URL>"
+& "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" -Fc -f "C:\WMS-backups\wms_prod_before_1b_<date>.dump" "<TCP proxy URL>"
 ```
 
-Store the backup somewhere safe, not in the repo. Restoring it means `pg_restore --clean -d <url> file.dump`.
+Store the backup outside the repo. Restoring it means `pg_restore --clean -d <url> file.dump`.
 
-## Step 3: stamp production (once)
+## Step 3: stamp (once per database)
 
-Stamping tells Alembic "this DB already has the baseline". It writes only the `alembic_version` table.
+Stamping tells Alembic "this DB already has the baseline". It writes only the `alembic_version` table. The running 1a app ignores that table, so stamping can happen before deploy day.
 
+Run it from a `phase-1b-a` checkout, because 1a has no Alembic:
 ```powershell
-$env:DATABASE_URL = "<prod URL>"      # only in this shell, then close it
+$env:DATABASE_URL = "<TCP proxy URL>"      # only in this shell, then close it
 .venv\Scripts\alembic stamp 0001
-.venv\Scripts\alembic current           # -> 0001
+.venv\Scripts\alembic current               # -> 0001
 ```
 
-## Step 4: deploy
+Then close the access window: remove the proxy, regenerate the password, redeploy 1a, check.
 
-Do this only after the blocker above is resolved. Merge the 1b PR, then deploy. Railway runs `alembic upgrade head`, which applies 0002 and 0003 in a single transaction, and only then starts the app.
-- Check the deploy log for `Running upgrade 0002 -> 0003` and `[Database] Schema at migration 0003.`
-- 0002 adds a column with a constant default and swaps one foreign key. On about 10k rows this takes well under a second, with no table rewrite.
+## Deploy order (staging first, then production)
+
+**Before you start (dashboard, read only):** for the main service, note:
+- Settings → Source: which branch it deploys from, and whether automatic deployments are on;
+- Deploy → Healthcheck path (expected: empty).
+
+If automatic deployments are on for `main`, merging the PR **is** the deploy.
+
+| # | Step | Staging | Production |
+|---|---|---|---|
+| 0 | Fresh data | Restore a current production dump into staging | (none) |
+| 1 | Access window open; schema dump and compare | must be `IDENTICAL`, else stop | must be `IDENTICAL`, else stop |
+| 2 | Backup | (none) | `wms_prod_before_1b_<date>.dump` |
+| 3 | `alembic stamp 0001`, `alembic current` → `0001`; close the window (remove proxy, regenerate password, redeploy 1a, check) | yes | yes |
+| 4 | **Settings → Deploy → Pre-deploy step = `alembic upgrade head`**. Leave Start command empty. | yes | yes, **right before step 5** |
+| 5 | Deploy 1b-a | Point the staging main service at `phase-1b-a`; this starts the deploy | Merge the 1b-a PR into `main`; deploy |
+| 6 | Deploy log | Pre-deploy shows `Running upgrade 0001 -> 0002`; app log shows `[Database] Schema at migration 0002.` | same |
+| 7 | Smoke checklist (below); dashboard totals unchanged | yes | yes |
+| 8 | Rehearse the undo: clear Pre-deploy, redeploy 1a, check that 1a runs on 0002, set Pre-deploy again, redeploy 1b-a | yes | **no** |
+
+**Notes:**
+- **Step 4 may redeploy 1a.** If saving the Pre-deploy step ("Deploy staged changes") redeploys the current 1a deployment, that deploy fails at "alembic: not found" and is aborted. This is expected and harmless: 1a keeps running and the DB stays at 0001. Rehearse it on staging so it is no surprise on production.
+- **Keep the Pre-deploy step set after 1b-a.** 1b-b (0003) and every later migration need it.
+- **0002 is fast.** It adds a column with a constant default and swaps one foreign key. On about 10k rows this takes well under a second, with no table rewrite.
+
+## Undo
+
+| Situation | Undo |
+|---|---|
+| Only stamped (step 3), 1a running | Nothing needed: 1a works with the stamp. Leave it; the next attempt reuses it. |
+| Pre-deploy step set (step 4), 1b-a not deployed | Clear the Pre-deploy field and save. The DB is unchanged at 0001. |
+| 1b-a deploy failed in the Pre-deploy step | Railway aborted it and 1a keeps running. The migrations run in one transaction, so the DB stays at 0001. Clear the field, keep the log and stop. |
+| 1b-a is running, you want 1a back | ① **First clear the Pre-deploy field** (otherwise the 1a redeploy fails at "alembic: not found"). ② Deployments → the previous 1a deployment → **Redeploy**. ③ The schema stays at 0002, which 1a works with: it ignores `is_active` (deactivated rows would just reappear), and RESTRICT only makes 1a's delete fail on rows with history, which 1a already blocks. ④ Optional, only with an explicit OK: `alembic downgrade 0001` from a `phase-1b-a` checkout, through an access window. It removes `is_active` and restores the CASCADE foreign key, with no rows deleted. |
+| Last resort | Restore the step-2 backup. |
+
+Downgrading below 0001 is refused unless `ALLOW_BASELINE_DOWNGRADE=1`. Never set that on production.
 
 ## Staging / smoke checklist (after deploy)
 
@@ -107,20 +153,12 @@ Do this only after the blocker above is resolved. Merge the 1b PR, then deploy. 
 - [ ] The movement log shows DEACTIVATE/REACTIVATE with your name.
 - [ ] QR picking and inbound approval still work.
 
-## Rollback
-
-- **Code only:** redeploy the previous (1a) deployment in Railway. The 1a code works with the 0002 schema: it ignores `is_active`, and deactivated rows would just reappear. RESTRICT only makes 1a's delete fail on rows with history, and 1a already blocks those.
-- **Schema:** `alembic downgrade 0002` drops only the unique index. `alembic downgrade 0001` (with DATABASE_URL set to prod) removes `is_active` and restores the CASCADE foreign key. No rows are deleted. Downgrading below 0001 is refused unless `ALLOW_BASELINE_DOWNGRADE=1`. Never set that on production.
-- **Last resort:** restore the step-2 backup.
-
 ## Local dev database
 
-`warehouse_dev` went through exactly this path:
+`warehouse_dev` went through this path:
 1. Schema identical to the baseline.
 2. Backup.
 3. `stamp 0001`.
 4. `upgrade head`.
 
-Afterwards all 9,789 rows are active, total units are unchanged, and the history is intact.
-
-Migration 0003 was then **refused** on warehouse_dev (5 Part 2 duplicate slots, nothing changed), so the database is at 0002.
+Afterwards all 9,789 rows were active, total units were unchanged, and the history was intact.
