@@ -1,7 +1,7 @@
 # Deploying Phase 1b (Alembic, protected history, deactivate)
 
 **1b ships in two steps:**
-- **1b-a** (branch `phase-1b-a`, this document): Alembic, migrations 0001 and 0002, protected history, deactivate. Head = **0002**.
+- **1b-a** (branch `phase-1b-a`, this document): Alembic, migrations 0001, 0001a and 0002, protected history, deactivate. Head = **0002**.
 - **1b-b** (branch `phase-1b-foundation`): migration 0003 (one active Part 2 row per slot). Deploy it only after the Part 2 duplicates are deactivated in the app (see "Migration 0003 comes later").
 
 **Status:** ready to deploy once steps 1–3 pass, on staging first, then production.
@@ -25,6 +25,7 @@ Deploy 1a first (`DEPLOY_1A.md`); 1b builds on it.
 | Alembic manages the schema | The app no longer runs `create_all` or `ALTER TABLE` at startup. It **refuses to start** if the DB is not at the latest migration (0002). |
 | Dashboard Pre-deploy step `alembic upgrade head` | Railway runs the migrations before each deploy. If they fail, the deploy is aborted and the old version keeps running. |
 | Migration `0001` (baseline) | Creates nothing on an existing DB. If the tables already exist without a stamp, it **refuses to run**. |
+| Migration `0001a` | Brings an existing DB in line with the baseline: creates the 5 `inventory_items` indexes that the old startup code never made, and drops the old server defaults on `brand`/`warehouse_part`/`placement_type` (`'ALLBIRDS'`/`'PART_1'`/`'RACK'`; every insert path sets these itself). **Changes no rows.** On a fresh DB it does nothing. |
 | Migration `0002` | `stock_movements.item_id` changes to `ON DELETE RESTRICT`, so the DB itself refuses to delete history. Adds `inventory_items.is_active BOOLEAN NOT NULL DEFAULT true` with an index. All existing rows stay active. No data is changed. |
 | `upgrade head` is all-or-nothing | All pending migrations run in one transaction. If anything fails, production stays at 0001. |
 | CSV export | Excludes deactivated rows. Admins get an extra "Export incl. Deactivated (Audit)" button that adds an ACTIVE column. Managers get 403 for that option. |
@@ -78,7 +79,8 @@ Production Postgres has had no public access since 2026-11-21. Steps 1–3 run f
    ```
 3. Read the result:
    - **`IDENTICAL`:** go to step 2.
-   - **Differences:** do **not** stamp. Close the access window (see above) and send me the diff. It is DDL only, with no data or passwords. I'll adjust the baseline, or add a migration `0001a` that brings production into line, and re-run the checks.
+   - **Only the known drift that `0001a` fixes:** go to step 2. That drift is exactly 5 missing `inventory_items` indexes (`idx_item_part_line_sec`, `ix_inventory_items_brand`, `ix_inventory_items_location_code`, `ix_inventory_items_placement_type`, `ix_inventory_items_warehouse_part`) and `DEFAULT 'ALLBIRDS'`/`'PART_1'`/`'RACK'` on `brand`/`warehouse_part`/`placement_type`. Staging showed exactly this on 2026-11-26.
+   - **Any other difference:** do **not** stamp. Close the access window (see above) and send me the diff. It is DDL only, with no data or passwords. I'll adjust the baseline, or add a migration `0001a` that brings production into line, and re-run the checks.
 
 **Expected differences:**
 - If production ever ran the old startup `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, then `brand`, `warehouse_part`, `placement_type` and `location_code` may carry server defaults (`DEFAULT 'ALLBIRDS'` and so on) that the baseline doesn't have.
@@ -117,12 +119,12 @@ If automatic deployments are on for `main`, merging the PR **is** the deploy.
 | # | Step | Staging | Production |
 |---|---|---|---|
 | 0 | Fresh data | Restore a current production dump into staging | (none) |
-| 1 | Access window open; schema dump and compare | must be `IDENTICAL`, else stop | must be `IDENTICAL`, else stop |
+| 1 | Access window open; schema dump and compare | `IDENTICAL` or only the known `0001a` drift, else stop | `IDENTICAL` or only the known `0001a` drift, else stop |
 | 2 | Backup | (none) | `wms_prod_before_1b_<date>.dump` |
 | 3 | `alembic stamp 0001`, `alembic current` → `0001`; close the window (remove proxy, regenerate password, redeploy 1a, check) | yes | yes |
 | 4 | **Settings → Deploy → Pre-deploy step = `alembic upgrade head`**. Leave Start command empty. | yes | yes, **right before step 5** |
 | 5 | Deploy 1b-a | Point the staging main service at `phase-1b-a`; this starts the deploy | Merge the 1b-a PR into `main`; deploy |
-| 6 | Deploy log | Pre-deploy shows `Running upgrade 0001 -> 0002`; app log shows `[Database] Schema at migration 0002.` | same |
+| 6 | Deploy log | Pre-deploy shows `Running upgrade 0001 -> 0001a` and `Running upgrade 0001a -> 0002`; app log shows `[Database] Schema at migration 0002.` | same |
 | 7 | Smoke checklist (below); dashboard totals unchanged | yes | yes |
 | 8 | Rehearse the undo: clear Pre-deploy, redeploy 1a, check that 1a runs on 0002, set Pre-deploy again, redeploy 1b-a | yes | **no** |
 

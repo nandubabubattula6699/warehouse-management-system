@@ -5,7 +5,9 @@
 - **Alembic**
   - Added `alembic.ini` and `migrations/`. The DB URL comes from `app.database`, with the same rules as the app.
   - `0001` baseline: built from the local schema and identical to `warehouse_dev` (75 DDL statements). It still has to be checked against the production dump. It refuses to run on existing unstamped tables, and refuses to downgrade without `ALLOW_BASELINE_DOWNGRADE=1`.
+  - `0001a`: aligns an existing database with the baseline (drift found on staging, 2026-11-26). Creates the 5 missing `inventory_items` indexes (`IF NOT EXISTS`, so a no-op on a fresh DB) and drops the server defaults on `brand`/`warehouse_part`/`placement_type` (every insert path sets them explicitly). Changes no rows. Its downgrade intentionally changes nothing (0001 = the baseline).
   - `0002`: `stock_movements.item_id` FK changed to `ON DELETE RESTRICT`. Added `inventory_items.is_active` (NOT NULL, default true, indexed). Reversible.
+  - `scripts/compare_schema.py` ignores the column order inside `CREATE TABLE` (columns added later by `ALTER TABLE` sit at the end).
 - **No schema changes from app code**
   - Removed `init_db()`/`create_all` and the startup `ALTER TABLE ... ADD COLUMN`.
   - Startup refuses to run if the DB isn't at the head migration.

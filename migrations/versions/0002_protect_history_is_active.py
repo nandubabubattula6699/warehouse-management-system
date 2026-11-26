@@ -8,7 +8,7 @@
    instead of deleted. Every existing row becomes active (no behaviour change on upgrade).
 
 Revision ID: 0002
-Revises: 0001
+Revises: 0001a
 Create Date: 2026-11-20
 """
 from typing import Sequence, Union
@@ -18,7 +18,7 @@ import sqlalchemy as sa
 
 
 revision: str = '0002'
-down_revision: Union[str, None] = '0001'
+down_revision: Union[str, None] = '0001a'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

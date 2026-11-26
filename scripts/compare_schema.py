@@ -1,6 +1,7 @@
 """
-Compare two `pg_dump --schema-only` files, ignoring ordering, comments, SET lines, ownership noise
-and the alembic_version table. Used to check a database against the Alembic baseline before stamping.
+Compare two `pg_dump --schema-only` files, ignoring ordering (of statements and of the columns inside
+CREATE TABLE), comments, SET lines, ownership noise and the alembic_version table. Used to check a
+database against the Alembic baseline before stamping.
 
     python scripts/compare_schema.py expected.sql actual.sql
 
@@ -13,6 +14,24 @@ import re
 import sys
 
 _SKIP_PREFIXES = ("SET ", "SELECT pg_catalog.set_config", "ALTER SCHEMA ", "CREATE SCHEMA ", "COMMENT ON SCHEMA ")
+
+
+def _sort_columns(stmt: str) -> str:
+    """CREATE TABLE t ( a ..., b ... ) -> columns sorted, so a column added later with ALTER TABLE
+    (it sits at the end) compares equal. Splits only on top-level commas: numeric(10,2) stays whole."""
+    if not stmt.startswith("CREATE TABLE ") or not stmt.endswith(")") or " ( " not in stmt:
+        return stmt
+    head, body = stmt.split(" ( ", 1)
+    cols, depth, cur = [], 0, ""
+    for ch in body[:-1]:
+        depth += (ch == "(") - (ch == ")")
+        if ch == "," and depth == 0:
+            cols.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    cols.append(cur.strip())
+    return f"{head} ( {', '.join(sorted(cols))} )"
 
 
 def normalize(path: str) -> list[str]:
@@ -28,7 +47,7 @@ def normalize(path: str) -> list[str]:
         s = re.sub(r" OWNER TO \S+", "", s)
         if s.startswith("ALTER TABLE") and s.endswith("OWNER"):
             continue
-        stmts.append(s)
+        stmts.append(_sort_columns(s))
     return sorted(stmts)
 
 

@@ -127,6 +127,46 @@ def test_stamp_then_upgrade_existing_database(migr_engine):
     assert f"{HEAD} (head)" in r.stdout
 
 
+_DRIFT_INDEXES = {"idx_item_part_line_sec", "ix_inventory_items_brand", "ix_inventory_items_location_code",
+                  "ix_inventory_items_placement_type", "ix_inventory_items_warehouse_part"}
+
+
+def test_0001a_aligns_drifted_database_and_changes_no_row(migr_engine):
+    """Staging/production drift (2026-11-26 dump): 5 inventory_items indexes missing and server defaults
+    on brand/warehouse_part/placement_type. stamp 0001 -> upgrade head must fix exactly that."""
+    _alembic("upgrade", "0001")
+    with migr_engine.begin() as conn:
+        conn.execute(text("DROP TABLE alembic_version"))
+        for name in _DRIFT_INDEXES:
+            conn.execute(text(f"DROP INDEX {name}"))
+        for col, val in (("brand", "ALLBIRDS"), ("warehouse_part", "PART_1"), ("placement_type", "RACK")):
+            conn.execute(text(f"ALTER TABLE inventory_items ALTER COLUMN {col} SET DEFAULT '{val}'"))
+        _insert_line_cartons(conn)
+        before = conn.execute(text("SELECT * FROM inventory_items ORDER BY id")).fetchall()
+    _alembic("stamp", "0001")
+    _alembic("upgrade", "head")
+    assert f"{HEAD} (head)" in _alembic("current").stdout
+    insp = inspect(migr_engine)
+    assert _DRIFT_INDEXES <= {i["name"] for i in insp.get_indexes("inventory_items")}
+    defaults = {c["name"]: c["default"] for c in insp.get_columns("inventory_items")}
+    assert [defaults[c] for c in ("brand", "warehouse_part", "placement_type")] == [None, None, None]
+    with migr_engine.connect() as conn:
+        after = conn.execute(text("SELECT * FROM inventory_items ORDER BY id")).fetchall()
+    assert [r[:-1] for r in after] == [tuple(r) for r in before]  # last column = is_active (new in 0002)
+
+
+def test_compare_schema_ignores_column_order(tmp_path):
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    from compare_schema import normalize
+    a, b = tmp_path / "a.sql", tmp_path / "b.sql"
+    a.write_text("CREATE TABLE public.t (\n    id integer NOT NULL,\n    price numeric(10,2),\n    brand text\n);\n")
+    b.write_text("CREATE TABLE public.t (\n    id integer NOT NULL,\n    brand text,\n    price numeric(10,2)\n);\n")
+    assert normalize(str(a)) == normalize(str(b))
+    b.write_text("CREATE TABLE public.t (\n    id integer NOT NULL,\n    brand text DEFAULT 'X',\n"
+                 "    price numeric(10,2)\n);\n")
+    assert normalize(str(a)) != normalize(str(b))
+
+
 def _insert_p2(conn, style, qty, active=True, pcs=8, box=None):
     """A Part 2 (Rows) row; is_active only exists from 0002 on."""
     conn.execute(text(
