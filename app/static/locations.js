@@ -221,7 +221,57 @@ document.getElementById("linkApplyBtn").addEventListener("click", async () => {
   showToast(`Linked ${data.linked} row(s), ${data.pieces} pcs. Linked in total: ${data.linked_after.rows} rows / ${data.linked_after.pieces} pcs`, "success");
   linkPlan = null;
   document.getElementById("linkApplyBtn").disabled = true;
+  loadLinkRuns();
 });
+
+// ---- D2 undo: unlink a whole link run (default: the last one) or every row at one location
+let unlinkPlan = null;
+
+async function loadLinkRuns() {
+  const sel = document.getElementById("unlinkRun");
+  const { res, data } = await getJson("/api/locations/unlink/runs");
+  if (!res.ok) return;
+  sel.textContent = "";
+  sel.appendChild(el("option", "", data.length ? "Link run…" : "No link runs yet"));
+  sel.firstChild.value = "";
+  data.forEach((r, i) => {
+    const o = el("option", "", `${i === 0 ? "Last run: " : ""}${r.run} · ${r.rows} rows · ${r.by} · ${String(r.at).replace("T", " ").slice(0, 16)}`);
+    o.value = r.run;
+    sel.appendChild(o);
+  });
+  if (data.length) sel.value = data[0].run;
+}
+
+document.getElementById("unlinkPreviewBtn").addEventListener("click", async () => {
+  const run = document.getElementById("unlinkRun").value;
+  const code = document.getElementById("unlinkCode").value.trim();
+  if (!!run === !!code) { showToast("Choose a link run OR type one location code", "error"); return; }
+  const qs = run ? `run=${encodeURIComponent(run)}` : `code=${encodeURIComponent(code)}`;
+  const { res, data } = await getJson(`/api/locations/unlink/preview?${qs}`);
+  if (!res.ok) { showToast(data.detail || "Preview failed", "error"); return; }
+  unlinkPlan = data;
+  const box = document.getElementById("unlinkResult");
+  box.textContent = "";
+  box.appendChild(listBlock(`Will be unlinked (${data.pieces} pcs; quantities unchanged)`, data.will_unlink.map(rowLine), "border-red-500/40 text-red-200"));
+  if (data.skipped.length) box.appendChild(listBlock("Skipped: changed since that run", data.skipped.map(r => rowLine(r) + ` · now: ${r.now}`), "border-slate-600 text-slate-300"));
+  box.hidden = false;
+  document.getElementById("unlinkApplyBtn").disabled = !data.can_apply;
+});
+
+document.getElementById("unlinkApplyBtn").addEventListener("click", async () => {
+  if (!unlinkPlan) return;
+  if (!confirm(`Unlink ${unlinkPlan.will_unlink.length} row(s)?\n\nQuantities do not change. Each unlink is recorded with your name.`)) return;
+  const body = { plan_hash: unlinkPlan.plan_hash, run: unlinkPlan.run, code: unlinkPlan.code };
+  const { res, data } = await post("/api/locations/unlink/apply", body);
+  if (!res.ok) { showToast(data.detail || "Nothing was changed", "error"); return; }
+  showToast(`Unlinked ${data.unlinked} row(s)${data.skipped ? `, ${data.skipped} skipped` : ""}`, "success");
+  unlinkPlan = null;
+  document.getElementById("unlinkApplyBtn").disabled = true;
+  document.getElementById("unlinkResult").hidden = true;
+  loadLinkRuns();
+});
+
+loadLinkRuns();
 
 document.querySelectorAll(".label-btn").forEach(btn => btn.addEventListener("click", () => {
   const kind = btn.dataset.label;

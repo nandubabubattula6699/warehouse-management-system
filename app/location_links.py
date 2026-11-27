@@ -6,6 +6,8 @@ Part 2 stock <-> locations (steps D0-D3). Part 1 (Allbirds, Lines) is never sele
       spots that DO exist (e.g. the "to be counted" entries) are listed and only included when ticked.
   D1  link_plan: read-only match report (row/section/level -> location code).
   D2  apply_links: set inventory_items.location_id, each with a recorded 0-pc LOCATION_LINK movement.
+  D2u unlink_runs / unlink_plan / apply_unlink: undo links, either a whole D2 run (default: the last one) or every row at
+      one location code; each with a recorded 0-pc LOCATION_UNLINK movement. Rows changed since the run are skipped.
   D3  part2_location_id: every Part 2 write resolves its spot; with PART2_LOCATIONS_ENFORCED on, a spot that is not
       an active location is refused (409, nothing saved).
 Every apply re-plans under an advisory lock and refuses unless the plan is exactly the one the admin previewed.
@@ -13,6 +15,7 @@ Every apply re-plans under an advisory lock and refuses unless the plan is exact
 import hashlib
 import json
 import os
+import re
 
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -23,6 +26,8 @@ from app.models import InventoryItem, Location, StockMovement
 
 LOCK_KEY = "part2_locations_import"  # same lock as the row-size import: one location change at a time
 EMPTY_ROW_REASON = "Bulk deactivate before location linking: Part 2 row at qty 0"
+LINK_REASON = "Linked to location {code} [link run {run}]"
+_LINK_RE = re.compile(r"^Linked to location (\S+) \[link run ([0-9a-f]{12})\]$")
 
 
 def _hash(obj) -> str:
@@ -134,6 +139,7 @@ def apply_links(db: Session, plan_hash: str, actor: str) -> dict:
         raise ValueError("Rows with stock have no active location (or are linked elsewhere). Nothing was changed.")
     if not plan["will_link"]:
         raise ValueError("Nothing to link.")
+    run = plan_hash[:12]
     wanted = {r["id"]: (r["location_id"], r["code"]) for r in plan["will_link"]}
     items = (db.query(InventoryItem).filter(InventoryItem.id.in_(list(wanted))).order_by(InventoryItem.id)
              .with_for_update().all())
@@ -141,9 +147,84 @@ def apply_links(db: Session, plan_hash: str, actor: str) -> dict:
         loc_id, code = wanted[item.id]
         item.location_id = loc_id
         db.add(StockMovement(item_id=item.id, style=item.style, change_amount=0, quantity_after=item.quantity,
-                             movement_type="LOCATION_LINK", reason=f"Linked to location {code}", staff_name=actor))
+                             movement_type="LOCATION_LINK", reason=LINK_REASON.format(code=code, run=run),
+                             staff_name=actor))
     db.flush()
-    return {"linked": len(items), "pieces": sum(i.quantity for i in items), "linked_after": plan["linked_after"]}
+    return {"linked": len(items), "pieces": sum(i.quantity for i in items), "linked_after": plan["linked_after"],
+            "run": run}
+
+
+# ----------------------------------------------------------------------------- D2 undo (unlink)
+def unlink_runs(db: Session) -> list:
+    """D2 runs, newest first: run id, when, who, rows linked."""
+    runs = {}
+    for mv in db.query(StockMovement).filter(StockMovement.movement_type == "LOCATION_LINK").order_by(StockMovement.id):
+        m = _LINK_RE.match(mv.reason or "")
+        if not m:
+            continue
+        r = runs.setdefault(m.group(2), {"run": m.group(2), "at": mv.created_at, "by": mv.staff_name, "rows": 0, "_last": 0})
+        r["rows"] += 1
+        r["_last"] = mv.id
+    out = sorted(runs.values(), key=lambda r: r["_last"], reverse=True)
+    for r in out:
+        del r["_last"]
+    return out
+
+
+def unlink_plan(db: Session, run: str = None, code: str = None) -> dict:
+    """Rows a run (or one location code) would unlink, and the rows skipped because they changed since the run."""
+    if bool(run) == bool(code):
+        raise ValueError("Choose exactly one: a link run or a location code.")
+    by_id = {loc.id: loc.code for loc in db.query(Location)}
+    will, skipped = [], []
+    if run:
+        linked_code = {}
+        for mv in (db.query(StockMovement).filter(StockMovement.movement_type == "LOCATION_LINK")
+                   .order_by(StockMovement.id)):
+            m = _LINK_RE.match(mv.reason or "")
+            if m and m.group(2) == run:
+                linked_code[mv.item_id] = m.group(1)
+        if not linked_code:
+            raise LookupError(f"Link run {run} not found.")
+        for item in db.query(InventoryItem).filter(InventoryItem.id.in_(list(linked_code))).order_by(InventoryItem.id):
+            info = _row_info(item, linked_code[item.id])
+            current = by_id.get(item.location_id)
+            if current == linked_code[item.id]:
+                will.append(info)
+            else:
+                info["now"] = current or "not linked"
+                skipped.append(info)
+    else:
+        code = code.strip().upper()
+        loc = db.query(Location).filter(Location.code == code).first()
+        if not loc:
+            raise LookupError(f"Location '{code}' not found.")
+        for item in db.query(InventoryItem).filter(InventoryItem.location_id == loc.id).order_by(InventoryItem.id):
+            will.append(_row_info(item, code))
+    return {"run": run, "code": code, "will_unlink": will, "skipped": skipped,
+            "pieces": sum(r["quantity"] for r in will),
+            "plan_hash": _hash([run, code, [(r["id"], r["code"]) for r in will]]), "can_apply": bool(will)}
+
+
+def apply_unlink(db: Session, plan_hash: str, actor: str, run: str = None, code: str = None) -> dict:
+    """Caller commits. Clears location_id on exactly the previewed rows; quantities never change."""
+    _lock(db)
+    plan = unlink_plan(db, run=run, code=code)
+    if plan["plan_hash"] != plan_hash:
+        raise LookupError("Links changed since this preview. Preview again: nothing was changed.")
+    if not plan["will_unlink"]:
+        raise ValueError("Nothing to unlink.")
+    wanted = {r["id"]: r["code"] for r in plan["will_unlink"]}
+    items = (db.query(InventoryItem).filter(InventoryItem.id.in_(list(wanted))).order_by(InventoryItem.id)
+             .with_for_update().all())
+    why = f" (undo of link run {run})" if run else ""
+    for item in items:
+        item.location_id = None
+        db.add(StockMovement(item_id=item.id, style=item.style, change_amount=0, quantity_after=item.quantity,
+                             movement_type="LOCATION_UNLINK", reason=f"Unlinked from location {wanted[item.id]}{why}",
+                             staff_name=actor))
+    db.flush()
+    return {"unlinked": len(items), "pieces": sum(i.quantity for i in items), "skipped": len(plan["skipped"])}
 
 
 # ----------------------------------------------------------------------------- D3

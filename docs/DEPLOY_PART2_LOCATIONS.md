@@ -55,6 +55,9 @@ write would be refused. While it is off, writes still link to the spot automatic
 ## Undo
 
 - Before D2: redeploy the previous version; `0004` can be downgraded (it refuses while any row is linked).
-- After D2: links are recorded (`LOCATION_LINK` movements). Turning enforcement off (`PART2_LOCATIONS_ENFORCED` unset)
-  restores the old write behaviour without touching data. Removing links needs a reviewed, recorded step; never SQL.
+- A wrong spot on one row: edit the row on Manage (recorded `ROW_EDIT`); its link follows the corrected spot.
+- A whole D2 run: `/locations` step 6, choose the run (the last one is preselected) → preview → unlink. Each row gets a
+  recorded `LOCATION_UNLINK` movement; quantities never change; rows changed since the run are skipped and listed.
+  Turn enforcement off first if the rows should stay unlinked (with it on, the next write links them again).
+- Turning enforcement off (`PART2_LOCATIONS_ENFORCED` unset) restores the old write behaviour without touching data.
 - Locations are never deleted: re-import a corrected workbook to deactivate or reactivate spots.

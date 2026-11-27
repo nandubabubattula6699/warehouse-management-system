@@ -205,3 +205,9 @@ class EmptyRowsApplyPayload(BaseModel):
 
 class LinkApplyPayload(BaseModel):
     plan_hash: str
+
+class UnlinkApplyPayload(BaseModel):
+    """Undo links: exactly one of run (a D2 link run id) or code (a location code), plus the preview's plan_hash."""
+    plan_hash: str
+    run: Optional[str] = None
+    code: Optional[str] = None

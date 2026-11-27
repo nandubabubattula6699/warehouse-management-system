@@ -94,6 +94,22 @@
       </div>
     </section>
 
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+      <h2 class="text-sm font-bold uppercase text-slate-300">6. Undo links (unlink)</h2>
+      <p class="text-xs text-slate-400">Removes links only; quantities never change. Each row gets a recorded 0-pc LOCATION_UNLINK movement with your name.
+        A run undo skips rows that were edited or moved since that run. To correct one row's spot, edit the row on Manage instead.</p>
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <select id="unlinkRun" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-2"><option value="">Link run…</option></select>
+        <span class="text-slate-500">or</span>
+        <input id="unlinkCode" type="text" placeholder="One location, e.g. R4-S21-L1" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 font-mono uppercase w-48">
+        <button id="unlinkPreviewBtn" type="button" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2 rounded-lg">Preview (changes nothing)</button>
+      </div>
+      <div id="unlinkResult" class="space-y-3 text-xs" hidden></div>
+      <div class="flex items-center gap-3">
+        <button id="unlinkApplyBtn" type="button" class="bg-red-500 hover:bg-red-400 text-white font-black px-4 py-2 rounded-lg text-xs disabled:opacity-40" disabled>Unlink exactly this preview</button>
+      </div>
+    </section>
+
     <div id="toast" class="fixed bottom-4 right-4 max-w-md px-4 py-3 rounded-xl text-sm font-semibold shadow-xl" hidden></div>
   </main>
 

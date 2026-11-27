@@ -216,3 +216,75 @@ def test_enforcement_never_touches_allbirds(manager, db, spots, enforced):
     r = manager.post("/api/receiving", json={"style": "TB1WJBK", "line": "2", "section": "1", "level": "4", "quantity": 5})
     assert r.status_code == 200
     assert db.execute(text("SELECT count(*) FROM inventory_items WHERE location_id IS NOT NULL")).scalar() == 0
+
+
+# ----------------------------------------------------------------------------- D2 undo (unlink)
+def _link_all(admin):
+    plan = admin.get("/api/locations/link/preview").json()
+    r = admin.post("/api/locations/link/apply", json={"plan_hash": plan["plan_hash"]})
+    assert r.status_code == 200, r.text
+    return r.json()["run"]
+
+
+def test_unlink_last_run_skips_rows_changed_since(admin, manager, db, spots):
+    a = p2(db, "A", "4", "1", "1", 24)
+    b = p2(db, "B", "15", "FRONT", "1", 10)
+    moved = p2(db, "M", "4", "1", "1", 8, pcs=9)
+    run = _link_all(admin)
+    runs = admin.get("/api/locations/unlink/runs").json()
+    assert runs[0]["run"] == run and runs[0]["rows"] == 3 and runs[0]["by"] == "Linkadmin Person"
+    # one row is moved to another spot after the run: its link now comes from that edit
+    body = {"style": "M", "color": "BLACK", "size": "OS", "row_pos": "4", "section": "1", "level": "2",
+            "pcs_per_box": 9, "quantity": 8}
+    assert manager.put(f"/api/items/{moved.id}", json=body).status_code == 200
+
+    plan = admin.get("/api/locations/unlink/preview", params={"run": run}).json()
+    assert [r["id"] for r in plan["will_unlink"]] == [a.id, b.id] and plan["pieces"] == 34
+    assert [(r["id"], r["now"]) for r in plan["skipped"]] == [(moved.id, "R4-S1-L2")]
+    before = {i.id: i.quantity for i in db.query(InventoryItem)}
+    r = admin.post("/api/locations/unlink/apply", json={"plan_hash": plan["plan_hash"], "run": run})
+    assert r.status_code == 200 and r.json() == {"status": "ok", "unlinked": 2, "pieces": 34, "skipped": 1}
+    db.expire_all()
+    assert db.get(InventoryItem, a.id).location_id is None and db.get(InventoryItem, b.id).location_id is None
+    assert db.get(InventoryItem, moved.id).location_id == spots["R4-S1-L2"]
+    assert {i.id: i.quantity for i in db.query(InventoryItem)} == before
+    mv = db.query(StockMovement).filter_by(movement_type="LOCATION_UNLINK").order_by(StockMovement.id).all()
+    assert [(m.item_id, m.change_amount, m.staff_name) for m in mv] == [(a.id, 0, "Linkadmin Person"), (b.id, 0, "Linkadmin Person")]
+    assert mv[0].reason == f"Unlinked from location R4-S1-L1 (undo of link run {run})"
+    # the rows can be linked again by a new D2 run
+    assert admin.get("/api/locations/link/preview").json()["counts"]["will_link"] == 2
+
+
+def test_unlink_one_location_code(admin, db, spots):
+    a = p2(db, "A", "4", "1", "1", 24)
+    b = p2(db, "B", "15", "FRONT", "1", 10)
+    _link_all(admin)
+    plan = admin.get("/api/locations/unlink/preview", params={"code": "r15-gf-l1"}).json()
+    assert [r["id"] for r in plan["will_unlink"]] == [b.id]
+    r = admin.post("/api/locations/unlink/apply", json={"plan_hash": plan["plan_hash"], "code": "r15-gf-l1"})
+    assert r.status_code == 200 and r.json()["unlinked"] == 1
+    db.expire_all()
+    assert db.get(InventoryItem, a.id).location_id == spots["R4-S1-L1"] and db.get(InventoryItem, b.id).location_id is None
+
+
+def test_unlink_refuses_stale_bad_and_empty_requests(admin, db, spots):
+    p2(db, "A", "4", "1", "1", 24)
+    run = _link_all(admin)
+    plan = admin.get("/api/locations/unlink/preview", params={"run": run}).json()
+    admin.post("/api/locations/unlink/apply", json={"plan_hash": plan["plan_hash"], "run": run})
+    assert admin.post("/api/locations/unlink/apply", json={"plan_hash": plan["plan_hash"], "run": run}).status_code == 409
+    assert admin.get("/api/locations/unlink/preview").status_code == 400
+    assert admin.get("/api/locations/unlink/preview", params={"run": run, "code": "R4-S1-L1"}).status_code == 400
+    assert admin.get("/api/locations/unlink/preview", params={"run": "000000000000"}).status_code == 404
+    assert admin.get("/api/locations/unlink/preview", params={"code": "R1-S1-L1"}).status_code == 404
+    empty = admin.get("/api/locations/unlink/preview", params={"code": "W-SB-L1"}).json()
+    assert empty["can_apply"] is False
+    assert admin.post("/api/locations/unlink/apply", json={"plan_hash": empty["plan_hash"], "code": "W-SB-L1"}).status_code == 400
+
+
+@pytest.mark.parametrize("role", ["MANAGER", "STAFF"])
+def test_unlink_admin_only(db, spots, role):
+    c = _logged_in(db, "nounlink", role)
+    assert c.get("/api/locations/unlink/runs").status_code == 403
+    assert c.get("/api/locations/unlink/preview", params={"code": "R4-S1-L1"}).status_code == 403
+    assert c.post("/api/locations/unlink/apply", json={"plan_hash": "x", "code": "R4-S1-L1"}).status_code == 403

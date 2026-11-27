@@ -30,7 +30,7 @@ from app.schemas import (
     ReceivingPayload,
     InboundShipmentCreate,
     InboundShipmentResponse, InboundParseRequest, InboundApprovePayload, InboundRejectPayload,
-    LocationImportPayload, EmptyRowsApplyPayload, LinkApplyPayload,
+    LocationImportPayload, EmptyRowsApplyPayload, LinkApplyPayload, UnlinkApplyPayload,
 )
 
 # Route-level access rules (server-side; the frontend's hidden buttons are not security).
@@ -623,6 +623,42 @@ def link_report_csv(db: Session = Depends(get_db)):
                         r["pcs_per_box"] if r["pcs_per_box"] is not None else "", r["quantity"], r.get("linked_to", "")])
     return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=part2_location_link_report.csv"})
+
+
+@app.get("/api/locations/unlink/runs", dependencies=ADMIN_ONLY)
+def list_link_runs(db: Session = Depends(get_db)):
+    """READ ONLY: the D2 link runs, newest first."""
+    from app.location_links import unlink_runs
+    return unlink_runs(db)
+
+
+@app.get("/api/locations/unlink/preview", dependencies=ADMIN_ONLY)
+def preview_unlink(run: Optional[str] = Query(None), code: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    """READ ONLY: rows a link run (or one location code) would unlink, and rows skipped because they changed."""
+    from app.location_links import unlink_plan
+    try:
+        return unlink_plan(db, run=run, code=code)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/locations/unlink/apply")
+def apply_unlink_links(payload: UnlinkApplyPayload, db: Session = Depends(get_db),
+                       user: WarehouseUser = Depends(require_admin)):
+    """Undo links on exactly the previewed rows, each with a recorded 0-pc LOCATION_UNLINK movement."""
+    from app.location_links import apply_unlink
+    try:
+        result = apply_unlink(db, payload.plan_hash, _actor_name(user), run=payload.run, code=payload.code)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
+    db.commit()
+    return {"status": "ok", **result}
 
 
 @app.post("/api/locations/link/apply")

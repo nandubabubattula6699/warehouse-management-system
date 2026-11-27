@@ -19,6 +19,11 @@
 - D1/D2 (`/locations` step 5, admin): match report (also as CSV) of active Part 2 rows to active locations; apply links
   exactly the report: `location_id` set, a recorded 0-pc `LOCATION_LINK` movement per row. Refused while any row with stock
   has no spot (or is linked elsewhere), or when the report is stale (409). No quantity changes.
+- D2 undo (`/locations` step 6, admin): unlink a whole D2 link run (default: the last one) or every row at one location
+  code; preview first. Each row gets a recorded 0-pc `LOCATION_UNLINK` movement; quantities never change. A run undo skips
+  rows edited or moved since that run (listed). Each D2 run now writes its run id into the `LOCATION_LINK` reasons
+  ("Linked to location R4-S21-L1 [link run 3f2a9c1b7d10]"). API: `GET /api/locations/unlink/runs`, `GET .../unlink/preview`,
+  `POST .../unlink/apply`.
 - D3: Part 2 create, edit, sheet IN/SET, receiving, inbound approval and reactivate resolve the spot and set
   `location_id`. With `PART2_LOCATIONS_ENFORCED=1` a spot that is not an active location is refused with a 409 naming the
   spot (a sheet is not saved at all). Off by default until D2 is done. Allbirds is never checked or linked.
