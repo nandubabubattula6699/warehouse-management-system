@@ -1,6 +1,6 @@
 # Handoff: WMS restructure (state on 2026-11-26)
 
-**Phase 1a (2026-11-21) and Phase 1b-a (2026-11-26) are deployed to production** (`main` = `d9f1811`, PR #1). Production is at migration **0002**. **Production data:** on 2026-11-24 all Part 2 stock was replaced through the /manage uploads (decision 7): 54,878 pcs. The next deploy is **1b-b** (migration 0003, branch `phase-1b-b`): first deactivate the Part 2 duplicate rows in the app (decision 3).
+**Phases 1a (2026-11-21), 1b-a and 1b-b (both 2026-11-26) are deployed to production** (`main` = `330eb06`, PRs #1 and #2). Production is at migration **0003** (head). **Production data:** on 2026-11-24 all Part 2 stock was replaced through the /manage uploads (decision 7): 54,878 pcs. Phase 1b is complete. Next: the open decisions in section 2 (VD/VO/ED relocation, receiving, Phase 3).
 
 ## 1. Phase status
 
@@ -9,8 +9,15 @@
 | 0: audit and target architecture | `phase-0-audit` | yes | n/a (docs) | yes | n/a |
 | 1a: emergency fixes (auth on every route, secrets, CORS, XSS, data safety) | `phase-1a-emergency-fixes` | yes | yes, automated tests + browser checks, then a Railway staging environment | yes | **DEPLOYED 2026-11-21** (`a8b3af8`) |
 | 1b-a: Alembic (0001, 0001a, 0002), protected history, deactivate, never hard-delete, ruff, CI | `phase-1b-a` (merged into `main` via PR #1) | yes | yes: 63 main-app + 9 picking-service tests, ruff clean; full staging rehearsal incl. undo | yes | **DEPLOYED 2026-11-26** (`main` = `d9f1811`) |
-| 1b-b: migration 0003 (one active Part 2 row per slot) | `phase-1b-b` (from `main` `d9f1811` + 0003) | yes | yes: 69 main-app (0 skipped) + 9 picking-service tests, ruff clean | yes | **NOT deployed** |
+| 1b-b: migration 0003 (one active Part 2 row per slot) | `phase-1b-b` (from `main` `d9f1811` + 0003) | yes | yes: 69 main-app (0 skipped) + 9 picking-service tests, ruff clean | yes | **DEPLOYED 2026-11-26** (`main` = `330eb06`, PR #2) |
 | (old) 1b in one step | `phase-1b-foundation` | superseded by 1b-a + 1b-b | | yes | do not deploy |
+
+**1b-b deploy (2026-11-26):**
+- **Before:** audit export `C:\WMS-backups\export_before_1b-b_2026-11-26.csv.csv` (the browser added a second `.csv`): Allbirds 8,609 rows / 209,191 pcs; Part 2 1,881 rows / 54,878 pcs; 4 Part 2 duplicate groups (9 rows), every extra row at qty 0.
+- **Deactivated in the app (5 rows, all qty 0, recorded `DEACTIVATE` movements):** VDBP-039 CAMO OS R4 S21 L1 (2 of 3; the 24-pc row stays), EHBG-002 BLACK OS R14 FRONT L1 (the 0 row; the 32-pc row stays), VDSB-2116 LIGHT DENIM OS R11 BACK L1 (1 of 2), VOSB-030 BLACK OS R12 BACK L2 (1 of 2).
+- **After:** `C:\WMS-backups\export_after_deactivate_2026-11-26.csv.csv`: 0 duplicate groups; the same 10,490 rows with identical values, only those 5 now inactive; totals unchanged (Part 2 1,876 active rows).
+- **Deploy:** PR #2 merged (merge commit `330eb06`); the Pre-deploy step ran `0002 -> 0003`; app log `Schema at migration 0003`, 10,490 records; site loads, search works.
+- **Staging was not moved to 1b-b** in this session: as last recorded it runs `phase-1b-a` at 0002, with older (2026-11-21) data and its own duplicates.
 
 **1b-a deploy (2026-11-26).** Steps and lessons (details: `docs/DEPLOY_1B.md`):
 - **Railway does not read `railway.json`** (no Config-as-code path on any service). The app starts from the `Procfile`. The migrations run from the dashboard **Pre-deploy step `alembic upgrade head`**, which is now **set on both staging and production** and stays set for 1b-b and every later migration.
@@ -33,7 +40,7 @@
 **Pull requests:**
 - **1a:** done (merged into `main` by fast-forward).
 - **1b-a:** done (PR #1, merged 2026-11-26).
-- **1b-b:** `phase-1b-b` → `main`. No PR yet. Open it only after the duplicates are deactivated in production.
+- **1b-b:** done (PR #2, merged 2026-11-26).
 
 **Local dev database (old PC only):**
 - `warehouse_dev` is at migration **0002** (before 0001a was added).
@@ -98,6 +105,8 @@
      (`scripts/report_duplicate_active_rows.py` against production needs the owner's OK), deactivate the extra rows in the
      app (each one a recorded `DEACTIVATE` movement), then deploy 1b-b. Staging holds older data (2026-11-21), so its
      duplicate list differs: check it there too before the 1b-b staging deploy.
+   - **Done 2026-11-26:** the 5 extra rows were deactivated in production and 0003 is applied. The rule is now enforced by the
+     database: a second active row for the same Part 2 slot is refused with a 409.
 4. **Receiving-check plan: ON HOLD.** Decided 2026-11-21: build it inside the WMS (as `modules/inbound`), not separately. Still on hold.
    - The revised plan was: same Postgres in its own schema `receiving_check`, WMS logins and roles read-only, Postgres 18 everywhere.
    - Still open within that plan:
@@ -231,7 +240,7 @@
 - [x] **Change the production DB password** (regenerated, reported 2026-11-21).
 - [x] **1b access windows closed (2026-11-26):** TCP proxy removed and DB password regenerated again on **staging and production**.
 - [x] **Pre-deploy step `alembic upgrade head` set** on the main service in **staging and production** (2026-11-26). Keep it.
-- [ ] **Delete the `receiving-check-dev` service and the staging environment** when they are no longer needed (staging is still useful for the 1b-b rehearsal).
+- [ ] **Delete the `receiving-check-dev` service and the staging environment** when they are no longer needed. If staging is kept, bring it to `main` (deactivate its Part 2 duplicates first, or 0003 refuses).
 - [ ] **Rotate the production `INTERNAL_API_KEY` and the picking device tokens.** They appeared in screenshots.
 - [ ] **Retire the old `nandu` / `manager` accounts.** Create the new personal admin account first.
 - [ ] **Optional clean-up:** `railway.json` still contains a `startCommand` and `preDeployCommand` that nothing reads. Trim or remove it in a later commit.
@@ -240,12 +249,9 @@
 
 1. **1a via staging:** done 2026-11-21.
 2. **1b-a via staging:** done 2026-11-26 (production at 0002).
-3. **Next: 1b-b (0003):**
-   - fresh Export CSV; re-check the Part 2 duplicate groups (decision 3);
-   - deactivate the extra rows **in the app** (production; no SQL);
-   - staging: deactivate its duplicates too, then point staging at `phase-1b-b` and check the log for `Running upgrade 0002 -> 0003`;
-   - production: back up, open the 1b-b PR into `main`, merge (the Pre-deploy step is already set, so the merge deploy runs 0003);
-   - if 0003 refuses (duplicates left), the deploy is aborted and 1b-a keeps running: nothing changes.
+3. **1b-b (0003):** done 2026-11-26, production only (staging still on 1b-a).
+4. **Next:** nothing is queued. Every future schema change: a new Alembic migration, tested locally, rehearsed on staging,
+   then merged; the Pre-deploy step runs it. Back up production first.
 
 ## 5. New PC setup (Windows)
 
@@ -259,7 +265,7 @@
    cd $HOME\IdeaProjects
    git clone https://github.com/nandubabubattula6699/warehouse-management-system.git
    cd warehouse-management-system
-   git checkout phase-1b-b
+   git checkout main
    ```
 3. **Create the virtual environment and install requirements:**
    ```powershell
@@ -283,7 +289,7 @@
 6. **Run the checks:**
    ```powershell
    .venv\Scripts\ruff check .
-   .venv\Scripts\python -m pytest -q                       # expect 69 passed (phase-1b-b)
+   .venv\Scripts\python -m pytest -q                       # expect 69 passed
    cd services\picking-service; ..\..\.venv\Scripts\python -m pytest -q; cd ..\..   # expect 9 passed
    ```
 
@@ -292,7 +298,7 @@
 Open Claude Code in the repo folder and paste:
 
 > Read HANDOFF.md, WMS_Restructure_Prompt.md, docs/CHANGELOG.md and docs/DEPLOY_1B.md. We are on branch
-> phase-1b-b. 1a and 1b-a are deployed (main = d9f1811, production at migration 0002). Do not deploy, do not push to main, and never run anything
+> main. 1a, 1b-a and 1b-b are deployed (main = 330eb06, production at migration 0003). Do not deploy, do not push to main, and never run anything
 > against the production database unless I explicitly say so in that message. First verify my new PC
 > setup (section 5): .venv, .env pointing at a LOCAL database, warehouse_dev and warehouse_test exist,
 > `alembic upgrade head`, ruff and both test suites pass. Report the results. Then wait for my
