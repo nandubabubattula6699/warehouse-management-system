@@ -571,6 +571,79 @@ def locations_summary(db: Session = Depends(get_db)):
     return [{"type": t, "area": a, "active": act, "count": n} for t, a, act, n in rows]
 
 
+@app.get("/api/locations/labels.pdf", dependencies=SUPERVISOR_ONLY)
+def location_labels_pdf(
+    code: Optional[str] = Query(None, description="One spot, e.g. R3-S5-L2"),
+    row: Optional[str] = Query(None, description="One row number, or WALL, or SPECIAL"),
+    all: bool = Query(False, description="Every active spot"),
+    db: Session = Depends(get_db),
+):
+    """Zebra thermal labels (one per page) for active Part 2 locations. Size and QR content: app/location_labels.py."""
+    from app.location_labels import build_labels_pdf, label_order, label_settings, normalize_scan
+    from app.models import Location
+    if sum(bool(x) for x in (code, row, all)) != 1:
+        raise HTTPException(status_code=400, detail="Choose exactly one: code, row, or all.")
+    q = db.query(Location).filter(Location.is_active.is_(True))
+    if code:
+        q = q.filter(Location.code == normalize_scan(code))
+        name = normalize_scan(code)
+    elif row:
+        r = row.strip().upper()
+        if r == "WALL":
+            q = q.filter(Location.area.in_(("WALL_FRONT", "WALL_BACK")))
+        elif r == "SPECIAL":
+            q = q.filter(Location.location_type != "STORAGE")
+        elif r.isdigit():
+            q = q.filter(Location.row_no == int(r))
+        else:
+            raise HTTPException(status_code=400, detail="row must be a row number, WALL or SPECIAL.")
+        name = f"row_{r}"
+    else:
+        name = "all"
+    locations = sorted(q.all(), key=label_order)
+    if not locations:
+        raise HTTPException(status_code=404, detail="No active location matches. Nothing to print.")
+    width, height, qr_template, base = label_settings()
+    pdf = build_labels_pdf(locations, base, width, height, qr_template)
+    filename = f"part2_labels_{name}_{len(locations)}_{width:g}x{height:g}in.pdf"
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{filename}"'})
+
+
+@app.get("/api/locations/lookup", dependencies=LOGIN_REQUIRED)
+def location_lookup(q: str = Query(..., description="Scanned or typed code, or a link ending with the code"),
+                    db: Session = Depends(get_db)):
+    """READ ONLY: a Part 2 location and the active stock rows at it."""
+    from app.location_labels import AREA_TEXT, describe, normalize_scan
+    from app.models import Location
+    code = normalize_scan(q)
+    loc = db.query(Location).filter(Location.code == code).first()
+    if not loc:
+        raise HTTPException(status_code=404, detail=f"Location '{code}' not found.")
+    # Until stock is linked (step D), match on the old row/section/level values as well as the link.
+    coords = None
+    if loc.area == "SHELF":
+        coords = (str(loc.row_no), str(loc.section_no), str(loc.level_no))
+    elif loc.area in ("GROUND_FRONT", "GROUND_BACK"):
+        coords = (str(loc.row_no), "FRONT" if loc.area == "GROUND_FRONT" else "BACK", str(loc.level_no))
+    elif loc.area in ("WALL_FRONT", "WALL_BACK"):
+        coords = ("WALL", "FRONT" if loc.area == "WALL_FRONT" else "BACK", str(loc.level_no))
+    match = InventoryItem.location_id == loc.id
+    if coords:
+        match = or_(match, (func.upper(func.trim(InventoryItem.row_pos)) == coords[0])
+                    & (func.upper(func.trim(InventoryItem.section)) == coords[1])
+                    & (func.trim(InventoryItem.level) == coords[2]))
+    items = (db.query(InventoryItem)
+             .filter(InventoryItem.warehouse_part == "PART_2", ACTIVE_ITEM, match)
+             .order_by(InventoryItem.style.asc(), InventoryItem.color.asc(), InventoryItem.size.asc()).all())
+    return {
+        "code": loc.code, "description": describe(loc), "area": AREA_TEXT.get(loc.area), "active": loc.is_active,
+        "rows": len(items), "pieces": sum(i.quantity for i in items),
+        "items": [{"style": i.style, "color": i.color, "size": i.size, "pcs_per_box": i.pcs_per_box,
+                   "quantity": i.quantity, "box_num": i.box_num} for i in items],
+    }
+
+
 @app.delete("/api/items/{item_id}", dependencies=SUPERVISOR_ONLY)
 def delete_item(item_id: int, db: Session = Depends(get_db)):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
@@ -2282,6 +2355,14 @@ if os.path.exists(static_dir):
         if not user:
             return RedirectResponse(url="/login", status_code=302)
         return FileResponse(os.path.join(static_dir, "index.html"))
+
+    @app.get("/loc")
+    @app.get("/loc/{code}")
+    def serve_location_lookup_page(request: Request, code: Optional[str] = None, db: Session = Depends(get_db)):
+        user = get_optional_user(request, db)
+        if not user:
+            return RedirectResponse(url=f"/login?next={request.url.path}", status_code=302)
+        return FileResponse(os.path.join(static_dir, "loc.html"))
 
     @app.get("/locations")
     def serve_locations_page(request: Request, db: Session = Depends(get_db)):

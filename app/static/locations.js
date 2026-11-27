@@ -130,4 +130,15 @@ document.getElementById("applyBtn").addEventListener("click", async () => {
   loadSummary();
 });
 
+document.querySelectorAll(".label-btn").forEach(btn => btn.addEventListener("click", () => {
+  const kind = btn.dataset.label;
+  let qs = "all=true";
+  if (kind === "code" || kind === "row") {
+    const v = document.getElementById(kind === "code" ? "labelCode" : "labelRow").value.trim();
+    if (!v) { showToast(kind === "code" ? "Type a code first" : "Type a row number, WALL or SPECIAL", "error"); return; }
+    qs = `${kind}=${encodeURIComponent(v)}`;
+  }
+  window.open(`/api/locations/labels.pdf?${qs}`, "_blank");
+}));
+
 loadSummary();

@@ -11,6 +11,20 @@
   - `location_changes`: append-only record (DB trigger refuses UPDATE / DELETE / TRUNCATE) of every create / deactivate /
     reactivate, with who, when and the source file.
 
+## Part 2 locations, step E (same branch, not deployed)
+
+- Zebra label PDF, one label per page: `GET /api/locations/labels.pdf?code=R3-S5-L2` | `?row=3` (or `WALL`, `SPECIAL`) |
+  `?all=true`; active spots only; ADMIN or MANAGER. Print buttons on `/locations`.
+- Label (default 4x6 portrait, same roll as Allbirds): the code large on top, the description and "PART 2", a line, a large
+  QR (link ending with the code) with "QR: phone camera", and at the bottom a Code 128 barcode of the code only with the
+  code and "Barcode: scanner gun" under it. Bars are whole 203-dpi printer dots with quiet zones. `4x2` gives a compact
+  landscape layout (QR left, code + barcode right).
+- Settings (env): `LOCATION_LABEL_SIZE` (default `4x6`), `LOCATION_LABEL_QR` (default `{base}/loc/{code}`; `{code}` = plain
+  code), `LOCATION_LABEL_BASE_URL` (default production, `https://alexander-warehouse.up.railway.app`).
+- Scan / lookup: `/loc/<code>` (what the QR opens) and `/loc` with a scan box for scanner guns; any logged-in user, read only.
+  Accepts the QR link, the plain code from the barcode, or a typed code. Shows the active Part 2 rows at that spot (matched by the old
+  row/section/level values until stock is linked in step D). Not logged in: login, then back to the same spot.
+
 ## Part 2 locations, step C (same branch, not deployed)
 
 - Admin page `/locations`: choose the row-size workbook (step A format) → **Preview** (reads only) → **Apply exactly this

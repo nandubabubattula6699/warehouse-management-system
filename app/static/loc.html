@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alexander Warehouse OS - Location lookup</title>
+  <link rel="shortcut icon" href="/favicon.ico?v=36.0">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=36.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/styles.css?v=36.0">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+  <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-3">
+    <h1 class="text-base font-black tracking-wider uppercase text-white">Location lookup</h1>
+    <a href="/" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold">Dashboard</a>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-5 space-y-5">
+    <form id="scanForm" class="flex gap-2" autocomplete="off">
+      <input id="scanInput" type="text" placeholder="Scan the location label or type a code, e.g. R3-S5-L2"
+             class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-3 text-base font-mono uppercase text-white" autofocus>
+      <button type="submit" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 rounded-xl text-sm">Look up</button>
+    </form>
+
+    <section id="result" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3" hidden>
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <div id="locCode" class="text-3xl font-black font-mono text-amber-400"></div>
+        <div id="locState" class="text-xs font-bold uppercase"></div>
+      </div>
+      <div id="locDesc" class="text-sm text-slate-300"></div>
+      <div id="locTotals" class="text-sm text-slate-200 font-semibold"></div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-[11px] uppercase text-slate-400">
+            <tr><th class="text-left py-1 pr-3">Style</th><th class="text-left pr-3">Color</th><th class="text-left pr-3">Size</th>
+                <th class="text-right pr-3">Pcs/box</th><th class="text-right">Qty</th></tr>
+          </thead>
+          <tbody id="locItems"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div id="message" class="text-sm text-red-300" hidden></div>
+  </main>
+
+  <script src="/static/loc.js?v=36.0"></script>
+</body>
+</html>

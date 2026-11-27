@@ -28,6 +28,18 @@
     </section>
 
     <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+      <h2 class="text-sm font-bold uppercase text-slate-300">Print labels (Zebra, one label per page)</h2>
+      <p class="text-xs text-slate-400">Opens a PDF of the active locations. Print it on the Zebra at 100% (actual size). Scan any label with <a href="/loc" class="underline">Location lookup</a>.</p>
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <input id="labelCode" type="text" placeholder="One spot, e.g. R3-S5-L2" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 font-mono uppercase w-44">
+        <button type="button" data-label="code" class="label-btn bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 rounded-lg font-semibold">One spot</button>
+        <input id="labelRow" type="text" placeholder="Row no., WALL or SPECIAL" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 font-mono uppercase w-44">
+        <button type="button" data-label="row" class="label-btn bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 rounded-lg font-semibold">One row</button>
+        <button type="button" data-label="all" class="label-btn bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 rounded-lg font-semibold">All active spots</button>
+      </div>
+    </section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
       <h2 class="text-sm font-bold uppercase text-slate-300">1. Choose the row-size workbook (.xlsx)</h2>
       <p class="text-xs text-slate-400">Choosing a file saves nothing. Every line in the sheet "Row sizes (fill in)" must say <b>OK</b> in the last column before it can be applied.</p>
       <div class="flex flex-wrap items-center gap-3">
