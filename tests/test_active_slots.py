@@ -5,9 +5,6 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models import InventoryItem, StockMovement
 
-# Release 1b-a ships without migration 0003 (the unique index); these tests come back with 1b-b.
-needs_0003 = pytest.mark.skip(reason="1b-a: migration 0003 (Part 2 unique slot index) ships in 1b-b")
-
 
 def _p2(db, style="VDBP-039", qty=8, active=True, box=None, color="CAMO", size="OS", pcs=8, row="4"):
     item = InventoryItem(style=style, color=color, size=size, row_pos=row, section="21", level="1", box_num=box,
@@ -27,7 +24,6 @@ def _p1(db, style="TB1WJBK", qty=20, box=None):
     return item
 
 
-@needs_0003
 def test_db_rejects_second_active_part2_row_in_slot(db):
     _p2(db)
     with pytest.raises(IntegrityError):
@@ -35,7 +31,6 @@ def test_db_rejects_second_active_part2_row_in_slot(db):
     db.rollback()
 
 
-@needs_0003
 def test_part2_box_number_is_not_part_of_the_slot(db):
     _p2(db)
     with pytest.raises(IntegrityError):
@@ -59,7 +54,6 @@ def test_part1_lines_keep_one_row_per_carton(db):
     assert db.query(InventoryItem).filter_by(style="TB1WJBK").count() == 19
 
 
-@needs_0003
 def test_api_create_into_occupied_part2_slot_is_409(manager, db):
     _p2(db)
     r = manager.post("/api/items", json={"style": "VDBP-039", "color": "CAMO", "size": "OS", "row_pos": "4",
@@ -79,7 +73,6 @@ def test_api_create_second_carton_row_on_a_line_is_allowed(manager, db):
     assert db.query(InventoryItem).count() == 2
 
 
-@needs_0003
 def test_reactivate_into_occupied_part2_slot_is_409(manager, db):
     old = _p2(db, qty=0, active=False)
     _p2(db, qty=4)

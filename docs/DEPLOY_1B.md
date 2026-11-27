@@ -2,9 +2,9 @@
 
 **1b ships in two steps:**
 - **1b-a** (branch `phase-1b-a`, this document): Alembic, migrations 0001, 0001a and 0002, protected history, deactivate. Head = **0002**.
-- **1b-b** (branch `phase-1b-foundation`): migration 0003 (one active Part 2 row per slot). Deploy it only after the Part 2 duplicates are deactivated in the app (see "Migration 0003 comes later").
+- **1b-b** (branch `phase-1b-b`, made from `main` after 1b-a): migration 0003 (one active Part 2 row per slot). Deploy it only after the Part 2 duplicates are deactivated in the app (see "Migration 0003 comes later").
 
-**Status:** ready to deploy once steps 1–3 pass, on staging first, then production.
+**Status:** 1b-a DEPLOYED to staging and production on 2026-11-26 (production at 0002). 1b-b is next.
 Deploy 1a first (`DEPLOY_1A.md`); 1b builds on it.
 
 ## Railway setup: read this first

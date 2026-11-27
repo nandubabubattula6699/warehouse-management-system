@@ -22,9 +22,7 @@ from tests.conftest import ROOT, TEST_DB_URL, _ensure_database_exists
 MIGR_DB_URL = urlunsplit(urlsplit(TEST_DB_URL)._replace(path="/warehouse_migrations_test"))
 assert urlsplit(MIGR_DB_URL).path.endswith("_test")  # same local *_test safety rule as conftest
 
-# Release 1b-a ships without migration 0003; its tests come back with 1b-b.
-needs_0003 = pytest.mark.skip(reason="1b-a: migration 0003 (Part 2 unique slot index) ships in 1b-b")
-HEAD = "0002"
+HEAD = "0003"
 
 
 def test_models_match_migrated_schema():
@@ -241,41 +239,15 @@ def test_no_line_row_is_changed_by_any_migration(migr_engine):
     _alembic("downgrade", "0001")
     assert _line_snapshot(migr_engine) == before
 
-    # Part 2 duplicates present: 1b-a's head (0002) still applies, and Lines are still untouched.
+    # Part 2 duplicates make 0003 refuse: Lines are still untouched.
     _alembic("upgrade", "0002")
     with migr_engine.begin() as conn:
         _insert_p2(conn, "VDBP-039", 8)
         _insert_p2(conn, "VDBP-039", 8)
-    _alembic("upgrade", "head")
+    assert _alembic("upgrade", "head", ok=False).returncode != 0
     assert _line_snapshot(migr_engine) == before
 
 
-def test_1b_a_production_path_with_part2_duplicates_changes_no_data(migr_engine):
-    """Release 1b-a on a database like production today: un-managed old schema with Part 2 duplicate
-    rows -> stamp 0001 -> upgrade head (= 0002). It must apply, change no row, and leave the duplicates
-    for the app's Deactivate."""
-    _alembic("upgrade", "0001")
-    with migr_engine.begin() as conn:
-        conn.execute(text("DROP TABLE alembic_version"))  # looks like production: never stamped
-        _insert_line_cartons(conn)
-        for qty in (24, 0, 0):  # the VDBP-039 group as it is in production
-            conn.execute(text(
-                "INSERT INTO inventory_items (style, color, size, row_pos, section, level, pcs_per_box, "
-                "warehouse_part, brand, location, quantity) VALUES ('VDBP-039', 'CAMO', 'OS', '4', '21', '1', 8, "
-                "'PART_2', 'VON DUTCH', 'Row 4 • Sec 21 • Lvl 1', :q)"), {"q": qty})
-        before = conn.execute(text("SELECT id, style, quantity FROM inventory_items ORDER BY id")).fetchall()
-        hist_before = conn.execute(text("SELECT count(*) FROM stock_movements")).scalar()
-    _alembic("stamp", "0001")
-    _alembic("upgrade", "head")
-    assert f"{HEAD} (head)" in _alembic("current").stdout
-    with migr_engine.connect() as conn:
-        assert conn.execute(text("SELECT id, style, quantity FROM inventory_items ORDER BY id")).fetchall() == before
-        assert conn.execute(text("SELECT count(*) FROM stock_movements")).scalar() == hist_before
-        assert conn.execute(text("SELECT bool_and(is_active) FROM inventory_items")).scalar() is True
-    assert ACTIVE_SLOT_INDEX not in {i["name"] for i in inspect(migr_engine).get_indexes("inventory_items")}
-
-
-@needs_0003
 def test_0003_refuses_part2_duplicates_and_changes_nothing(migr_engine):
     _alembic("upgrade", "0002")
     with migr_engine.begin() as conn:
@@ -306,7 +278,6 @@ def test_0003_refuses_part2_duplicates_and_changes_nothing(migr_engine):
     assert "TB1WJBK" not in rep.stdout
 
 
-@needs_0003
 def test_failed_upgrade_rolls_back_all_steps(migr_engine):
     """0001 -> head in one go: 0003 fails on Part 2 duplicates, so 0002 must not stay applied either."""
     _alembic("upgrade", "0001")
@@ -319,7 +290,6 @@ def test_failed_upgrade_rolls_back_all_steps(migr_engine):
     assert "is_active" not in {c["name"] for c in inspect(migr_engine).get_columns("inventory_items")}
 
 
-@needs_0003
 def test_0003_applies_when_clean_and_downgrades(migr_engine):
     _alembic("upgrade", "0002")
     with migr_engine.begin() as conn:
