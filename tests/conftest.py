@@ -73,7 +73,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from app.auth import hash_password  # noqa: E402
-from app.database import Base, SessionLocal, engine  # noqa: E402
+from app.database import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import WarehouseUser  # noqa: E402
 
@@ -83,10 +83,22 @@ TABLES = ["stock_movements", "inventory_items", "inbound_shipment_items", "inbou
 PASSWORD = "Correct-Horse-Battery-9"
 
 
+def alembic_config():
+    from alembic.config import Config
+
+    from app.database import ALEMBIC_INI
+    return Config(ALEMBIC_INI)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _schema():
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+    """Build the test schema exactly like production: from the Alembic migrations (no create_all)."""
+    from alembic import command
+
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+    command.upgrade(alembic_config(), "head")
     yield
     engine.dispose()
 

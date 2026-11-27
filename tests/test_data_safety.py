@@ -82,22 +82,55 @@ def test_delete_blocked_when_history_exists(manager, db):
     assert db.query(StockMovement).filter_by(item_id=item.id).count() == 1
 
 
-def test_delete_allowed_without_history(manager, db):
+def test_delete_refused_without_history_and_stock(manager, db):
+    """Staging 2026-11-26: VDSB-2117 (48 pcs, no history) was hard-deleted with no recorded movement."""
+    item = InventoryItem(style="VDSB-2117", color="TREE CAMO", size="OS", row_pos="3", section="BACK", level="2",
+                         warehouse_part="PART_2", location="Row 3 • Ground BACK • Lvl 2", quantity=48)
+    db.add(item)
+    db.commit()
+    r = manager.delete(f"/api/items/{item.id}")
+    assert r.status_code == 409
+    assert "48 pcs" in r.json()["detail"] and "Adj" in r.json()["detail"]
+    db.expire_all()
+    assert db.get(InventoryItem, item.id).quantity == 48
+
+
+def test_delete_refused_at_zero_without_history_points_to_deactivate(manager, db):
     item = InventoryItem(style="B1", location="x", quantity=0)
     db.add(item)
     db.commit()
-    assert manager.delete(f"/api/items/{item.id}").status_code == 200
-
-
-def test_bulk_delete_is_all_or_nothing(manager, db):
-    with_hist = _item_with_history(db, "A1")
-    plain = InventoryItem(style="B1", location="x", quantity=0)
-    db.add(plain)
-    db.commit()
-    r = manager.post("/api/items/bulk-delete", json={"item_ids": [with_hist.id, plain.id]})
+    r = manager.delete(f"/api/items/{item.id}")
     assert r.status_code == 409
+    assert "can be deactivated now" in r.json()["detail"]
+    assert manager.post(f"/api/items/{item.id}/deactivate").status_code == 200
     db.expire_all()
-    assert db.query(InventoryItem).count() == 2
+    assert db.get(InventoryItem, item.id).is_active is False
+
+
+def test_bulk_delete_never_deletes(manager, db):
+    with_hist = _item_with_history(db, "A1")
+    plain = InventoryItem(style="B1", location="x", quantity=7)
+    zero = InventoryItem(style="B2", location="y", quantity=0)
+    db.add_all([plain, zero])
+    db.commit()
+    for ids in ([with_hist.id, plain.id, zero.id], [zero.id]):
+        r = manager.post("/api/items/bulk-delete", json={"item_ids": ids})
+        assert r.status_code == 409
+    db.expire_all()
+    assert db.query(InventoryItem).count() == 3
+
+
+def test_sheet_delete_without_history_is_refused(manager, db):
+    item = InventoryItem(style="C1", location="Line 3 • Sec 2", line="3", section="2", quantity=12)
+    db.add(item)
+    db.commit()
+    r = manager.post("/api/sheet-submit", json={"rows": [
+        {"action": "DELETE", "style": "C1", "line": "3", "section": "2"},
+    ]})
+    assert r.status_code == 409, r.text
+    assert "SET with quantity 0" in r.json()["detail"]
+    db.expire_all()
+    assert db.get(InventoryItem, item.id).quantity == 12
 
 
 def test_sheet_delete_with_history_rolls_back_whole_sheet(manager, db):

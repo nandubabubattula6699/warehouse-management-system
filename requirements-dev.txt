@@ -1,0 +1,5 @@
+# Development / CI tools (not installed on Railway).
+-r requirements.txt
+-r services/picking-service/requirements.txt
+pytest==9.2.0
+ruff==0.17.6

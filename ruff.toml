@@ -1,0 +1,17 @@
+# Ruff configuration. A ruff.toml (not pyproject.toml) so Railway's build detection is unaffected.
+
+target-version = "py312"
+line-length = 120
+extend-exclude = ["services/receiving-check"]
+
+[lint]
+# Correctness-focused: syntax errors, undefined names, unused imports/variables, bad comparisons,
+# import placement. Style rules (formatting, import order, bugbear) can be added once main.py
+# is split up in Phase 2, without a giant reformatting diff now.
+select = ["E4", "E7", "E9", "F"]
+
+[lint.per-file-ignores]
+# These scripts must put the repo root on sys.path / load .env before importing app.*
+"scripts/*.py" = ["E402"]
+"tests/conftest.py" = ["E402"]
+"services/*/tests/conftest.py" = ["E402"]

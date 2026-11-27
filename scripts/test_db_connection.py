@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from sqlalchemy import text
-from app.database import engine, init_db, SessionLocal, DATABASE_URL
+from app.database import engine, schema_revisions, SessionLocal, DATABASE_URL
 from app.models import InventoryItem
 
 
@@ -20,11 +20,13 @@ def test_connection():
     print("=" * 60)
 
     try:
-        init_db()
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version();")).scalar() if engine.dialect.name == "postgresql" else engine.dialect.name
             print("[SUCCESS] Connected successfully!")
             print(f"[INFO] Server Version: {version}")
+        current, head = schema_revisions()
+        print(f"[INFO] Schema migration: {current or 'NOT STAMPED'} (code expects {head})"
+              + ("" if current == head else "  <-- run 'alembic upgrade head'"))
 
         db = SessionLocal()
         try:

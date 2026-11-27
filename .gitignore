@@ -11,3 +11,7 @@ venv/
 data/*.tmp
 .idea/
 *.db
+
+# database dumps / backups (never commit production schema or data)
+*.dump
+prod_schema*.sql

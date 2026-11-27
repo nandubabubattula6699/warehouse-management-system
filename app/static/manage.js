@@ -47,7 +47,6 @@ function addSheetRows(count = 1, prefillList = null) {
           <option value="IN" ${act === 'IN' ? 'selected' : ''}>📥 IN (+Add)</option>
           <option value="OUT" ${act === 'OUT' ? 'selected' : ''}>📤 OUT (-Ship)</option>
           <option value="SET" ${act === 'SET' ? 'selected' : ''}>✏️ SET (=Exact)</option>
-          <option value="DELETE" ${act === 'DELETE' ? 'selected' : ''}>🗑️ DELETE</option>
         </select>
       </td>
       <td class="py-1.5 px-2">
@@ -413,6 +412,8 @@ async function searchExistingLocations(e) {
   if (section) params.set("section", section);
   if (level) params.set("level", level);
   if (color) params.set("color", color);
+  const inactiveEl = document.getElementById("locSearchInactive");
+  if (inactiveEl && inactiveEl.checked) params.set("include_inactive", "true");
   params.set("limit", "150");
 
   const tbody = document.getElementById("existingLocationsBody");
@@ -429,7 +430,7 @@ async function searchExistingLocations(e) {
     }
 
     tbody.innerHTML = items.map(item => `
-      <tr data-item-id="${item.id}" class="hover:bg-slate-800/40 transition">
+      <tr data-item-id="${item.id}" class="hover:bg-slate-800/40 transition${item.is_active === false ? ' opacity-50' : ''}">
         <td class="py-1.5 px-2 text-center">
           <input type="checkbox" class="existing-row-check" value="${item.id}" />
         </td>
@@ -463,13 +464,17 @@ async function searchExistingLocations(e) {
         <td class="py-1.5 px-2">
           <input type="number" value="${item.quantity}" class="edit-qty w-full bg-slate-950 border border-emerald-500/40 rounded px-2 py-1 text-xs text-emerald-400 text-center font-mono font-black" />
         </td>
-        <td class="py-1.5 px-2 text-right whitespace-nowrap space-x-1">
+        <td class="py-1.5 px-2 text-right whitespace-nowrap space-x-1">${item.is_active === false ? `
+          <span class="text-[10px] font-bold uppercase text-slate-400">Deactivated</span>
+          <button type="button" onclick="setRowActive(${item.id}, true)" class="bg-sky-500/20 hover:bg-sky-500/35 text-sky-200 border border-sky-500/40 font-bold px-2 py-1 rounded text-[11px] transition">
+            Reactivate
+          </button>` : `
           <button type="button" onclick="saveExistingRow(${item.id}, this)" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-2.5 py-1 rounded text-[11px] transition">
             Save
           </button>
           <button type="button" onclick="deleteSingleExistingRow(${item.id})" class="bg-red-500/15 hover:bg-red-500/30 text-red-300 border border-red-500/30 font-bold px-2 py-1 rounded text-[11px] transition">
             Del
-          </button>
+          </button>`}
         </td>
       </tr>
     `).join("");
@@ -513,20 +518,28 @@ async function saveExistingRow(itemId, btnEl) {
   }
 }
 
+// Rows are never deleted (server refuses); "Del" deactivates: hidden from stock views, history kept.
 async function deleteSingleExistingRow(itemId) {
-  if (!confirm("Delete this location record from PostgreSQL?")) return;
+  if (!confirm("Rows are never deleted, so every stock change stays on record.\n\n" +
+               "Deactivate this row instead? It is hidden from all stock views and keeps its history.\n" +
+               "It must be at 0 pcs: if not, Save it with quantity 0 first (that records the stock-out).")) return;
+  await setRowActive(itemId, false);
+}
+
+// Deactivate (hide, keep history) or reactivate a row. Server enforces quantity 0 for deactivation.
+async function setRowActive(itemId, active) {
   try {
-    const res = await fetch(`/api/items/${itemId}`, { method: "DELETE" });
+    const res = await fetch(`/api/items/${itemId}/${active ? "reactivate" : "deactivate"}`, { method: "POST" });
+    let data = {};
+    try { data = await res.json(); } catch (e) { /* non-JSON */ }
     if (!res.ok) {
-      let detail = "Delete failed";
-      try { detail = (await res.json()).detail || detail; } catch (e) { /* non-JSON */ }
-      showToast(detail, "error");
+      showToast(data.detail || (active ? "Reactivate failed" : "Deactivate failed"), "error");
       return;
     }
-    showToast("Location deleted", "success");
+    showToast(`${data.style} @ ${data.location} ${active ? "reactivated" : "deactivated (history kept)"}`, "success");
     searchExistingLocations();
   } catch (err) {
-    showToast("Delete failed", "error");
+    showToast(active ? "Reactivate failed" : "Deactivate failed", "error");
   }
 }
 
@@ -534,32 +547,6 @@ function toggleSelectAllExisting(checked) {
   document.querySelectorAll(".existing-row-check").forEach(cb => {
     cb.checked = checked;
   });
-}
-
-async function deleteSelectedExistingRows() {
-  const checked = [...document.querySelectorAll(".existing-row-check:checked")].map(cb => parseInt(cb.value, 10));
-  if (checked.length === 0) {
-    showToast("Check at least one row to delete", "error");
-    return;
-  }
-  if (!confirm(`Delete ${checked.length} selected location row(s) from PostgreSQL?`)) return;
-
-  try {
-    const res = await fetch("/api/items/bulk-delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ item_ids: checked, staff_name: "Nandu" })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showToast(data.detail || "Bulk delete failed", "error");
-      return;
-    }
-    showToast(`Deleted ${data.deleted_count} location rows`, "success");
-    searchExistingLocations();
-  } catch (err) {
-    showToast("Error deleting selected rows", "error");
-  }
 }
 
 async function handleQuickRenameStyle(e) {

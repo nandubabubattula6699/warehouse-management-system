@@ -1,28 +1,28 @@
+import hmac as _hmac
 import os
 from contextlib import asynccontextmanager
 from typing import Optional, List
+
+import httpx
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi import Request, Response
-from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, distinct
 
-from app.database import get_db, init_db, SessionLocal
+from app.database import get_db, require_current_schema, SessionLocal
 from app.models import InventoryItem, StockMovement, WarehouseUser, InboundShipment, InboundShipmentItem
 from app.llm_parser import parse_inbound_documents, DocumentParserError
 from app.auth import (
     SESSION_COOKIE_NAME, hash_password, verify_password,
     get_optional_user, require_user, require_supervisor, require_admin
 )
-
-# Route-level access rules (server-side; the frontend's hidden buttons are not security).
-LOGIN_REQUIRED = [Depends(require_user)]        # any approved, logged-in user
-SUPERVISOR_ONLY = [Depends(require_supervisor)]  # ADMIN or MANAGER
-ADMIN_ONLY = [Depends(require_admin)]
-from app.location_engine import build_location_info, ensure_schema_and_locations_seeded
+from app.inventory_slots import ACTIVE_SLOT_CONFLICT_MESSAGE, ACTIVE_SLOT_INDEX
+from app.location_engine import _norm_coord, build_location_info, seed_locations_if_empty
 from app.schemas import (
     ItemCreate, ItemUpdatePayload, ItemResponse, StockAdjustPayload, SetQuantityPayload, WarehouseStats,
     SheetSubmitPayload, BulkDeletePayload, StyleRenamePayload,
@@ -31,17 +31,35 @@ from app.schemas import (
     InboundShipmentResponse, InboundParseRequest, InboundApprovePayload, InboundRejectPayload
 )
 
+# Route-level access rules (server-side; the frontend's hidden buttons are not security).
+LOGIN_REQUIRED = [Depends(require_user)]        # any approved, logged-in user
+SUPERVISOR_ONLY = [Depends(require_supervisor)]  # ADMIN or MANAGER
+ADMIN_ONLY = [Depends(require_admin)]
+
+# Deactivated inventory rows (is_active = false) keep their stock history but are hidden from every
+# stock view, lookup, map, export and the picking service. They are never matched for new stock.
+ACTIVE_ITEM = InventoryItem.is_active.is_(True)
+
+
+def _integrity_message(exc: IntegrityError) -> str:
+    """User-facing text for a database constraint violation (nothing was saved)."""
+    if ACTIVE_SLOT_INDEX in str(getattr(exc, "orig", exc)):
+        return ACTIVE_SLOT_CONFLICT_MESSAGE
+    return "The change conflicts with existing data (database constraint) and was not saved."
+
 def seed_if_empty():
     """
-    Create missing tables/columns and seed the location master list.
-    NEVER inserts, deletes, or modifies inventory rows. Loading inventory from CSV is a
+    Check the schema is at the latest Alembic migration (refuse to start otherwise) and seed the
+    location master list if it is empty. Never creates/alters tables (that is `alembic upgrade head`)
+    and NEVER inserts, deletes, or modifies inventory rows. Loading inventory from CSV is a
     manual, explicit operation (scripts/migrate_inventory.py).
     """
+    revision = require_current_schema()
+    print(f"[Database] Schema at migration {revision}.", flush=True)
     try:
-        init_db()
         db_map = SessionLocal()
         try:
-            ensure_schema_and_locations_seeded(db_map)
+            seed_locations_if_empty(db_map)
         finally:
             db_map.close()
 
@@ -104,6 +122,13 @@ app = FastAPI(
     version="2.1.0"
 )
 
+
+@app.exception_handler(IntegrityError)
+async def _integrity_error_to_409(request: Request, exc: IntegrityError):
+    # e.g. a second active row for the same slot (create, edit, reactivate, rename, receiving).
+    # The request's session is rolled back and closed by get_db; nothing was saved.
+    return JSONResponse(status_code=409, content={"detail": _integrity_message(exc)})
+
 def _allowed_origins() -> List[str]:
     """
     Cross-origin browser access is allowed ONLY for origins listed in ALLOWED_ORIGINS
@@ -138,10 +163,10 @@ def health():
 
 @app.get("/api/stats", response_model=WarehouseStats, dependencies=LOGIN_REQUIRED)
 def get_stats(db: Session = Depends(get_db)):
-    total_styles = db.query(func.count(distinct(InventoryItem.style))).scalar() or 0
-    total_records = db.query(func.count(InventoryItem.id)).scalar() or 0
-    total_units = db.query(func.sum(InventoryItem.quantity)).scalar() or 0
-    total_locations = db.query(func.count(distinct(InventoryItem.location))).scalar() or 0
+    total_styles = db.query(func.count(distinct(InventoryItem.style))).filter(ACTIVE_ITEM).scalar() or 0
+    total_records = db.query(func.count(InventoryItem.id)).filter(ACTIVE_ITEM).scalar() or 0
+    total_units = db.query(func.sum(InventoryItem.quantity)).filter(ACTIVE_ITEM).scalar() or 0
+    total_locations = db.query(func.count(distinct(InventoryItem.location))).filter(ACTIVE_ITEM).scalar() or 0
 
     return WarehouseStats(
         total_styles=total_styles,
@@ -160,7 +185,7 @@ def list_styles(
         InventoryItem.style,
         func.sum(InventoryItem.quantity).label("total_qty"),
         func.count(InventoryItem.id).label("location_count")
-    )
+    ).filter(ACTIVE_ITEM)
     if q:
         query = query.filter(InventoryItem.style.ilike(f"%{q.strip()}%"))
 
@@ -265,7 +290,7 @@ def get_styles_batch(
             match_clauses.append(func.upper(InventoryItem.style).like(f"{tok}%"))
 
     items = db.query(InventoryItem).filter(
-        or_(*match_clauses)
+        ACTIVE_ITEM, or_(*match_clauses)
     ).all()
     items = sort_inventory_items_physically(items)
 
@@ -298,7 +323,7 @@ def get_styles_batch(
 @app.get("/api/styles/{style_code}", dependencies=LOGIN_REQUIRED)
 def get_style_detail(style_code: str, db: Session = Depends(get_db)):
     items = db.query(InventoryItem).filter(
-        InventoryItem.style.ilike(style_code.strip())
+        ACTIVE_ITEM, InventoryItem.style.ilike(style_code.strip())
     ).order_by(InventoryItem.line.asc(), InventoryItem.section.asc(), InventoryItem.size.asc()).all()
 
     if not items:
@@ -323,6 +348,14 @@ def _actor_name(user: WarehouseUser) -> str:
     return ((user.full_name or "").strip() or user.username)[:100]
 
 
+def _require_active(item: InventoryItem) -> None:
+    if not item.is_active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{item.style} at {item.location} is deactivated. Reactivate it on the Manage page first.",
+        )
+
+
 @app.post("/api/items/{item_id}/adjust", response_model=ItemResponse)
 def adjust_quantity(
     item_id: int,
@@ -333,6 +366,7 @@ def adjust_quantity(
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).with_for_update().first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+    _require_active(item)
 
     new_qty = item.quantity + payload.change_amount
     if new_qty < 0:
@@ -364,6 +398,7 @@ def set_quantity(
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).with_for_update().first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+    _require_active(item)
 
     if payload.new_quantity < 0:
         raise HTTPException(status_code=400, detail="Stock cannot be negative.")
@@ -429,27 +464,52 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
 
     return new_item
 
-def _movement_counts(db: Session, item_ids: List[int]) -> dict:
-    """{item_id: number of stock_movements rows} for the given items (only items that have history)."""
-    if not item_ids:
-        return {}
-    db.flush()  # include movements added earlier in the same request (e.g. sheet IN then DELETE)
-    rows = (
-        db.query(StockMovement.item_id, func.count(StockMovement.id))
-        .filter(StockMovement.item_id.in_(item_ids))
-        .group_by(StockMovement.item_id)
-        .all()
-    )
-    return {item_id: int(n) for item_id, n in rows}
+def _never_delete_message(label: str, qty: int) -> str:
+    """Inventory rows are never hard-deleted by the app: a delete would remove stock (and a row without
+    history) with no recorded movement. Deactivate keeps the row and records who hid it."""
+    how = (f"It still has {qty} pcs: bring it to 0 first with 'Adj' (with a reason) or edit it on the Manage "
+           f"page and Save with quantity 0, so the stock-out is recorded. Then deactivate it."
+           if qty else "It is at 0 pcs, so it can be deactivated now.")
+    return (f"{label} cannot be deleted: inventory rows are never deleted, so every stock change stays on "
+            f"record. Deactivate it instead: this hides it from all stock views and keeps its history. {how}")
 
 
-def _history_block_message(label: str, n: int) -> str:
-    return (
-        f"{label} has {n} stock-movement history record(s) and cannot be deleted "
-        f"(deleting it would erase its audit history). To empty it instead, bring its quantity to 0 "
-        f"with an action that records a movement under your login: 'Adj' on the dashboard "
-        f"(deduct the remaining pieces), or edit the row on the Manage page and Save with quantity 0."
-    )
+def _set_active(item_id: int, active: bool, db: Session, user: WarehouseUser) -> InventoryItem:
+    item = db.query(InventoryItem).filter(InventoryItem.id == item_id).with_for_update().first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if item.is_active == active:
+        return item
+    if not active and item.quantity != 0:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"{item.style} at {item.location} still has {item.quantity} pcs. Bring it to 0 first "
+                    f"('Adj' or Save with quantity 0) so the stock-out is recorded, then deactivate."),
+        )
+    item.is_active = active
+    db.add(StockMovement(
+        item_id=item.id,
+        style=item.style,
+        change_amount=0,
+        quantity_after=item.quantity,
+        movement_type="REACTIVATE" if active else "DEACTIVATE",
+        reason="Row reactivated" if active else "Row deactivated (hidden, history kept)",
+        staff_name=_actor_name(user),
+    ))
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.post("/api/items/{item_id}/deactivate", response_model=ItemResponse)
+def deactivate_item(item_id: int, db: Session = Depends(get_db), user: WarehouseUser = Depends(require_supervisor)):
+    """Soft-delete: hide a quantity-0 row from every stock view while keeping its movement history."""
+    return _set_active(item_id, False, db, user)
+
+
+@app.post("/api/items/{item_id}/reactivate", response_model=ItemResponse)
+def reactivate_item(item_id: int, db: Session = Depends(get_db), user: WarehouseUser = Depends(require_supervisor)):
+    return _set_active(item_id, True, db, user)
 
 
 @app.delete("/api/items/{item_id}", dependencies=SUPERVISOR_ONLY)
@@ -457,15 +517,8 @@ def delete_item(item_id: int, db: Session = Depends(get_db)):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    history = _movement_counts(db, [item.id]).get(item.id, 0)
-    if history:
-        raise HTTPException(
-            status_code=409,
-            detail=_history_block_message(f"{item.style} at {item.location}", history),
-        )
-    db.delete(item)
-    db.commit()
-    return {"message": f"Item {item.style} at location {item.location} deleted."}
+    raise HTTPException(status_code=409, detail=_never_delete_message(f"{item.style} at {item.location}",
+                                                                      item.quantity))
 
 @app.get("/api/movements", dependencies=LOGIN_REQUIRED)
 def get_movements(limit: int = 50, db: Session = Depends(get_db)):
@@ -517,14 +570,14 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
       - IN: Add pieces to existing location or create new style/location
       - OUT: Deduct pieces from matching location
       - SET: Set exact pieces at location (or create if new)
-      - DELETE: Delete matching location record
+      - DELETE: refused (409, sheet not saved): rows are never deleted; use SET 0, then Deactivate
     """
     if not payload.rows:
         raise HTTPException(status_code=400, detail="No rows provided in sheet.")
 
     # Pre-check which styles already exist in DB before this sheet
     all_existing_styles = {
-        r[0].upper() for r in db.query(distinct(InventoryItem.style)).all() if r[0]
+        r[0].upper() for r in db.query(InventoryItem.style).filter(ACTIVE_ITEM).distinct().all() if r[0]
     }
 
     inserted_count = 0
@@ -580,6 +633,7 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
 
             # Find matching record at this location
             q = db.query(InventoryItem).filter(
+                ACTIVE_ITEM,
                 func.upper(InventoryItem.style) == style,
                 func.upper(func.coalesce(InventoryItem.color, "STANDARD")) == color,
                 func.upper(func.coalesce(InventoryItem.size, "OS")) == size,
@@ -600,16 +654,11 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                         status_code=400,
                         detail=f"Row #{idx} ({style} at {loc_str}): Location not found to delete."
                     )
-                history = _movement_counts(db, [target.id]).get(target.id, 0)
-                if history:
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"Row #{idx}: " + _history_block_message(f"{style} at {target.location}", history)
-                        + " Sheet not saved.",
-                    )
-                db.delete(target)
-                deleted_count += 1
-                continue
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Row #{idx}: " + _never_delete_message(f"{style} at {target.location}", target.quantity)
+                    + " On a sheet, use SET with quantity 0. Sheet not saved.",
+                )
 
             if action == "OUT":
                 # Deduct stock from matching location (or across matching locations for that style/color/size)
@@ -617,6 +666,7 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                 if not target:
                     # Fallback: if manager only gave style + color + size without exact row/box
                     fallback_q = db.query(InventoryItem).filter(
+                        ACTIVE_ITEM,
                         func.upper(InventoryItem.style) == style,
                         func.upper(func.coalesce(InventoryItem.color, "STANDARD")) == color,
                         func.upper(func.coalesce(InventoryItem.size, "OS")) == size,
@@ -713,6 +763,10 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                     staff_name=staff,
                 ))
                 db.add(new_item)
+                if new_item.warehouse_part == "PART_2":
+                    # Part 2 has one active row per slot: later rows of this same sheet must find (and
+                    # add to) this new row. Part 1 (Lines) is left exactly as before: one row per carton.
+                    db.flush()
                 inserted_count += 1
                 total_pieces_in += qty
 
@@ -720,6 +774,9 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
     except HTTPException:
         db.rollback()
         raise
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=_integrity_message(e) + " Sheet not saved.")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Sheet failed and rolled back safely: {e}")
@@ -750,11 +807,14 @@ def search_locations(
     section: Optional[str] = Query(None),
     level: Optional[str] = Query(None),
     color: Optional[str] = Query(None),
+    include_inactive: bool = Query(False, description="Also return deactivated rows (to reactivate them)"),
     limit: int = Query(200, ge=1, le=1000),
     db: Session = Depends(get_db)
 ):
     """Search inventory records by style and/or warehouse location coordinates for editing or deleting."""
     q = db.query(InventoryItem)
+    if not include_inactive:
+        q = q.filter(ACTIVE_ITEM)
     if style and style.strip():
         s_clean = style.strip().upper()
         q = q.filter(
@@ -798,6 +858,7 @@ def update_item_full(
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).with_for_update().first()
     if not item:
         raise HTTPException(status_code=404, detail="Location record not found.")
+    _require_active(item)
     if payload.quantity < 0:
         raise HTTPException(status_code=400, detail="Quantity cannot be negative.")
 
@@ -838,30 +899,15 @@ def update_item_full(
 
 @app.post("/api/items/bulk-delete", dependencies=SUPERVISOR_ONLY)
 def bulk_delete_items(payload: BulkDeletePayload, db: Session = Depends(get_db)):
-    """Delete multiple selected location records at once."""
+    """Refused: inventory rows are never deleted. Kept as an endpoint so older pages get a clear 409."""
     if not payload.item_ids:
         raise HTTPException(status_code=400, detail="No item IDs selected.")
-    with_history = _movement_counts(db, payload.item_ids)
-    if with_history:
-        blocked = (
-            db.query(InventoryItem.id, InventoryItem.style, InventoryItem.location)
-            .filter(InventoryItem.id.in_(list(with_history.keys())))
-            .order_by(InventoryItem.style.asc())
-            .all()
-        )
-        examples = "; ".join(f"{s} at {loc}" for _, s, loc in blocked[:5])
-        more = f" and {len(blocked) - 5} more" if len(blocked) > 5 else ""
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Nothing was deleted: {len(blocked)} of the selected rows have stock-movement history "
-                f"({examples}{more}). Rows with history cannot be deleted — unselect them, or bring their "
-                f"quantity to 0 by editing each row and pressing Save (this records a movement under your login)."
-            ),
-        )
-    deleted = db.query(InventoryItem).filter(InventoryItem.id.in_(payload.item_ids)).delete(synchronize_session=False)
-    db.commit()
-    return {"status": "ok", "deleted_count": deleted}
+    raise HTTPException(
+        status_code=409,
+        detail=("Nothing was deleted: inventory rows are never deleted, so every stock change stays on record. "
+                "Use Deactivate on each row instead (a row must be at quantity 0 first: edit and Save with 0, "
+                "which records the stock-out)."),
+    )
 
 
 @app.post("/api/styles/rename", dependencies=SUPERVISOR_ONLY)
@@ -883,27 +929,39 @@ def rename_style(payload: StyleRenamePayload, db: Session = Depends(get_db)):
     return {"status": "ok", "old_style": old_s, "new_style": new_s, "updated_records": len(items)}
 
 
-@app.get("/api/export-csv", dependencies=SUPERVISOR_ONLY)
-def export_inventory_csv(db: Session = Depends(get_db)):
-    """Export all inventory rows as a CSV file."""
+@app.get("/api/export-csv")
+def export_inventory_csv(
+    include_inactive: bool = Query(False, description="ADMIN only: also export deactivated rows (audits)"),
+    db: Session = Depends(get_db),
+    user: WarehouseUser = Depends(require_supervisor),
+):
+    """Export active inventory rows as CSV. Admins can add deactivated rows (extra ACTIVE column)."""
     import csv
     import io
-    items = db.query(InventoryItem).order_by(InventoryItem.style.asc(), InventoryItem.line.asc(), InventoryItem.section.asc()).all()
+    if include_inactive and (user.role or "").upper() != "ADMIN":
+        raise HTTPException(status_code=403, detail="Only admins can export deactivated rows.")
+    q = db.query(InventoryItem)
+    if not include_inactive:
+        q = q.filter(ACTIVE_ITEM)
+    items = q.order_by(InventoryItem.style.asc(), InventoryItem.line.asc(), InventoryItem.section.asc()).all()
     out = io.StringIO()
     writer = csv.writer(out)
-    writer.writerow(["SKU", "COLOR", "ROW", "LINE", "SECTION", "LEVEL", "SIZE", "PCS/BOX", "QTY", "BOX #"])
+    header = ["SKU", "COLOR", "ROW", "LINE", "SECTION", "LEVEL", "SIZE", "PCS/BOX", "QTY", "BOX #"]
+    writer.writerow(header + (["ACTIVE"] if include_inactive else []))
     for i in items:
-        writer.writerow([
+        row = [
             i.style, i.color or "", i.row_pos or "", i.line or "",
             i.section or "", i.level or "", i.size or "",
             i.pcs_per_box if i.pcs_per_box is not None else "",
             i.quantity, i.box_num or ""
-        ])
+        ]
+        writer.writerow(row + (["YES" if i.is_active else "NO"] if include_inactive else []))
     out.seek(0)
+    filename = "warehouse_inventory_export_incl_deactivated.csv" if include_inactive else "warehouse_inventory_export.csv"
     return StreamingResponse(
         iter([out.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=warehouse_inventory_export.csv"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 
@@ -914,7 +972,7 @@ def get_warehouse_overview(db: Session = Depends(get_db)):
       - PART_1: Allbirds Zone (14 Lines, each 32-35 Sections, 4 Levels)
       - PART_2: Von Dutch & Valentino Zone (14 Rows + WALL, 36 Sections + Ground FRONT/BACK + WALL, 4 Levels)
     """
-    items = db.query(InventoryItem).all()
+    items = db.query(InventoryItem).filter(ACTIVE_ITEM).all()
 
     part1_lines = {
         str(i): {
@@ -1085,11 +1143,11 @@ def get_warehouse_aisle_detail(
 
     if p == "PART_1":
         items = db.query(InventoryItem).filter(
-            func.coalesce(InventoryItem.line, "") == a
+            ACTIVE_ITEM, func.coalesce(InventoryItem.line, "") == a
         ).order_by(InventoryItem.section.asc(), InventoryItem.level.asc(), InventoryItem.style.asc()).all()
     else:
         items = db.query(InventoryItem).filter(
-            func.upper(func.coalesce(InventoryItem.row_pos, "")) == a
+            ACTIVE_ITEM, func.upper(func.coalesce(InventoryItem.row_pos, "")) == a
         ).order_by(InventoryItem.section.asc(), InventoryItem.level.asc(), InventoryItem.style.asc()).all()
 
     sections_map = {}
@@ -1414,6 +1472,7 @@ def receive_stock(payload: ReceivingPayload, db: Session = Depends(get_db)):
     )
 
     q = db.query(InventoryItem).filter(
+        ACTIVE_ITEM,
         func.upper(InventoryItem.style) == style,
         func.upper(func.coalesce(InventoryItem.color, "STANDARD")) == color,
         func.upper(func.coalesce(InventoryItem.size, "OS")) == size,
@@ -1701,6 +1760,7 @@ def approve_inbound_shipment(
         )
 
         q = db.query(InventoryItem).filter(
+            ACTIVE_ITEM,
             func.upper(InventoryItem.style) == it.style.upper(),
             func.upper(func.coalesce(InventoryItem.color, "STANDARD")) == it.color.upper(),
             func.upper(func.coalesce(InventoryItem.size, "OS")) == it.size.upper(),
@@ -1820,8 +1880,6 @@ def delete_inbound_shipment(shipment_id: int, db: Session = Depends(get_db)):
 # Used by other microservices (e.g. picking-service). Protected by a shared secret in the
 # X-Internal-Key header. Disabled entirely if INTERNAL_API_KEY is not configured.
 # ======================================================================================
-import hmac as _hmac
-from app.location_engine import _norm_coord
 
 # No default: if INTERNAL_API_KEY is unset, every /api/internal/* call is refused (503).
 INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "").strip()
@@ -1866,6 +1924,7 @@ def internal_location_stock(
     """All inventory rows in one Line/Section (every level). Used by picking-service to build its UI."""
     ln, sec = _norm_line(line), _norm_section(section)
     rows = db.query(InventoryItem).filter(
+        ACTIVE_ITEM,
         InventoryItem.warehouse_part == warehouse_part,
         InventoryItem.line == ln,
         InventoryItem.section == sec,
@@ -1905,6 +1964,7 @@ def internal_pick(
     ln, sec, lvl = _norm_line(payload.line), _norm_section(payload.section), _norm_level(payload.level)
 
     q = db.query(InventoryItem).filter(
+        ACTIVE_ITEM,
         InventoryItem.warehouse_part == payload.warehouse_part,
         InventoryItem.line == ln,
         InventoryItem.section == sec,
@@ -1976,7 +2036,7 @@ def internal_catalog(
         InventoryItem.size,
         InventoryItem.pcs_per_box,
         InventoryItem.quantity,
-    ).all()
+    ).filter(ACTIVE_ITEM).all()
 
     styles_map: dict = {}
     colors_cnt: Counter = Counter()
@@ -2035,7 +2095,7 @@ def internal_style_lookup(
     _: bool = Depends(require_internal_service),
 ):
     """Return live rack locations and quantities for a scanned style (used by vision-llm-service)."""
-    q = db.query(InventoryItem).filter(func.upper(InventoryItem.style) == style.strip().upper())
+    q = db.query(InventoryItem).filter(ACTIVE_ITEM, func.upper(InventoryItem.style) == style.strip().upper())
     items = q.order_by(InventoryItem.quantity.desc(), InventoryItem.location.asc()).limit(40).all()
     if color:
         cu = color.strip().upper()
@@ -2062,7 +2122,6 @@ def internal_style_lookup(
 # ======================================================================================
 # API GATEWAY: forward /pick/* -> picking-service and /scan/* -> vision-llm-service.
 # ======================================================================================
-import httpx
 
 PICKING_SERVICE_URL = os.getenv("PICKING_SERVICE_URL", "http://localhost:8001").rstrip("/")
 VISION_SERVICE_URL = os.getenv("VISION_SERVICE_URL", "http://localhost:8002").rstrip("/")
