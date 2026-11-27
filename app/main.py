@@ -28,7 +28,8 @@ from app.schemas import (
     SheetSubmitPayload, BulkDeletePayload, StyleRenamePayload,
     ReceivingPayload,
     InboundShipmentCreate,
-    InboundShipmentResponse, InboundParseRequest, InboundApprovePayload, InboundRejectPayload
+    InboundShipmentResponse, InboundParseRequest, InboundApprovePayload, InboundRejectPayload,
+    LocationImportPayload,
 )
 
 # Route-level access rules (server-side; the frontend's hidden buttons are not security).
@@ -510,6 +511,64 @@ def deactivate_item(item_id: int, db: Session = Depends(get_db), user: Warehouse
 @app.post("/api/items/{item_id}/reactivate", response_model=ItemResponse)
 def reactivate_item(item_id: int, db: Session = Depends(get_db), user: WarehouseUser = Depends(require_supervisor)):
     return _set_active(item_id, True, db, user)
+
+
+# ----------------------------------------------------------------------------- Part 2 locations (row-size import)
+LOCATION_IMPORT_MAX_BYTES = 2 * 1024 * 1024
+
+
+def _read_row_sizes(payload: LocationImportPayload):
+    import base64
+    import hashlib
+    from app.location_import import parse_row_sizes
+    try:
+        data = base64.b64decode(payload.data_base64.split(",")[-1], validate=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="The file could not be read (bad upload). Nothing was changed.")
+    if not data or len(data) > LOCATION_IMPORT_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="The file is empty or larger than 2 MB. Nothing was changed.")
+    source = f"row-size import {payload.filename.strip()[:120]} sha256:{hashlib.sha256(data).hexdigest()[:12]}"
+    return parse_row_sizes(data), source
+
+
+@app.post("/api/locations/import/preview", dependencies=ADMIN_ONLY)
+def preview_location_import(payload: LocationImportPayload, db: Session = Depends(get_db)):
+    """READ ONLY: what importing this row-size workbook would create / reactivate / deactivate."""
+    from app.location_import import plan_changes
+    row_sizes, _ = _read_row_sizes(payload)
+    plan = plan_changes(db, row_sizes)
+    db.rollback()
+    plan["create_count"] = len(plan["create"])
+    plan["create"] = plan["create"][:40]  # sample; the per-row table shows the full picture
+    return plan
+
+
+@app.post("/api/locations/import/apply")
+def apply_location_import(payload: LocationImportPayload, db: Session = Depends(get_db),
+                          user: WarehouseUser = Depends(require_admin)):
+    """Create / reactivate / deactivate exactly what the preview showed, in one transaction, each change recorded."""
+    from app.location_import import apply_changes
+    if not payload.plan_hash:
+        raise HTTPException(status_code=400, detail="Preview first: the apply needs the preview's plan. Nothing was changed.")
+    row_sizes, source = _read_row_sizes(payload)
+    try:
+        result = apply_changes(db, row_sizes, payload.plan_hash, user.id, source)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
+    db.commit()
+    return {"status": "ok", **result, "source": source}
+
+
+@app.get("/api/locations/summary", dependencies=ADMIN_ONLY)
+def locations_summary(db: Session = Depends(get_db)):
+    from app.models import Location
+    rows = (db.query(Location.location_type, Location.area, Location.is_active, func.count(Location.id))
+            .group_by(Location.location_type, Location.area, Location.is_active).all())
+    return [{"type": t, "area": a, "active": act, "count": n} for t, a, act, n in rows]
 
 
 @app.delete("/api/items/{item_id}", dependencies=SUPERVISOR_ONLY)
@@ -2223,6 +2282,15 @@ if os.path.exists(static_dir):
         if not user:
             return RedirectResponse(url="/login", status_code=302)
         return FileResponse(os.path.join(static_dir, "index.html"))
+
+    @app.get("/locations")
+    def serve_locations_page(request: Request, db: Session = Depends(get_db)):
+        user = get_optional_user(request, db)
+        if not user:
+            return RedirectResponse(url="/login", status_code=302)
+        if user.role != "ADMIN":
+            return RedirectResponse(url="/", status_code=302)
+        return FileResponse(os.path.join(static_dir, "locations.html"))
 
     @app.get("/manage")
     def serve_manage_page(request: Request, db: Session = Depends(get_db)):

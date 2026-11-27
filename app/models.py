@@ -4,7 +4,7 @@ from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Column, Integer, S
 from sqlalchemy.orm import relationship
 from .database import Base
 from .inventory_slots import ACTIVE_SLOT_EXPRESSIONS, ACTIVE_SLOT_INDEX, ACTIVE_SLOT_WHERE
-from .location_codes import ITEM_LOCATION_CHECK, ITEM_LOCATION_CHECK_NAME, LOCATION_CHECKS
+from .location_codes import ITEM_LOCATION_CHECK, ITEM_LOCATION_CHECK_NAME, LOCATION_CHANGE_ACTIONS_CHECK, LOCATION_CHECKS
 
 
 class Location(Base):
@@ -38,6 +38,20 @@ class Location(Base):
         Index("ix_locations_row_area", "row_no", "area", "section_no", "level_no"),
         *[CheckConstraint(sql, name=name) for name, sql in LOCATION_CHECKS.items()],
     )
+
+
+class LocationChange(Base):
+    """Append-only (DB trigger): who created / deactivated / reactivated a location, when, and from which file."""
+    __tablename__ = "location_changes"
+
+    id = Column(BigInteger, Identity(always=True), primary_key=True)
+    location_id = Column(BigInteger, ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False, index=True)
+    action = Column(String(20), nullable=False)           # CREATE | DEACTIVATE | REACTIVATE
+    source = Column(String(255), nullable=False)          # e.g. "row-size import part2_row_sizes.xlsx sha256:ab12…"
+    changed_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    changed_by = Column(Integer, ForeignKey("warehouse_users.id", ondelete="RESTRICT"), nullable=False, index=True)
+
+    __table_args__ = (CheckConstraint(LOCATION_CHANGE_ACTIONS_CHECK, name="ck_location_changes_action"),)
 
 
 class WarehouseLocation(Base):

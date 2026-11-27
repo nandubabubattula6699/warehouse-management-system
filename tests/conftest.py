@@ -77,8 +77,9 @@ from app.database import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import WarehouseUser  # noqa: E402
 
-TABLES = ["stock_movements", "inventory_items", "locations", "inbound_shipment_items", "inbound_shipments",
-          "warehouse_users", "warehouse_locations"]
+TABLES = ["stock_movements", "location_changes", "inventory_items", "locations", "inbound_shipment_items",
+          "inbound_shipments", "warehouse_users", "warehouse_locations"]
+APPEND_ONLY_TRIGGER = "trg_location_changes_append_only"  # test cleanup only: production never disables it
 
 PASSWORD = "Correct-Horse-Battery-9"
 
@@ -106,7 +107,9 @@ def _schema():
 @pytest.fixture(autouse=True)
 def _clean_tables():
     with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE location_changes DISABLE TRIGGER {APPEND_ONLY_TRIGGER}"))
         conn.execute(text("TRUNCATE " + ", ".join(TABLES) + " RESTART IDENTITY CASCADE"))
+        conn.execute(text(f"ALTER TABLE location_changes ENABLE TRIGGER {APPEND_ONLY_TRIGGER}"))
     yield
 
 

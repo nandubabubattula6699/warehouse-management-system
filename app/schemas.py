@@ -191,3 +191,9 @@ class InboundApprovePayload(BaseModel):
 class InboundRejectPayload(BaseModel):
     rejected_by: Optional[str] = "Nandu (Admin)"
     reason: str
+
+class LocationImportPayload(BaseModel):
+    """Row-size workbook (.xlsx) as base64. plan_hash is required to apply: it must match the preview."""
+    filename: str
+    data_base64: str
+    plan_hash: Optional[str] = None

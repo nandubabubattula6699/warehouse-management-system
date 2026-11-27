@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alexander Warehouse OS - Part 2 Locations</title>
+  <link rel="shortcut icon" href="/favicon.ico?v=36.0">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=36.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/styles.css?v=36.0">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+  <header class="bg-slate-900 border-b border-slate-800 px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-lg font-black tracking-wider uppercase text-white">Part 2 Locations</h1>
+      <p class="text-xs text-slate-400">Admin only. Upload the confirmed row-size workbook, check the preview, then apply. Spots are never deleted, only deactivated.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/manage" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold">Manage</a>
+      <a href="/" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold">Dashboard</a>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+      <h2 class="text-sm font-bold uppercase text-slate-300 mb-2">Current locations</h2>
+      <div id="summary" class="text-xs text-slate-300">Loading…</div>
+    </section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+      <h2 class="text-sm font-bold uppercase text-slate-300">1. Choose the row-size workbook (.xlsx)</h2>
+      <p class="text-xs text-slate-400">Choosing a file saves nothing. Every line in the sheet "Row sizes (fill in)" must say <b>OK</b> in the last column before it can be applied.</p>
+      <div class="flex flex-wrap items-center gap-3">
+        <input id="fileInput" type="file" accept=".xlsx" class="text-xs text-slate-300">
+        <button id="previewBtn" type="button" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2 rounded-lg text-xs disabled:opacity-40" disabled>Preview (changes nothing)</button>
+      </div>
+    </section>
+
+    <section id="previewSection" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4" hidden>
+      <h2 class="text-sm font-bold uppercase text-slate-300">2. Preview</h2>
+      <div id="counts" class="grid grid-cols-2 md:grid-cols-5 gap-3 text-center"></div>
+      <div id="problems" class="space-y-3"></div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead class="text-slate-400 uppercase">
+            <tr><th class="text-left py-1 pr-3">Row</th><th class="text-right pr-3">Shelf sections</th><th class="text-right pr-3">Shelf levels</th>
+                <th class="text-right pr-3">Ground front</th><th class="text-right pr-3">Ground back</th><th class="text-right">Spots</th></tr>
+          </thead>
+          <tbody id="perRow" class="text-slate-200"></tbody>
+        </table>
+      </div>
+      <div id="lists" class="space-y-2 text-xs"></div>
+      <div class="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-800">
+        <button id="applyBtn" type="button" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-lg text-xs disabled:opacity-40" disabled>3. Apply exactly this preview</button>
+        <span id="applyHint" class="text-xs text-slate-400"></span>
+      </div>
+    </section>
+
+    <div id="toast" class="fixed bottom-4 right-4 max-w-md px-4 py-3 rounded-xl text-sm font-semibold shadow-xl" hidden></div>
+  </main>
+
+  <script src="/static/locations.js?v=36.0"></script>
+</body>
+</html>

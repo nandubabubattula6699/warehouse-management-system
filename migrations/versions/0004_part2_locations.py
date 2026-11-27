@@ -10,6 +10,8 @@
 Every storage spot has a level (>= 1). Check constraints make the code always agree with its coordinates.
 Spots are never deleted: they are deactivated (is_active = false). Every row records who created it.
 
+`location_changes`: append-only record (DB trigger) of every create / deactivate / reactivate: who, when, source file.
+
 `inventory_items.location_id`: nullable FK, ON DELETE RESTRICT. Added EMPTY for every row (no row changes).
 A check constraint refuses a value on any row that is not Part 2, so Allbirds (Part 1, Lines) can never be
 linked. Part 2 rows are linked later in a separate, recorded step.
@@ -25,7 +27,9 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-from app.location_codes import ITEM_LOCATION_CHECK, ITEM_LOCATION_CHECK_NAME, LOCATION_CHECKS
+from app.location_codes import (
+    APPEND_ONLY_FUNCTION, ITEM_LOCATION_CHECK, ITEM_LOCATION_CHECK_NAME, LOCATION_CHANGE_ACTIONS_CHECK, LOCATION_CHECKS,
+)
 
 
 revision: str = '0004'
@@ -60,6 +64,24 @@ def upgrade() -> None:
     op.create_index("ix_locations_updated_by", "locations", ["updated_by"])
     op.create_index("ix_locations_row_area", "locations", ["row_no", "area", "section_no", "level_no"])
 
+    # Who created / deactivated / reactivated which spot, when and from which file. Append-only (trigger).
+    op.create_table(
+        "location_changes",
+        sa.Column("id", sa.BigInteger(), sa.Identity(always=True), primary_key=True),
+        sa.Column("location_id", sa.BigInteger(), sa.ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column("action", sa.String(length=20), nullable=False),
+        sa.Column("source", sa.String(length=255), nullable=False),
+        sa.Column("changed_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("changed_by", sa.Integer(), sa.ForeignKey("warehouse_users.id", ondelete="RESTRICT"),
+                  nullable=False),
+        sa.CheckConstraint(LOCATION_CHANGE_ACTIONS_CHECK, name="ck_location_changes_action"),
+    )
+    op.create_index("ix_location_changes_location_id", "location_changes", ["location_id"])
+    op.create_index("ix_location_changes_changed_by", "location_changes", ["changed_by"])
+    op.execute(APPEND_ONLY_FUNCTION)
+    op.execute("CREATE TRIGGER trg_location_changes_append_only BEFORE UPDATE OR DELETE OR TRUNCATE "
+               "ON location_changes FOR EACH STATEMENT EXECUTE FUNCTION location_changes_append_only()")
+
     # Nullable, no default: existing rows are not rewritten or changed; every row starts unlinked.
     op.add_column("inventory_items", sa.Column("location_id", sa.BigInteger(), nullable=True))
     op.create_foreign_key("fk_inventory_items_location_id", "inventory_items", "locations",
@@ -77,6 +99,8 @@ def downgrade() -> None:
     op.drop_index("ix_inventory_items_location_id", table_name="inventory_items")
     op.drop_constraint("fk_inventory_items_location_id", "inventory_items", type_="foreignkey")
     op.drop_column("inventory_items", "location_id")
+    op.drop_table("location_changes")  # drops its trigger too
+    op.execute("DROP FUNCTION location_changes_append_only()")
     op.drop_index("ix_locations_row_area", table_name="locations")
     op.drop_index("ix_locations_updated_by", table_name="locations")
     op.drop_index("ix_locations_created_by", table_name="locations")

@@ -41,6 +41,14 @@ LOCATION_CHECKS = {
     ),
 }
 
+# location_changes: one row per create / deactivate / reactivate. Append-only: the trigger refuses UPDATE,
+# DELETE and TRUNCATE, so the record of who changed which spot can never be rewritten.
+LOCATION_CHANGE_ACTIONS_CHECK = "action IN ('CREATE', 'DEACTIVATE', 'REACTIVATE')"
+APPEND_ONLY_FUNCTION = (
+    "CREATE FUNCTION location_changes_append_only() RETURNS trigger LANGUAGE plpgsql AS $$ "
+    "BEGIN RAISE EXCEPTION 'location_changes is append-only (% refused)', TG_OP; END $$"
+)
+
 # inventory_items.location_id may only be set on Part 2 rows: Allbirds can never be linked.
 ITEM_LOCATION_CHECK_NAME = "ck_inventory_items_location_part2_only"
 ITEM_LOCATION_CHECK = "location_id IS NULL OR warehouse_part = 'PART_2'"

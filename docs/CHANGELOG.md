@@ -8,6 +8,21 @@
     its coordinates (`app/location_codes.py`); every storage spot has a level >= 1; codes unique; `created_by` required.
   - `location_id` can only be set on Part 2 rows (DB check), so Allbirds can never be linked. FK is `ON DELETE RESTRICT`.
   - Creates no locations and changes no inventory row. Downgrade refuses while any row is linked.
+  - `location_changes`: append-only record (DB trigger refuses UPDATE / DELETE / TRUNCATE) of every create / deactivate /
+    reactivate, with who, when and the source file.
+
+## Part 2 locations, step C (same branch, not deployed)
+
+- Admin page `/locations`: choose the row-size workbook (step A format) → **Preview** (reads only) → **Apply exactly this
+  preview**. Choosing the file saves nothing.
+- Apply refuses (nothing changed) when: a line is not marked OK; a number is invalid; an unknown special spot is listed; a
+  spot that would be deactivated still holds stock; or the locations changed since the preview (plan hash, 409). Imports are
+  serialized by an advisory lock and run in one transaction.
+- Spots are created, deactivated or reactivated, never deleted; every change is a `location_changes` row with the admin's id.
+- Stock that sits at spots outside the table is listed, never guessed. No inventory row or movement is touched; Allbirds is
+  not read.
+- API (ADMIN only): `POST /api/locations/import/preview`, `POST /api/locations/import/apply`, `GET /api/locations/summary`.
+- New dependency: `openpyxl` (reads the .xlsx).
 
 ## Phase 1b: foundation (branch `phase-1b-foundation`)
 
