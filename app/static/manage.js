@@ -47,7 +47,6 @@ function addSheetRows(count = 1, prefillList = null) {
           <option value="IN" ${act === 'IN' ? 'selected' : ''}>📥 IN (+Add)</option>
           <option value="OUT" ${act === 'OUT' ? 'selected' : ''}>📤 OUT (-Ship)</option>
           <option value="SET" ${act === 'SET' ? 'selected' : ''}>✏️ SET (=Exact)</option>
-          <option value="DELETE" ${act === 'DELETE' ? 'selected' : ''}>🗑️ DELETE</option>
         </select>
       </td>
       <td class="py-1.5 px-2">
@@ -519,25 +518,12 @@ async function saveExistingRow(itemId, btnEl) {
   }
 }
 
+// Rows are never deleted (server refuses); "Del" deactivates: hidden from stock views, history kept.
 async function deleteSingleExistingRow(itemId) {
-  if (!confirm("Delete this location record from PostgreSQL?")) return;
-  try {
-    const res = await fetch(`/api/items/${itemId}`, { method: "DELETE" });
-    if (!res.ok) {
-      let detail = "Delete failed";
-      try { detail = (await res.json()).detail || detail; } catch (e) { /* non-JSON */ }
-      if (res.status === 409 && confirm(`${detail}\n\nDeactivate this row now instead?`)) {
-        await setRowActive(itemId, false);
-        return;
-      }
-      showToast(detail, "error");
-      return;
-    }
-    showToast("Location deleted", "success");
-    searchExistingLocations();
-  } catch (err) {
-    showToast("Delete failed", "error");
-  }
+  if (!confirm("Rows are never deleted, so every stock change stays on record.\n\n" +
+               "Deactivate this row instead? It is hidden from all stock views and keeps its history.\n" +
+               "It must be at 0 pcs: if not, Save it with quantity 0 first (that records the stock-out).")) return;
+  await setRowActive(itemId, false);
 }
 
 // Deactivate (hide, keep history) or reactivate a row. Server enforces quantity 0 for deactivation.
@@ -561,32 +547,6 @@ function toggleSelectAllExisting(checked) {
   document.querySelectorAll(".existing-row-check").forEach(cb => {
     cb.checked = checked;
   });
-}
-
-async function deleteSelectedExistingRows() {
-  const checked = [...document.querySelectorAll(".existing-row-check:checked")].map(cb => parseInt(cb.value, 10));
-  if (checked.length === 0) {
-    showToast("Check at least one row to delete", "error");
-    return;
-  }
-  if (!confirm(`Delete ${checked.length} selected location row(s) from PostgreSQL?`)) return;
-
-  try {
-    const res = await fetch("/api/items/bulk-delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ item_ids: checked, staff_name: "Nandu" })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showToast(data.detail || "Bulk delete failed", "error");
-      return;
-    }
-    showToast(`Deleted ${data.deleted_count} location rows`, "success");
-    searchExistingLocations();
-  } catch (err) {
-    showToast("Error deleting selected rows", "error");
-  }
 }
 
 async function handleQuickRenameStyle(e) {

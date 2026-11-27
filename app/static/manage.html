@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alexander Warehouse OS - Manager Sheet Entry & Location Manager</title>
-  <link rel="shortcut icon" href="/favicon.ico?v=35.0">
-  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png?v=35.0">
-  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png?v=35.0">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=35.0">
-  <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=35.0">
+  <link rel="shortcut icon" href="/favicon.ico?v=36.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png?v=36.0">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png?v=36.0">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=36.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=36.0">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/static/styles.css?v=35.0">
+  <link rel="stylesheet" href="/static/styles.css?v=36.0">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
 
@@ -18,7 +18,7 @@
   <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xl">
     <div class="flex items-center space-x-3">
       <div class="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-blue-500/30 border border-[#38bdf8]/40 shrink-0">
-        <img src="/static/favicon.svg?v=35.0" alt="Alexander Warehouse A" class="w-full h-full object-contain" />
+        <img src="/static/favicon.svg?v=36.0" alt="Alexander Warehouse A" class="w-full h-full object-contain" />
       </div>
       <div>
         <div class="flex items-center gap-2">
@@ -97,7 +97,6 @@
               <option value="IN">📥 STOCK IN (Add to Inventory / Receive)</option>
               <option value="OUT">📤 STOCK OUT (Deduct / Today Output)</option>
               <option value="SET">✏️ SET EXACT QTY (Overwrite Count)</option>
-              <option value="DELETE">🗑️ DELETE LOCATIONS</option>
             </select>
           </div>
           <div>
@@ -261,9 +260,6 @@
         <div class="flex items-center gap-2">
           <button type="submit" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2 rounded-lg text-xs transition">
             🔍 Search Rows
-          </button>
-          <button type="button" onclick="deleteSelectedExistingRows()" class="bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 font-bold px-3 py-2 rounded-lg text-xs whitespace-nowrap transition" title="Delete Checked Rows">
-            🗑️ Delete Checked
           </button>
         </div>
       </form>
@@ -926,8 +922,8 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script src="/static/inbound_client.js?v=35.0"></script>
-  <script src="/static/manage.js?v=35.0"></script>
-  <script src="/static/auth_client.js?v=35.0"></script>
+  <script src="/static/inbound_client.js?v=36.0"></script>
+  <script src="/static/manage.js?v=36.0"></script>
+  <script src="/static/auth_client.js?v=36.0"></script>
 </body>
 </html>

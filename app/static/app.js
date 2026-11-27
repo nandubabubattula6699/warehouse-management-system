@@ -977,32 +977,22 @@ async function handleAddLocationSubmit(e) {
   }
 }
 
+// Rows are never deleted (server refuses); the 🗑️ button deactivates: hidden from stock views, history kept.
 async function deleteLocationRecord(itemId) {
-  if (!confirm("Are you sure you want to remove this location record from PostgreSQL?")) return;
+  if (!confirm("Rows are never deleted, so every stock change stays on record.\n\n" +
+               "Deactivate this row instead? It is hidden from all stock views and keeps its history.\n" +
+               "It must be at 0 pcs: if not, use 'Adj' first (that records the stock-out).")) return;
 
   try {
-    const res = await fetch(`/api/items/${itemId}`, { method: "DELETE" });
-    if (!res.ok) {
-      let detail = "Error deleting item";
-      try { detail = (await res.json()).detail || detail; } catch (e) { /* non-JSON */ }
-      if (res.status === 409 && confirm(`${detail}\n\nDeactivate this row now instead?`)) {
-        const d = await fetch(`/api/items/${itemId}/deactivate`, { method: "POST" });
-        let dd = {};
-        try { dd = await d.json(); } catch (e) { /* non-JSON */ }
-        if (!d.ok) { showToast(dd.detail || "Deactivate failed", "error"); return; }
-        showToast("Row deactivated (hidden, history kept)", "success");
-        loadBatchStylesDetails(); autoSwitchToMobileLocations();
-        loadStats();
-        return;
-      }
-      showToast(detail, "error");
-      return;
-    }
-    showToast("Location record deleted", "success");
+    const d = await fetch(`/api/items/${itemId}/deactivate`, { method: "POST" });
+    let dd = {};
+    try { dd = await d.json(); } catch (e) { /* non-JSON */ }
+    if (!d.ok) { showToast(dd.detail || "Deactivate failed", "error"); return; }
+    showToast("Row deactivated (hidden, history kept)", "success");
     loadBatchStylesDetails(); autoSwitchToMobileLocations();
     loadStats();
   } catch (err) {
-    showToast("Error deleting item", "error");
+    showToast("Deactivate failed", "error");
   }
 }
 

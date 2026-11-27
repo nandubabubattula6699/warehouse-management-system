@@ -21,7 +21,8 @@
   - `POST /api/items/{id}/deactivate|reactivate` (supervisor; deactivating requires qty 0; audited as a 0-pc movement).
   - Deactivated rows are hidden from stats, style lookups, location search (unless `include_inactive=true`), export, the warehouse map, receiving, sheet and inbound matching, and the internal picking and vision APIs.
   - Adjust, set-quantity and edit on a deactivated row return 409.
-  - Delete-409 messages point to Deactivate.
+  - **Inventory rows are never hard-deleted by the app** (staging smoke test 2026-11-26: a row without history, 48 pcs, was deleted with no recorded movement). `DELETE /api/items/{id}`, `POST /api/items/bulk-delete` and the sheet `DELETE` action always return 409 and point to Deactivate (quantity 0 first, via Adj/Save, which records the stock-out).
+  - The dashboard 🗑️ and Manage "Del" buttons now ask to Deactivate directly. Manage no longer offers the DELETE sheet mode/action or "Delete Checked". Cache-buster v36.
   - Dashboard and Manage page offer "Deactivate instead?" after a blocked delete.
   - Manage page has "Show deactivated rows" and a Reactivate button.
   - Cache-buster v34.

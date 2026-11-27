@@ -149,8 +149,9 @@ Downgrading below 0001 is refused unless `ALLOW_BASELINE_DOWNGRADE=1`. Never set
 
 - [ ] The app starts and the log says `Schema at migration 0002`.
 - [ ] Dashboard stats are unchanged from before the deploy (row count and units).
-- [ ] Delete a row that has history: you get a 409 and are asked "Deactivate this row now instead?". Answering OK with qty > 0 shows "Bring it to 0 first".
-- [ ] Bring a test row to 0 with Adj, then Del, then OK: the row disappears from the dashboard, map and QR picking.
+- [ ] Del (🗑️) on a row with qty > 0, with or without history: it asks to Deactivate instead; OK shows "Bring it to 0 first". Nothing is deleted, and the dashboard record count stays the same.
+- [ ] Bring a test row to 0 with Adj, then Del, then OK: the row is deactivated and disappears from the dashboard, map and QR picking.
+- [ ] Manage: no DELETE sheet mode/action and no "Delete Checked" button.
 - [ ] Manage page, "Show deactivated rows": the row shows as Deactivated. Reactivate brings it back.
 - [ ] The movement log shows DEACTIVATE/REACTIVATE with your name.
 - [ ] QR picking and inbound approval still work.

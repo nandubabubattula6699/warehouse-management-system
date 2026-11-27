@@ -464,27 +464,14 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
 
     return new_item
 
-def _movement_counts(db: Session, item_ids: List[int]) -> dict:
-    """{item_id: number of stock_movements rows} for the given items (only items that have history)."""
-    if not item_ids:
-        return {}
-    db.flush()  # include movements added earlier in the same request (e.g. sheet IN then DELETE)
-    rows = (
-        db.query(StockMovement.item_id, func.count(StockMovement.id))
-        .filter(StockMovement.item_id.in_(item_ids))
-        .group_by(StockMovement.item_id)
-        .all()
-    )
-    return {item_id: int(n) for item_id, n in rows}
-
-
-def _history_block_message(label: str, n: int) -> str:
-    return (
-        f"{label} has {n} stock-movement history record(s) and cannot be deleted "
-        f"(deleting it would erase its audit history). Deactivate it instead: this hides it from all "
-        f"stock views and keeps the history. A row must be at quantity 0 to deactivate; to get there, "
-        f"use 'Adj' on the dashboard or edit the row on the Manage page and Save with quantity 0."
-    )
+def _never_delete_message(label: str, qty: int) -> str:
+    """Inventory rows are never hard-deleted by the app: a delete would remove stock (and a row without
+    history) with no recorded movement. Deactivate keeps the row and records who hid it."""
+    how = (f"It still has {qty} pcs: bring it to 0 first with 'Adj' (with a reason) or edit it on the Manage "
+           f"page and Save with quantity 0, so the stock-out is recorded. Then deactivate it."
+           if qty else "It is at 0 pcs, so it can be deactivated now.")
+    return (f"{label} cannot be deleted: inventory rows are never deleted, so every stock change stays on "
+            f"record. Deactivate it instead: this hides it from all stock views and keeps its history. {how}")
 
 
 def _set_active(item_id: int, active: bool, db: Session, user: WarehouseUser) -> InventoryItem:
@@ -530,15 +517,8 @@ def delete_item(item_id: int, db: Session = Depends(get_db)):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    history = _movement_counts(db, [item.id]).get(item.id, 0)
-    if history:
-        raise HTTPException(
-            status_code=409,
-            detail=_history_block_message(f"{item.style} at {item.location}", history),
-        )
-    db.delete(item)
-    db.commit()
-    return {"message": f"Item {item.style} at location {item.location} deleted."}
+    raise HTTPException(status_code=409, detail=_never_delete_message(f"{item.style} at {item.location}",
+                                                                      item.quantity))
 
 @app.get("/api/movements", dependencies=LOGIN_REQUIRED)
 def get_movements(limit: int = 50, db: Session = Depends(get_db)):
@@ -590,7 +570,7 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
       - IN: Add pieces to existing location or create new style/location
       - OUT: Deduct pieces from matching location
       - SET: Set exact pieces at location (or create if new)
-      - DELETE: Delete matching location record
+      - DELETE: refused (409, sheet not saved): rows are never deleted; use SET 0, then Deactivate
     """
     if not payload.rows:
         raise HTTPException(status_code=400, detail="No rows provided in sheet.")
@@ -674,16 +654,11 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                         status_code=400,
                         detail=f"Row #{idx} ({style} at {loc_str}): Location not found to delete."
                     )
-                history = _movement_counts(db, [target.id]).get(target.id, 0)
-                if history:
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"Row #{idx}: " + _history_block_message(f"{style} at {target.location}", history)
-                        + " Sheet not saved.",
-                    )
-                db.delete(target)
-                deleted_count += 1
-                continue
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Row #{idx}: " + _never_delete_message(f"{style} at {target.location}", target.quantity)
+                    + " On a sheet, use SET with quantity 0. Sheet not saved.",
+                )
 
             if action == "OUT":
                 # Deduct stock from matching location (or across matching locations for that style/color/size)
@@ -924,30 +899,15 @@ def update_item_full(
 
 @app.post("/api/items/bulk-delete", dependencies=SUPERVISOR_ONLY)
 def bulk_delete_items(payload: BulkDeletePayload, db: Session = Depends(get_db)):
-    """Delete multiple selected location records at once."""
+    """Refused: inventory rows are never deleted. Kept as an endpoint so older pages get a clear 409."""
     if not payload.item_ids:
         raise HTTPException(status_code=400, detail="No item IDs selected.")
-    with_history = _movement_counts(db, payload.item_ids)
-    if with_history:
-        blocked = (
-            db.query(InventoryItem.id, InventoryItem.style, InventoryItem.location)
-            .filter(InventoryItem.id.in_(list(with_history.keys())))
-            .order_by(InventoryItem.style.asc())
-            .all()
-        )
-        examples = "; ".join(f"{s} at {loc}" for _, s, loc in blocked[:5])
-        more = f" and {len(blocked) - 5} more" if len(blocked) > 5 else ""
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Nothing was deleted: {len(blocked)} of the selected rows have stock-movement history "
-                f"({examples}{more}). Rows with history cannot be deleted — unselect them and use "
-                f"Deactivate instead (rows must be at quantity 0; edit and Save with 0 first)."
-            ),
-        )
-    deleted = db.query(InventoryItem).filter(InventoryItem.id.in_(payload.item_ids)).delete(synchronize_session=False)
-    db.commit()
-    return {"status": "ok", "deleted_count": deleted}
+    raise HTTPException(
+        status_code=409,
+        detail=("Nothing was deleted: inventory rows are never deleted, so every stock change stays on record. "
+                "Use Deactivate on each row instead (a row must be at quantity 0 first: edit and Save with 0, "
+                "which records the stock-out)."),
+    )
 
 
 @app.post("/api/styles/rename", dependencies=SUPERVISOR_ONLY)
