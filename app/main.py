@@ -23,13 +23,14 @@ from app.auth import (
 )
 from app.inventory_slots import ACTIVE_SLOT_CONFLICT_MESSAGE, ACTIVE_SLOT_INDEX
 from app.location_engine import _norm_coord, build_location_info, seed_locations_if_empty
+from app.location_links import part2_location_id
 from app.schemas import (
     ItemCreate, ItemUpdatePayload, ItemResponse, StockAdjustPayload, SetQuantityPayload, WarehouseStats,
     SheetSubmitPayload, BulkDeletePayload, StyleRenamePayload,
     ReceivingPayload,
     InboundShipmentCreate,
     InboundShipmentResponse, InboundParseRequest, InboundApprovePayload, InboundRejectPayload,
-    LocationImportPayload,
+    LocationImportPayload, EmptyRowsApplyPayload, LinkApplyPayload,
 )
 
 # Route-level access rules (server-side; the frontend's hidden buttons are not security).
@@ -445,6 +446,7 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
         "level": info["level"],
         "box_num": info["box_num"],
     })
+    data["location_id"] = part2_location_id(db, info)
     new_item = InventoryItem(**data)
     db.add(new_item)
     db.commit()
@@ -487,6 +489,9 @@ def _set_active(item_id: int, active: bool, db: Session, user: WarehouseUser) ->
             detail=(f"{item.style} at {item.location} still has {item.quantity} pcs. Bring it to 0 first "
                     f"('Adj' or Save with quantity 0) so the stock-out is recorded, then deactivate."),
         )
+    if active:
+        item.location_id = part2_location_id(db, {"warehouse_part": item.warehouse_part, "row_pos": item.row_pos,
+                                                  "section": item.section, "level": item.level})
     item.is_active = active
     db.add(StockMovement(
         item_id=item.id,
@@ -569,6 +574,72 @@ def locations_summary(db: Session = Depends(get_db)):
     rows = (db.query(Location.location_type, Location.area, Location.is_active, func.count(Location.id))
             .group_by(Location.location_type, Location.area, Location.is_active).all())
     return [{"type": t, "area": a, "active": act, "count": n} for t, a, act, n in rows]
+
+
+@app.get("/api/locations/empty-rows/preview", dependencies=ADMIN_ONLY)
+def preview_empty_rows(db: Session = Depends(get_db)):
+    """READ ONLY (D0): active Part 2 rows at qty 0, split into 'spot no longer exists' and 'at an existing spot'."""
+    from app.location_links import empty_rows_plan
+    return empty_rows_plan(db)
+
+
+@app.post("/api/locations/empty-rows/apply")
+def apply_empty_rows(payload: EmptyRowsApplyPayload, db: Session = Depends(get_db),
+                     user: WarehouseUser = Depends(require_admin)):
+    """D0: deactivate exactly the previewed rows (plus the ticked ones), each with a recorded DEACTIVATE movement."""
+    from app.location_links import deactivate_empty_rows
+    try:
+        result = deactivate_empty_rows(db, payload.plan_hash, payload.include_ids, _actor_name(user))
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
+    db.commit()
+    return {"status": "ok", **result}
+
+
+@app.get("/api/locations/link/preview", dependencies=ADMIN_ONLY)
+def preview_links(db: Session = Depends(get_db)):
+    """READ ONLY (D1): match report of active Part 2 rows to active locations."""
+    from app.location_links import link_plan
+    return link_plan(db)
+
+
+@app.get("/api/locations/link/report.csv", dependencies=ADMIN_ONLY)
+def link_report_csv(db: Session = Depends(get_db)):
+    """READ ONLY (D1): the match report as CSV, one line per active Part 2 row."""
+    import csv
+    import io
+    from app.location_links import link_plan
+    plan = link_plan(db)
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["GROUP", "ID", "SKU", "COLOR", "SIZE", "OLD LOCATION", "NEW CODE", "PCS/BOX", "QTY", "LINKED TO"])
+    for group in ("will_link", "linked_ok", "linked_other", "unmatched_stock", "unmatched_empty"):
+        for r in plan[group]:
+            w.writerow([group, r["id"], r["style"], r["color"], r["size"], r["location"], r["code"],
+                        r["pcs_per_box"] if r["pcs_per_box"] is not None else "", r["quantity"], r.get("linked_to", "")])
+    return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
+                             headers={"Content-Disposition": "attachment; filename=part2_location_link_report.csv"})
+
+
+@app.post("/api/locations/link/apply")
+def apply_location_links(payload: LinkApplyPayload, db: Session = Depends(get_db),
+                         user: WarehouseUser = Depends(require_admin)):
+    """D2: link exactly the previewed rows, each with a recorded 0-pc LOCATION_LINK movement."""
+    from app.location_links import apply_links
+    try:
+        result = apply_links(db, payload.plan_hash, _actor_name(user))
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
+    db.commit()
+    return {"status": "ok", **result}
 
 
 @app.get("/api/locations/labels.pdf", dependencies=SUPERVISOR_ONLY)
@@ -833,8 +904,10 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                 ))
                 continue
 
-            # Action is IN or SET
+            # Action is IN or SET: stock goes to this spot, so it must be an active location (Part 2, D3)
+            spot_id = part2_location_id(db, loc_meta, label=f"Row #{idx} ({style}): ")
             if exact_match:
+                exact_match.location_id = spot_id
                 if action == "IN":
                     delta = qty
                     exact_match.quantity += qty
@@ -885,6 +958,7 @@ def submit_manager_sheet(payload: SheetSubmitPayload, db: Session = Depends(get_
                     location=loc_meta["location"],
                     pcs_per_box=pcs_per_box,
                     quantity=qty,
+                    location_id=spot_id,
                 )
                 new_item.movements.append(StockMovement(
                     style=new_item.style,
@@ -1014,6 +1088,7 @@ def update_item_full(
     item.placement_type = loc_meta["placement_type"]
     item.location_code = loc_meta["location_code"]
     item.location = loc_meta["location"]
+    item.location_id = part2_location_id(db, loc_meta)
 
     db.add(StockMovement(
         item_id=item.id,
@@ -1617,8 +1692,10 @@ def receive_stock(payload: ReceivingPayload, db: Session = Depends(get_db)):
         target = q.filter(func.coalesce(InventoryItem.box_num, "") == loc_meta["box_num"]).first()
     else:
         target = q.first()
+    spot_id = part2_location_id(db, loc_meta)
 
     if target:
+        target.location_id = spot_id
         target.quantity += payload.quantity
         if payload.pcs_per_box:
             target.pcs_per_box = payload.pcs_per_box
@@ -1657,7 +1734,8 @@ def receive_stock(payload: ReceivingPayload, db: Session = Depends(get_db)):
             row_pos=loc_meta["row_pos"],
             box_num=loc_meta["box_num"],
             pcs_per_box=payload.pcs_per_box,
-            quantity=payload.quantity
+            quantity=payload.quantity,
+            location_id=spot_id,
         )
         db.add(new_item)
         db.commit()
@@ -1905,8 +1983,10 @@ def approve_inbound_shipment(
             target = q.filter(func.coalesce(InventoryItem.box_num, "") == loc_meta["box_num"]).first()
         else:
             target = q.first()
+        spot_id = part2_location_id(db, loc_meta, label=f"{it.style.upper()}: ")
 
         if target:
+            target.location_id = spot_id
             target.quantity += it.quantity
             if it.pcs_per_box:
                 target.pcs_per_box = it.pcs_per_box
@@ -1938,7 +2018,8 @@ def approve_inbound_shipment(
                 row_pos=loc_meta["row_pos"],
                 box_num=loc_meta["box_num"],
                 pcs_per_box=it.pcs_per_box,
-                quantity=it.quantity
+                quantity=it.quantity,
+                location_id=spot_id,
             )
             db.add(new_item)
             db.flush()

@@ -11,6 +11,21 @@
   - `location_changes`: append-only record (DB trigger refuses UPDATE / DELETE / TRUNCATE) of every create / deactivate /
     reactivate, with who, when and the source file.
 
+## Part 2 locations, steps D0-D3 (same branch, not deployed)
+
+- D0 (`/locations` step 4, admin): deactivate active Part 2 rows at qty 0, preview first. Rows at spots that no longer
+  exist are always included; rows at 0 at spots that still exist (e.g. "to be counted") only when ticked. Each row gets a
+  recorded `DEACTIVATE` movement. Rows with stock and Allbirds rows are never included.
+- D1/D2 (`/locations` step 5, admin): match report (also as CSV) of active Part 2 rows to active locations; apply links
+  exactly the report: `location_id` set, a recorded 0-pc `LOCATION_LINK` movement per row. Refused while any row with stock
+  has no spot (or is linked elsewhere), or when the report is stale (409). No quantity changes.
+- D3: Part 2 create, edit, sheet IN/SET, receiving, inbound approval and reactivate resolve the spot and set
+  `location_id`. With `PART2_LOCATIONS_ENFORCED=1` a spot that is not an active location is refused with a 409 naming the
+  spot (a sheet is not saved at all). Off by default until D2 is done. Allbirds is never checked or linked.
+- API (ADMIN only): `GET /api/locations/empty-rows/preview`, `POST .../empty-rows/apply`, `GET /api/locations/link/preview`,
+  `GET .../link/report.csv`, `POST .../link/apply`.
+- Deploy steps: `docs/DEPLOY_PART2_LOCATIONS.md` (staging sets `LOCATION_LABEL_BASE_URL` to the staging address).
+
 ## Part 2 locations, step E (same branch, not deployed)
 
 - Zebra label PDF, one label per page: `GET /api/locations/labels.pdf?code=R3-S5-L2` | `?row=3` (or `WALL`, `SPECIAL`) |

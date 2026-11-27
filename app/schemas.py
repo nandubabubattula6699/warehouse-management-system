@@ -197,3 +197,11 @@ class LocationImportPayload(BaseModel):
     filename: str
     data_base64: str
     plan_hash: Optional[str] = None
+
+class EmptyRowsApplyPayload(BaseModel):
+    """D0: plan_hash from the preview; include_ids = ticked rows from the 'at existing locations' list."""
+    plan_hash: str
+    include_ids: List[int] = []
+
+class LinkApplyPayload(BaseModel):
+    plan_hash: str

@@ -130,6 +130,99 @@ document.getElementById("applyBtn").addEventListener("click", async () => {
   loadSummary();
 });
 
+// ---- D0: deactivate empty Part 2 rows
+let emptyPlan = null;
+
+function rowLine(r) {
+  return `${r.style} · ${r.color || ""} · ${r.size || ""} · ${r.location} → ${r.code} · ${r.quantity} pcs`;
+}
+
+async function getJson(url) {
+  const res = await fetch(url);
+  let data = {};
+  try { data = await res.json(); } catch (e) { /* non-JSON */ }
+  return { res, data };
+}
+
+document.getElementById("emptyPreviewBtn").addEventListener("click", async () => {
+  const { res, data } = await getJson("/api/locations/empty-rows/preview");
+  if (!res.ok) { showToast(data.detail || "Preview failed", "error"); return; }
+  emptyPlan = data;
+  const box = document.getElementById("emptyResult");
+  box.textContent = "";
+  box.appendChild(listBlock("Always deactivated: spot no longer exists", data.outside.map(rowLine), "border-amber-500/40 text-amber-200"));
+  const wrap = el("div", "rounded-xl border border-sky-500/40 p-3 text-sky-200");
+  wrap.appendChild(el("div", "font-bold mb-1", `At spots that still exist, only if ticked (${data.inside.length})`));
+  const list = el("div", "space-y-0.5 max-h-48 overflow-y-auto");
+  data.inside.forEach(r => {
+    const label = el("label", "flex items-center gap-2");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "empty-include";
+    cb.value = String(r.id);
+    label.appendChild(cb);
+    label.appendChild(el("span", "", rowLine(r)));
+    list.appendChild(label);
+  });
+  wrap.appendChild(list);
+  box.appendChild(wrap);
+  box.hidden = false;
+  const can = data.outside.length > 0 || data.inside.length > 0;
+  document.getElementById("emptyApplyBtn").disabled = !can;
+  document.getElementById("emptyHint").textContent = can ? "" : "No empty Part 2 rows.";
+});
+
+document.getElementById("emptyApplyBtn").addEventListener("click", async () => {
+  if (!emptyPlan) return;
+  const include = [...document.querySelectorAll(".empty-include:checked")].map(cb => parseInt(cb.value, 10));
+  const n = emptyPlan.outside.length + include.length;
+  if (!n) { showToast("Nothing selected", "error"); return; }
+  if (!confirm(`Deactivate ${n} Part 2 row(s) at qty 0 (${emptyPlan.outside.length} at old spots + ${include.length} ticked)?\n\nEach one is recorded with your name. Rows are never deleted.`)) return;
+  const { res, data } = await post("/api/locations/empty-rows/apply", { plan_hash: emptyPlan.plan_hash, include_ids: include });
+  if (!res.ok) { showToast(data.detail || "Nothing was changed", "error"); return; }
+  showToast(`Deactivated ${data.deactivated} row(s)`, "success");
+  emptyPlan = null;
+  document.getElementById("emptyApplyBtn").disabled = true;
+  document.getElementById("emptyResult").hidden = true;
+});
+
+// ---- D1 / D2: link Part 2 stock to locations
+let linkPlan = null;
+
+document.getElementById("linkPreviewBtn").addEventListener("click", async () => {
+  const { res, data } = await getJson("/api/locations/link/preview");
+  if (!res.ok) { showToast(data.detail || "Report failed", "error"); return; }
+  linkPlan = data;
+  const box = document.getElementById("linkResult");
+  box.textContent = "";
+  const counts = el("div", "grid grid-cols-2 md:grid-cols-5 gap-3 text-center");
+  counts.appendChild(countBox("will be linked", data.counts.will_link, "text-emerald-300"));
+  counts.appendChild(countBox("pieces in them", data.will_link_pieces, "text-emerald-300"));
+  counts.appendChild(countBox("already linked", data.counts.linked_ok));
+  counts.appendChild(countBox("no spot, with stock", data.counts.unmatched_stock, data.counts.unmatched_stock ? "text-red-300" : ""));
+  counts.appendChild(countBox("no spot, at qty 0", data.counts.unmatched_empty));
+  box.appendChild(counts);
+  box.appendChild(el("div", "text-slate-300", `After linking: ${data.linked_after.rows} rows / ${data.linked_after.pieces} pcs linked. ` +
+    "Per row: " + data.per_row.map(r => `Row ${r.row}: ${r.rows} / ${r.pieces}`).join(" · ")));
+  if (data.unmatched_stock.length) box.appendChild(listBlock("Rows WITH STOCK and no active spot: fix these first (refused)", data.unmatched_stock.map(rowLine), "border-red-500/50 text-red-200"));
+  if (data.linked_other.length) box.appendChild(listBlock("Linked to a different spot: check these first (refused)", data.linked_other.map(r => rowLine(r) + ` · linked to ${r.linked_to}`), "border-red-500/50 text-red-200"));
+  if (data.unmatched_empty.length) box.appendChild(listBlock("At qty 0 with no spot (skipped; see step 4)", data.unmatched_empty.map(rowLine), "border-slate-600 text-slate-300"));
+  box.hidden = false;
+  document.getElementById("linkApplyBtn").disabled = !data.can_apply;
+  document.getElementById("linkHint").textContent = data.can_apply ? "" :
+    (data.counts.will_link ? "Not possible until the red lists are empty." : "Nothing to link.");
+});
+
+document.getElementById("linkApplyBtn").addEventListener("click", async () => {
+  if (!linkPlan) return;
+  if (!confirm(`Link ${linkPlan.counts.will_link} Part 2 row(s) (${linkPlan.will_link_pieces} pcs) to their locations?\n\nQuantities do not change. Each link is recorded with your name.`)) return;
+  const { res, data } = await post("/api/locations/link/apply", { plan_hash: linkPlan.plan_hash });
+  if (!res.ok) { showToast(data.detail || "Nothing was changed", "error"); return; }
+  showToast(`Linked ${data.linked} row(s), ${data.pieces} pcs. Linked in total: ${data.linked_after.rows} rows / ${data.linked_after.pieces} pcs`, "success");
+  linkPlan = null;
+  document.getElementById("linkApplyBtn").disabled = true;
+});
+
 document.querySelectorAll(".label-btn").forEach(btn => btn.addEventListener("click", () => {
   const kind = btn.dataset.label;
   let qs = "all=true";
