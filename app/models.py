@@ -1,8 +1,43 @@
 from datetime import datetime
-from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, Index, Text, text, true
+from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Column, Integer, String, DateTime, ForeignKey, Identity,
+                        Index, Text, UniqueConstraint, func, text, true)
 from sqlalchemy.orm import relationship
 from .database import Base
 from .inventory_slots import ACTIVE_SLOT_EXPRESSIONS, ACTIVE_SLOT_INDEX, ACTIVE_SLOT_WHERE
+from .location_codes import ITEM_LOCATION_CHECK, ITEM_LOCATION_CHECK_NAME, LOCATION_CHECKS
+
+
+class Location(Base):
+    """
+    Part 2 location master (migration 0004): one row per physical spot, e.g. R3-S5-L2, R3-GF-L1, W-SB-L2, R-RECV.
+    Codes and their checks: app/location_codes.py. Never deleted: deactivated (is_active = false).
+    Part 1 (Allbirds, Lines) keeps using warehouse_locations and is not linked here.
+    """
+    __tablename__ = "locations"
+
+    id = Column(BigInteger, Identity(always=True), primary_key=True)
+    code = Column(String(30), nullable=False)
+    location_type = Column(String(20), nullable=False)    # STORAGE | RECEIVING | STAGING | DAMAGE
+    area = Column(String(20), nullable=True)              # STORAGE only: SHELF | GROUND_FRONT | GROUND_BACK | WALL_FRONT | WALL_BACK
+    row_no = Column(Integer, nullable=True)
+    section_no = Column(Integer, nullable=True)
+    level_no = Column(Integer, nullable=True)
+    putaway_sequence = Column(Integer, nullable=True)     # walking order from the dock (later)
+    max_cartons = Column(Integer, nullable=True)          # optional capacity, not used yet
+    is_active = Column(Boolean, nullable=False, default=True, server_default=true())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_by = Column(Integer, ForeignKey("warehouse_users.id", ondelete="RESTRICT"), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+    updated_by = Column(Integer, ForeignKey("warehouse_users.id", ondelete="RESTRICT"), nullable=True)
+    row_version = Column(Integer, nullable=False, server_default=text("1"))
+
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_locations_code"),
+        Index("ix_locations_created_by", "created_by"),
+        Index("ix_locations_updated_by", "updated_by"),
+        Index("ix_locations_row_area", "row_no", "area", "section_no", "level_no"),
+        *[CheckConstraint(sql, name=name) for name, sql in LOCATION_CHECKS.items()],
+    )
 
 
 class WarehouseLocation(Base):
@@ -48,10 +83,14 @@ class InventoryItem(Base):
     quantity = Column(Integer, default=0, nullable=False, index=True)
     # False = deactivated: hidden from lookups/maps/picking, kept for its stock history (never deleted).
     is_active = Column(Boolean, nullable=False, default=True, server_default=true(), index=True)
+    # Part 2 only (DB check): link to the locations master. Empty until a recorded linking step fills it.
+    location_id = Column(BigInteger, ForeignKey("locations.id", ondelete="RESTRICT",
+                                                 name="fk_inventory_items_location_id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
+        CheckConstraint(ITEM_LOCATION_CHECK, name=ITEM_LOCATION_CHECK_NAME),
         Index("idx_item_style_loc", "style", "location"),
         Index("idx_item_style_size_color", "style", "size", "color"),
         Index("idx_item_part_line_sec", "warehouse_part", "line", "row_pos", "section", "level"),

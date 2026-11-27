@@ -55,7 +55,7 @@
    - **Part 2 location names (decided 2026-11-21; replaces the old "level = number" rule). Every location always has a level:**
      - shelf `R<row>-S<section>-L<level>` (e.g. `R3-S5-L2`);
      - ground front `R<row>-GF-L<level>`; ground back `R<row>-GB-L<level>`;
-     - wall `W-S<section>-L<level>`;
+     - wall: **no section numbers** (owner 2026-11-26): wall front `W-SF-L<level>`, wall back `W-SB-L<level>` (e.g. `W-SF-L1`, `W-SB-L2`);
      - special `R-RECV`, `R-STAGE`, `R-DAMAGE`.
    - **Draft layout (2026-11-21):** `C:\WMS-backups\part2_layout_draft.xlsx` (outside the repo, from a local restore of that morning's backup). Every spot must be confirmed on the floor. Found, to check on the floor:
      - stock in row 15 (146 rows), which is not in the app's Rows 1-14 location map (Part 2 is Rows 1-16: decision 6);
@@ -128,7 +128,7 @@
    - **Open layout questions:**
      - Ground Front = staging side, and Ground Back = wall side?
      - Where is the receiving door?
-     - Wall: which sections and levels?
+     - Wall: which levels on the front side (`W-SF`) and on the back side (`W-SB`)? Today's wall stock is stored as BACK.
      - Are Rows 1-3, 10 and 14 still ground-only?
 7. **Part 2 full replacement in PRODUCTION (2026-11-24, owner's explicit OK, uploads done by the owner).**
    - **Current state = v2 (the "original" full count, 12:10-12:21).** It replaced the morning run (v1).

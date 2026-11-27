@@ -22,7 +22,7 @@ from tests.conftest import ROOT, TEST_DB_URL, _ensure_database_exists
 MIGR_DB_URL = urlunsplit(urlsplit(TEST_DB_URL)._replace(path="/warehouse_migrations_test"))
 assert urlsplit(MIGR_DB_URL).path.endswith("_test")  # same local *_test safety rule as conftest
 
-HEAD = "0003"
+HEAD = "0004"
 
 
 def test_models_match_migrated_schema():
@@ -150,7 +150,8 @@ def test_0001a_aligns_drifted_database_and_changes_no_row(migr_engine):
     assert [defaults[c] for c in ("brand", "warehouse_part", "placement_type")] == [None, None, None]
     with migr_engine.connect() as conn:
         after = conn.execute(text("SELECT * FROM inventory_items ORDER BY id")).fetchall()
-    assert [r[:-1] for r in after] == [tuple(r) for r in before]  # last column = is_active (new in 0002)
+    n = len(before[0])  # columns added later (is_active in 0002, location_id in 0004) come after these
+    assert [tuple(r[:n]) for r in after] == [tuple(r) for r in before]
 
 
 def test_compare_schema_ignores_column_order(tmp_path):
@@ -310,3 +311,40 @@ def test_baseline_downgrade_needs_explicit_flag(migr_engine):
     assert "Refusing to downgrade below the baseline" in r.stderr
     _alembic("downgrade", "base", extra_env={"ALLOW_BASELINE_DOWNGRADE": "1"})
     assert not inspect(migr_engine).has_table("inventory_items")
+
+
+def test_0004_adds_locations_without_changing_any_row(migr_engine):
+    """0004 only adds the locations table and an EMPTY location_id: no inventory row changes, in any part."""
+    _alembic("upgrade", "0003")
+    with migr_engine.begin() as conn:
+        _insert_line_cartons(conn)
+        _insert_p2(conn, "VDBP-039", 24)
+        cols = ("id, style, brand, warehouse_part, placement_type, color, size, line, section, level, row_pos, box_num, "
+                "location_code, location, pcs_per_box, quantity, is_active, created_at, updated_at")
+        before = conn.execute(text(f"SELECT {cols} FROM inventory_items ORDER BY id")).fetchall()
+    line_before = _line_snapshot(migr_engine)
+
+    _alembic("upgrade", "0004")
+    with migr_engine.connect() as conn:
+        assert conn.execute(text(f"SELECT {cols} FROM inventory_items ORDER BY id")).fetchall() == before
+        assert conn.execute(text("SELECT count(*) FROM inventory_items WHERE location_id IS NOT NULL")).scalar() == 0
+        assert conn.execute(text("SELECT count(*) FROM locations")).scalar() == 0
+    assert _line_snapshot(migr_engine) == line_before
+
+    _alembic("downgrade", "0003")
+    assert "location_id" not in {c["name"] for c in inspect(migr_engine).get_columns("inventory_items")}
+    assert _line_snapshot(migr_engine) == line_before
+
+
+def test_0004_downgrade_refuses_while_rows_are_linked(migr_engine):
+    _alembic("upgrade", "0004")
+    with migr_engine.begin() as conn:
+        conn.execute(text("INSERT INTO warehouse_users (username, full_name, password_hash, role, assigned_zone, "
+                          "is_approved) VALUES ('a', 'A', 'x', 'ADMIN', 'ALL_ZONES', 1)"))
+        conn.execute(text("INSERT INTO locations (code, location_type, area, row_no, section_no, level_no, created_by) "
+                          "VALUES ('R4-S21-L1', 'STORAGE', 'SHELF', 4, 21, 1, 1)"))
+        _insert_p2(conn, "VDBP-039", 24)
+        conn.execute(text("UPDATE inventory_items SET location_id = (SELECT id FROM locations)"))
+    r = _alembic("downgrade", "0003", ok=False)
+    assert r.returncode != 0 and "Downgrade 0004 refused" in r.stderr
+    assert f"{HEAD} (head)" in _alembic("current").stdout

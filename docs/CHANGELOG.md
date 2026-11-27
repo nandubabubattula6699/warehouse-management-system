@@ -1,5 +1,14 @@
 # Changelog
 
+## Part 2 locations, step B (branch `feature/part2-locations`, not deployed)
+
+- Migration `0004`: new table `locations` (Part 2 location master) and an empty, nullable `inventory_items.location_id`.
+  - Codes: shelf `R<row>-S<section>-L<level>`, ground `R<row>-GF-L<level>` / `R<row>-GB-L<level>`, wall `W-SF-L<level>` /
+    `W-SB-L<level>` (no section numbers), special `R-RECV` / `R-STAGE` / `R-DAMAGE`. Check constraints keep every code equal to
+    its coordinates (`app/location_codes.py`); every storage spot has a level >= 1; codes unique; `created_by` required.
+  - `location_id` can only be set on Part 2 rows (DB check), so Allbirds can never be linked. FK is `ON DELETE RESTRICT`.
+  - Creates no locations and changes no inventory row. Downgrade refuses while any row is linked.
+
 ## Phase 1b: foundation (branch `phase-1b-foundation`)
 
 - **Alembic**

@@ -77,7 +77,7 @@ from app.database import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import WarehouseUser  # noqa: E402
 
-TABLES = ["stock_movements", "inventory_items", "inbound_shipment_items", "inbound_shipments",
+TABLES = ["stock_movements", "inventory_items", "locations", "inbound_shipment_items", "inbound_shipments",
           "warehouse_users", "warehouse_locations"]
 
 PASSWORD = "Correct-Horse-Battery-9"
